@@ -118,8 +118,28 @@ export default function Home() {
     soundEngine.unlockAudio();
     if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia){const message='เบราว์เซอร์บล็อกกล้องบน HTTP ให้เปิดผ่าน HTTPS หรือ localhost';setScanMessage({ok:false,title:'ต้องใช้การเชื่อมต่อที่ปลอดภัย',detail:message});setToast(message);return;}
     setScanMessage({ok:true,title:'กำลังขอใช้กล้อง',detail:'อนุญาตสิทธิ์ Camera ในหน้าต่างของเบราว์เซอร์'});
-    try{const {Html5Qrcode}=await import('html5-qrcode');const scanner=new Html5Qrcode('aru-reader');scannerRef.current=scanner;await scanner.start({facingMode:'environment'},{fps:20,qrbox:{width:260,height:260}},(text)=>{void scanPayload(text)},()=>{});setScannerOn(true);setScanMessage({ok:true,title:'กล้องพร้อมทำงาน',detail:'เล็ง QR Code ให้อยู่ในกรอบเพื่อสแกน'});}
-    catch(error){const detail=error instanceof Error?error.message:String(error);let message='เปิดกล้องไม่ได้';if(/NotAllowed|Permission|denied/i.test(detail))message='ยังไม่ได้รับอนุญาตใช้กล้อง กรุณาเปิดสิทธิ์ Camera ในการตั้งค่าเว็บไซต์';else if(/NotFound|device.*not found/i.test(detail))message='ไม่พบกล้องบนอุปกรณ์นี้';else if(/NotReadable|TrackStart|busy/i.test(detail))message='กล้องกำลังถูกใช้งานโดยแอปอื่น กรุณาปิดแอปนั้นแล้วลองใหม่';setScannerOn(false);setScanMessage({ok:false,title:message,detail});setToast(message);if(scannerRef.current){try{await scannerRef.current.stop();await scannerRef.current.clear()}catch{}scannerRef.current=null;}}
+    try{
+      const {Html5Qrcode}=await import('html5-qrcode');
+      const scanner=new Html5Qrcode('aru-reader');
+      scannerRef.current=scanner;
+      const cameras=await Html5Qrcode.getCameras();
+      if(!cameras.length)throw new DOMException('ไม่พบกล้องที่เชื่อมต่ออยู่','NotFoundError');
+      const camera=cameras.find(({label})=>/back|rear|environment|หลัง/i.test(label))||cameras[0];
+      await scanner.start(camera.id,{fps:20,qrbox:{width:260,height:260}},(text)=>{void scanPayload(text)},()=>{});
+      setScannerOn(true);
+      setScanMessage({ok:true,title:'กล้องพร้อมทำงาน',detail:`กำลังใช้กล้อง ${camera.label||'เริ่มต้น'} · เล็ง QR Code ให้อยู่ในกรอบ`});
+    }
+    catch(error){
+      const name=error instanceof Error?error.name:'';
+      const detail=error instanceof Error?`${error.name}: ${error.message}`:String(error);
+      let message='เปิดกล้องไม่ได้';
+      if(/NotAllowed|Permission|denied|Security/i.test(`${name} ${detail}`))message='ยังไม่ได้รับอนุญาตใช้กล้อง กรุณาเปิดสิทธิ์ Camera สำหรับเว็บไซต์นี้';
+      else if(/NotFound|device.*not found/i.test(`${name} ${detail}`))message='ไม่พบกล้องบนอุปกรณ์นี้';
+      else if(/NotReadable|TrackStart|busy/i.test(`${name} ${detail}`))message='กล้องกำลังถูกใช้งานโดยแอปอื่น กรุณาปิดแอปนั้นแล้วลองใหม่';
+      else if(/Overconstrained|constraint/i.test(`${name} ${detail}`))message='เบราว์เซอร์เลือกกล้องนี้ไม่ได้ กรุณาอนุญาตสิทธิ์กล้องแล้วลองใหม่';
+      setScannerOn(false);setScanMessage({ok:false,title:message,detail});setToast(message);
+      if(scannerRef.current){try{await scannerRef.current.stop();await scannerRef.current.clear()}catch{}scannerRef.current=null;}
+    }
   }
   async function stopScanner(){if(scannerRef.current){try{await scannerRef.current.stop();await scannerRef.current.clear()}catch{}scannerRef.current=null;}setScannerOn(false);}
   async function setScanMode(){const nextMode=currentEvent.scan_mode==='CHECKIN'?'CHECKOUT':'CHECKIN';if(isSupabaseConfigured&&supabase&&/^[0-9a-f-]{36}$/i.test(activeEvent)){if(!sessionToken){setToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');return;}const {data,error}=await supabase.rpc('set_event_scan_mode',{p_session_token:sessionToken,p_event_id:activeEvent,p_scan_mode:nextMode});if(error||!data?.success){setToast(data?.message||error?.message||'เปลี่ยนโหมดสแกนไม่สำเร็จ');return;}}save({...store,events:store.events.map(e=>e.id===activeEvent?{...e,scan_mode:nextMode}:e)});setScanMessage({ok:true,title:`เปิดโหมด${nextMode==='CHECKIN'?'เช็กอิน':'เช็กเอาต์'}`,detail:'สแกน QR Code ถัดไปเพื่อดำเนินการ'});}
