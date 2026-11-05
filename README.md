@@ -11,7 +11,7 @@
 
 ## เชื่อมต่อ Supabase Cloud
 
-1. สร้าง Supabase project แล้วรันไฟล์ใน `supabase/migrations/` ตามลำดับเลขใน SQL Editor หากใช้โปรเจกต์เดิม ให้รันเฉพาะ migration ที่ยังไม่เคยรัน โดยเรียงตามเลข (โปรเจกต์ที่ตั้งค่าถึง `002` แล้ว ต้องรันทั้ง `003` และ `004`)
+1. สร้าง Supabase project แล้วรันไฟล์ใน `supabase/migrations/` ตามลำดับเลขใน SQL Editor หากใช้โปรเจกต์เดิม ให้รันเฉพาะ migration ที่ยังไม่เคยรัน โดยเรียงตามเลข (โปรเจกต์ที่ตั้งค่าถึง `002` แล้ว ต้องรัน `003` ถึง `005`)
 2. คัดลอก `.env.example` เป็น `.env.local` แล้วกรอก Project URL กับ publishable key จาก Project Settings → API Keys
 3. ปิดและเปิด dev server ใหม่
 4. ตรวจว่า `event_registrations` และ `event_passcodes` อยู่ใน publication `supabase_realtime` (migration เพิ่มให้เมื่อ publication มีอยู่แล้ว)
