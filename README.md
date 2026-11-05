@@ -11,7 +11,7 @@
 
 ## เชื่อมต่อ Supabase Cloud
 
-1. สร้าง Supabase project แล้วรัน [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql) ใน SQL Editor
+1. สร้าง Supabase project แล้วรันไฟล์ใน `supabase/migrations/` ตามลำดับเลขใน SQL Editor (โปรเจกต์เดิมที่ใช้ `001_init.sql` แล้ว ให้รัน [`002_admin_update_event_redirect.sql`](supabase/migrations/002_admin_update_event_redirect.sql) เพิ่ม)
 2. คัดลอก `.env.example` เป็น `.env.local` แล้วกรอก Project URL กับ publishable key จาก Project Settings → API Keys
 3. ปิดและเปิด dev server ใหม่
 4. ตรวจว่า `event_registrations` และ `event_passcodes` อยู่ใน publication `supabase_realtime` (migration เพิ่มให้เมื่อ publication มีอยู่แล้ว)

@@ -16,6 +16,7 @@ class ScannerSoundEngine {
 
   private tone(frequency: number, duration: number, type: OscillatorType, offset = 0, volume = 0.3) {
     if (!this.context) return;
+    if (this.context.state === 'suspended') void this.context.resume().catch(() => {});
     const start = this.context.currentTime + offset;
     const oscillator = this.context.createOscillator();
     const gain = this.context.createGain();
