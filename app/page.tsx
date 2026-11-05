@@ -43,6 +43,10 @@ function genId():string {
   const hex=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
   return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
 }
+async function hashSessionToken(token:string):Promise<string>{
+  const bytes=await globalThis.crypto.subtle.digest('SHA-256',new TextEncoder().encode(token));
+  return Array.from(new Uint8Array(bytes),byte=>byte.toString(16).padStart(2,'0')).join('');
+}
 function parseCsvLine(line:string):string[]{
   const fields:string[]=[];let value='';let quoted=false;
   for(let i=0;i<line.length;i++){
@@ -85,6 +89,8 @@ export default function Home() {
   const [mobileNav,setMobileNav]=useState(false);
   const scannerRef=useRef<{clear:()=>void|Promise<void>;stop:()=>Promise<void>}|null>(null);
   const cooldown=useRef<Map<string,number>>(new Map());
+  const eventsRef=useRef(store.events);
+  eventsRef.current=store.events;
   const selected=store.events.find(e=>e.id===selectedEvent)||store.events[0]||initialStore.events[0];
   const currentEvent=store.events.find(e=>e.id===activeEvent)||store.events[0]||initialStore.events[0];
   const studentRegs=useMemo(()=>store.regs.filter(r=>r.user_id===user?.id),[store.regs,user?.id]);
@@ -97,29 +103,40 @@ export default function Home() {
   useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(''),2800);return()=>clearTimeout(t)},[toast]);
   useEffect(()=>{
     const client=supabase;
-    if(!user||user.role!=='STUDENT'||!client)return;
-    const refresh=()=>{if(sessionToken)void client.rpc('load_workspace',{p_session_token:sessionToken}).then(({data,error})=>{if(!error&&data?.success)setStore(workspaceStore(data));});};
-    const ch=client.channel(`student-${user.id}`)
-      .on('postgres_changes',{event:'*',schema:'public',table:'event_registrations',filter:`user_id=eq.${user.id}`},(payload)=>{
-        const row=payload.new as Record<string,unknown>;
-        if(row?.event_id){
-          setStore(old=>({...old,regs:old.regs.map(r=>r.event_id===row.event_id&&r.user_id===user.id?{
-            ...r,
-            status:(row.status as Status)||r.status,
-            checkin_at:(row.checkin_at as string)||r.checkin_at,
-            checkout_at:(row.checkout_at as string)||r.checkout_at,
-          }:r)}));
-          const event=store.events.find(e=>e.id===row.event_id);
-          const scanSucceeded=row.status==='ATTENDING'||row.status==='COMPLETED';
-          if(Number(user.study_year)===1&&scanSucceeded&&event?.redirect_url_year1){setToast('สแกนสำเร็จ · กำลังเปิดหน้ากิจกรรม');window.setTimeout(()=>window.location.assign(event.redirect_url_year1),1400);return;}
-        }
-        refresh();
-        setToast(row?.status==='COMPLETED'?'เช็กเอาต์สำเร็จ · เข้าร่วมกิจกรรมสำเร็จ':'สถานะกิจกรรมอัปเดตแล้ว');
-      })
-      .on('postgres_changes',{event:'*',schema:'public',table:'event_passcodes',filter:`assigned_to=eq.${user.id}`},()=>{refresh();setToast('ข้อมูล Passcode อัปเดตแล้ว');})
-      .subscribe();
-    return()=>{void client.removeChannel(ch)};
-  },[user,store.events,sessionToken]);
+    if(!user||user.role!=='STUDENT'||!client||!sessionToken)return;
+    let disposed=false;
+    let channel:ReturnType<typeof client.channel>|undefined;
+    let pollTimer:ReturnType<typeof setInterval>|undefined;
+    const refresh=()=>{if(sessionToken)void client.rpc('load_workspace',{p_session_token:sessionToken}).then(({data,error})=>{if(!disposed&&!error&&data?.success)setStore(workspaceStore(data));});};
+    const startFallback=()=>{if(!pollTimer)pollTimer=setInterval(refresh,2500);};
+    const stopFallback=()=>{if(pollTimer){clearInterval(pollTimer);pollTimer=undefined;}};
+    const receiveUpdate=(message:{event_id?:string;user_id?:string;status?:Status;checkin_at?:string|null;checkout_at?:string|null;operation?:string})=>{
+      if(message.user_id!==user.id||!message.event_id)return;
+      if(message.operation==='DELETE'){
+        setStore(old=>({...old,regs:old.regs.filter(reg=>!(reg.event_id===message.event_id&&reg.user_id===user.id))}));
+        void refresh();
+        return;
+      }
+      if(message.status){
+        setStore(old=>({...old,regs:old.regs.map(reg=>reg.event_id===message.event_id&&reg.user_id===user.id?{...reg,status:message.status!,checkin_at:message.checkin_at||reg.checkin_at,checkout_at:message.checkout_at||reg.checkout_at}:reg)}));
+        const event=eventsRef.current.find(item=>item.id===message.event_id);
+        const scanSucceeded=message.status==='ATTENDING'||message.status==='COMPLETED';
+        if(Number(user.study_year)===1&&scanSucceeded&&event?.redirect_url_year1){setToast('สแกนสำเร็จ · กำลังเปิดหน้ากิจกรรม');window.setTimeout(()=>window.location.assign(event.redirect_url_year1),1400);}
+        else if(scanSucceeded)setToast(message.status==='COMPLETED'?'เข้าร่วมกิจกรรมสำเร็จ':'เช็กอินสำเร็จ · สถานะอัปเดตแล้ว');
+      }
+      void refresh();
+    };
+    void hashSessionToken(sessionToken).then(tokenHash=>{
+      if(disposed)return;
+      channel=client.channel(`aru-student:${tokenHash}`,{config:{private:true}})
+        .on('broadcast',{event:'registration_status'},({payload})=>receiveUpdate(payload as Parameters<typeof receiveUpdate>[0]))
+        .subscribe(status=>{
+          if(status==='SUBSCRIBED'){stopFallback();refresh();}
+          else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED')startFallback();
+        });
+    }).catch(()=>startFallback());
+    return()=>{disposed=true;stopFallback();if(channel)void client.removeChannel(channel);};
+  },[user?.id,user?.role,user?.study_year,sessionToken]);
 
   async function enterAs() {
     if(isSupabaseConfigured&&supabase) {
