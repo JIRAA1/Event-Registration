@@ -5,5 +5,13 @@ const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || proce
 
 export const isSupabaseConfigured = Boolean(url && publishableKey && url.startsWith('https://'));
 export const supabase: SupabaseClient | null = isSupabaseConfigured
-  ? createClient(url!, publishableKey!, { auth: { persistSession: true, autoRefreshToken: true } })
+  // This app uses its own short-lived app_sessions token via RPC, not Supabase Auth.
+  // Do not restore an unrelated/stale Supabase Auth JWT from browser storage on RPC calls.
+  ? createClient(url!, publishableKey!, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    })
   : null;
