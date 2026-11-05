@@ -47,18 +47,20 @@ async function hashSessionToken(token:string):Promise<string>{
   const bytes=await globalThis.crypto.subtle.digest('SHA-256',new TextEncoder().encode(token));
   return Array.from(new Uint8Array(bytes),byte=>byte.toString(16).padStart(2,'0')).join('');
 }
-function parseCsvLine(line:string):string[]{
+function parseCsvLine(line:string,delimiter=','):string[]{
   const fields:string[]=[];let value='';let quoted=false;
   for(let i=0;i<line.length;i++){
     const char=line[i];
     if(char==='"'&&quoted&&line[i+1]==='"'){value+='"';i++;}
     else if(char==='"')quoted=!quoted;
-    else if(char===','&&!quoted){fields.push(value.trim());value='';}
+    else if(char===delimiter&&!quoted){fields.push(value.trim());value='';}
     else value+=char;
   }
   fields.push(value.trim());
   return fields;
 }
+function westernDigits(value:string){return value.replace(/[๐-๙]/g,d=>String(d.charCodeAt(0)-0x0e50));}
+function csvHeaderKey(value:string){return value.replace(/^\uFEFF/,'').trim().toLocaleLowerCase('th').replace(/[\s_-]+/g,'');}
 function cx(...parts:(string|false|undefined|null)[]) { return parts.filter(Boolean).join(' '); }
 function initials(name:string) { return name.split(' ').map(w=>w[0]).slice(0,2).join(''); }
 function formatThaiDate(date=new Date()) { return new Intl.DateTimeFormat('th-TH',{day:'numeric',month:'short',year:'numeric'}).format(date); }
@@ -259,10 +261,50 @@ export default function Home() {
   async function createStaffAccount(ev:React.FormEvent<HTMLFormElement>){ev.preventDefault();if(!user||user.role!=='ADMIN'){setToast('รายการนี้สงวนสิทธิ์สำหรับแอดมิน');return;}const form=new FormData(ev.currentTarget),username=String(form.get('username')).trim(),password=String(form.get('password')),fullName=String(form.get('full_name')).trim(),role=String(form.get('role')) as 'STAFF'|'ADMIN',faculty=String(form.get('faculty')||''),major=String(form.get('major')||'');if(username.length<3||password.length<8||fullName.length<2){setToast('กรุณาตรวจข้อมูลและใช้รหัสผ่านอย่างน้อย 8 ตัวอักษร');return;}if(store.users.some(u=>u.student_id===username)){setToast('ชื่อผู้ใช้นี้มีในระบบแล้ว');return;}let createdId=genId();if(isSupabaseConfigured&&supabase){if(!sessionToken){setToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบแอดมินใหม่');return;}const {data,error}=await supabase.rpc('admin_create_user',{p_admin_token:sessionToken,p_username:username,p_password:password,p_full_name:fullName,p_role:role,p_faculty:faculty||null,p_major:major||null});if(error||!data?.success){setToast(data?.message||error?.message||'สร้างบัญชีไม่สำเร็จ');return;}createdId=String(data.user?.id||createdId);}const newUser:User={id:createdId,student_id:username,full_name:fullName,faculty:faculty||'องค์การนักศึกษา',major:major||roleName(role),class_group:role,enrollment_year:0,study_year:0,role};save({...store,users:[...store.users,newUser]});setModal(null);setToast(`เพิ่มบัญชี${role==='ADMIN'?'แอดมิน':'สตาฟ'}สำเร็จ`);}
   async function importCsv(){
     if(!csvFile)return;
-    const rows=(await csvFile.text()).split(/\r?\n/).slice(1).filter(Boolean).map(parseCsvLine);
-    const students=rows.map(([student_id,full_name,faculty,major,class_group,enrollment_year,birth_date,phone])=>({
-      student_id,full_name,faculty,major,class_group,enrollment_year:Number(enrollment_year)||2569,birth_date,phone,
-    })).filter(student=>student.student_id&&student.full_name);
+    const csvText=(await csvFile.text()).replace(/^\uFEFF/,'');
+    const lines=csvText.split(/\r?\n/).filter(line=>line.trim());
+    if(lines.length<2){setToast('ไฟล์ CSV ต้องมีหัวตารางและข้อมูลนักศึกษาอย่างน้อย 1 แถว');return;}
+    const delimiter=(lines[0].split(';').length>lines[0].split(',').length)?';':',';
+    const headers=parseCsvLine(lines[0],delimiter).map(csvHeaderKey);
+    const headerAliases:Record<string,string[]>={
+      student_id:['student_id','รหัสนักศึกษา','รหัสประจำตัวนักศึกษา'],
+      full_name:['full_name','ชื่อ-นามสกุล','ชื่อสกุล','ชื่อและนามสกุล'],
+      faculty:['faculty','คณะ'],
+      major:['major','สาขา','สาขาวิชา'],
+      class_group:['class_group','หมู่เรียน','กลุ่มเรียน'],
+      study_year:['study_year','ชั้นปี','ชั้นปีปัจจุบัน','ชั้นปีที่กำลังศึกษา','ระดับชั้นปี','ระดับชั้นปีปัจจุบัน','ปีที่กำลังศึกษา'],
+      enrollment_year:['enrollment_year','ปีที่เข้าศึกษา','ปีการเข้า','รหัสรุ่น'],
+      birth_date:['birth_date','วันเกิด','วันเดือนปีเกิด'],
+      phone:['phone','เบอร์โทร','เบอร์โทรศัพท์','โทรศัพท์','โทรศัพท์มือถือ'],
+    };
+    const indexes=Object.fromEntries(Object.entries(headerAliases).map(([key,aliases])=>[key,headers.findIndex(header=>aliases.some(alias=>csvHeaderKey(alias)===header))])) as Record<string,number>;
+    const missing=['student_id','full_name','faculty','major','class_group','birth_date','phone'].filter(key=>indexes[key]<0);
+    if(indexes.study_year<0&&indexes.enrollment_year<0)missing.push('study_year / ชั้นปี');
+    if(missing.length){setToast(`ไม่พบหัวตาราง: ${missing.join(', ')} · รองรับชื่อคอลัมน์ภาษาไทยหรืออังกฤษ`);return;}
+    const readField=(row:string[],key:string)=>indexes[key]>=0?(row[indexes[key]]||'').trim():'';
+    const currentBuddhistYear=new Date().getFullYear()+543;
+    const students=lines.slice(1).map((line,index)=>{
+      const row=parseCsvLine(line,delimiter);
+      const student_id=westernDigits(readField(row,'student_id'));
+      const full_name=readField(row,'full_name');
+      const faculty=readField(row,'faculty');
+      const major=readField(row,'major');
+      const class_group=readField(row,'class_group');
+      const rawStudyYear=westernDigits(readField(row,'study_year')).replace(/\D/g,'');
+      const rawEnrollmentYear=westernDigits(readField(row,'enrollment_year')).replace(/\D/g,'');
+      const suppliedStudyYear=Number(rawStudyYear)||0;
+      const suppliedEnrollmentYear=Number(rawEnrollmentYear)||0;
+      const study_year=suppliedStudyYear|| (suppliedEnrollmentYear?Math.max(1,Math.min(8,currentBuddhistYear-suppliedEnrollmentYear+1)):0);
+      const enrollment_year=suppliedStudyYear?currentBuddhistYear-suppliedStudyYear+1:suppliedEnrollmentYear;
+      const birth_date=westernDigits(readField(row,'birth_date')).replace(/\D/g,'');
+      const phone=westernDigits(readField(row,'phone'));
+      if(!student_id||!full_name||!birth_date||birth_date.length!==8||study_year<1||study_year>8){
+        setToast(`ข้อมูลแถวที่ ${index+2} ไม่ครบหรือไม่ถูกต้อง · ตรวจรหัส ชื่อ ชั้นปี และวันเกิด 8 หลัก`);
+        return null;
+      }
+      return {student_id,full_name,faculty,major,class_group,enrollment_year,birth_date,phone};
+    }).filter((student):student is NonNullable<typeof student>=>student!==null);
+    if(students.length!==lines.length-1)return;
     if(isSupabaseConfigured&&supabase&&user?.role==='ADMIN'){
       if(!sessionToken){setToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบแอดมินใหม่');return;}
       const {data,error}=await supabase.rpc('admin_import_event_students',{p_admin_token:sessionToken,p_event_id:selectedEvent,p_students:students});
@@ -420,7 +462,7 @@ function AdminView({store,selectedEvent,selectedEventId,setSelectedEvent,openCre
  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><AdminMetric label="กิจกรรมทั้งหมด" value={store.events.length} note="รายการในระบบ" icon={<Activity size={17}/>} tone="rose"/><AdminMetric label="ผู้เข้าร่วม" value={store.users.filter(u=>u.role==='STUDENT').length} note="บัญชีนักศึกษา" icon={<Users size={17}/>} tone="gold"/><AdminMetric label="ลงทะเบียน" value={regs.length} note={selectedEvent.title} icon={<QrCode size={17}/>} tone="blue"/><AdminMetric label="เข้าร่วมครบแล้ว" value={completed} note="เช็กเอาต์สำเร็จ" icon={<CheckCircle2 size={17}/>} tone="green"/></div>
  <div className="grid gap-5 xl:grid-cols-[1.1fr_.9fr]"><section className="bento p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-base font-extrabold text-slate-900">การจัดการกิจกรรม</h2><p className="mt-1 text-[10px] text-slate-500">เลือกและตั้งค่าการลงทะเบียนของแต่ละกิจกรรม</p></div><select value={selectedEventId} onChange={e=>setSelectedEvent(e.target.value)} className="max-w-[240px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-bold">{store.events.map(e=><option value={e.id} key={e.id}>{e.title}</option>)}</select></div>
   <div className="mt-4 rounded-2xl border border-slate-100 p-4"><div className="flex items-start justify-between gap-3"><div><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[8px] font-bold text-emerald-700">{selectedEvent.status}</span><h3 className="mt-2 text-sm font-extrabold text-slate-900">{selectedEvent.title}</h3><p className="mt-1 text-[9px] text-slate-500">{selectedEvent.location} · {selectedEvent.activity_hours} ชั่วโมง</p></div><span className="rounded-xl bg-rose-50 p-2 text-[#7c0a02]"><BookOpen size={18}/></span></div><div className="mt-4 grid gap-3 sm:grid-cols-2"><div><label className="text-[9px] font-semibold text-slate-500">URL Redirect · รุ่นปี 1</label><div className="mt-1 flex gap-2"><input type="url" value={redirectDraft} onChange={e=>setRedirectDraft(e.target.value)} placeholder="https://..." className="h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 text-[10px]"/><button type="button" onClick={()=>void updateEvent({redirect_url_year1:redirectDraft})} className="shrink-0 rounded-lg bg-[#7c0a02] px-3 text-[9px] font-bold text-white">บันทึก URL</button></div></div><label className="text-[9px] font-semibold text-slate-500">สถานะกิจกรรม<select value={selectedEvent.status} onChange={e=>updateEvent({status:e.target.value as Event['status']})} className="mt-1 block h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-[10px]"><option value="ACTIVE">เปิดใช้งาน</option><option value="UPCOMING">กำลังจะมาถึง</option><option value="CLOSED">ปิดกิจกรรม</option></select></label></div><div className="mt-4 flex flex-wrap gap-2"><button onClick={deleteActivity} className="flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-2 text-[9px] font-bold text-rose-700"><Trash2 size={13}/>ลบกิจกรรม</button><button onClick={openCodes} className="flex items-center gap-1.5 rounded-lg bg-amber-100 px-3 py-2 text-[9px] font-bold text-amber-900"><Ticket size={13}/>เติม Passcode สำรอง</button><span className="rounded-lg bg-slate-50 px-3 py-2 text-[9px] text-slate-500">เหลือ <b className="text-slate-800">{remaining}</b> / {reserves.length} รหัสสำรอง</span></div></div>
-  <div className="mt-5"><div className="flex items-center justify-between"><div><h3 className="text-xs font-extrabold text-slate-900">นำเข้ารายชื่อนักศึกษา</h3><p className="mt-1 text-[9px] text-slate-500">CSV: student_id,full_name,faculty,major,class_group,enrollment_year,birth_date,phone</p></div><FileUp size={17} className="text-slate-400"/></div><label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-[10px] text-slate-500 hover:border-amber-400 hover:bg-amber-50"><Download size={15}/>{csvFile?csvFile.name:'เลือกไฟล์ .csv'}<input type="file" accept=".csv,text/csv" className="hidden" onChange={e=>setCsvFile(e.target.files?.[0]||null)}/></label><button disabled={!csvFile} onClick={importCsv} className="mt-2 w-full rounded-xl bg-slate-900 py-2.5 text-[10px] font-bold text-white disabled:bg-slate-300">นำเข้ารายชื่อและจับคู่ Passcode</button></div>
+  <div className="mt-5"><div className="flex items-center justify-between"><div><h3 className="text-xs font-extrabold text-slate-900">นำเข้ารายชื่อนักศึกษา</h3><p className="mt-1 text-[9px] text-slate-500">CSV: student_id,full_name,faculty,major,class_group,study_year,birth_date,phone</p><p className="mt-1 text-[9px] text-slate-400">รองรับหัวตารางภาษาไทย · ชั้นปีปัจจุบัน 1–8</p></div><FileUp size={17} className="text-slate-400"/></div><label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-[10px] text-slate-500 hover:border-amber-400 hover:bg-amber-50"><Download size={15}/>{csvFile?csvFile.name:'เลือกไฟล์ .csv'}<input type="file" accept=".csv,text/csv" className="hidden" onChange={e=>setCsvFile(e.target.files?.[0]||null)}/></label><button disabled={!csvFile} onClick={importCsv} className="mt-2 w-full rounded-xl bg-slate-900 py-2.5 text-[10px] font-bold text-white disabled:bg-slate-300">นำเข้ารายชื่อและจับคู่ Passcode</button></div>
  </section><div className="space-y-5"><div className="bento p-5"><div className="flex items-center justify-between"><div><span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Reserve Passcode Pool</span><h2 className="mt-1 text-sm font-extrabold text-slate-900">Passcode สำรองคงเหลือ</h2></div><span className="rounded-xl bg-amber-50 p-2 text-amber-600"><Ticket size={18}/></span></div><div className="mt-4 flex items-center gap-5"><div className="relative flex h-32 w-32 shrink-0 items-center justify-center rounded-full" style={{background:'conic-gradient(#d4af37 '+(reserves.length?remaining/reserves.length*360:0)+'deg,#f1f5f9 0deg)'}}><div className="flex h-24 w-24 flex-col items-center justify-center rounded-full bg-white"><b className="text-3xl text-slate-900">{remaining}</b><span className="text-[8px] text-slate-400">AVAILABLE</span></div></div><div><b className="text-xs text-slate-900">{remaining===0?'ต้องเติม Passcode':'พร้อมสำหรับ Walk-in'}</b><p className="mt-1 max-w-[180px] text-[9px] leading-5 text-slate-500">โค้ดจะถูกจับคู่ด้วย transaction ป้องกันการแจกซ้ำ</p><button onClick={openCodes} className="mt-3 rounded-lg bg-[#7c0a02] px-3 py-2 text-[9px] font-bold text-white">เติมรหัสสำรอง</button></div></div></div>
   <div className="bento p-5"><h2 className="text-sm font-extrabold text-slate-900">กิจกรรมทั้งหมด</h2><div className="mt-3 space-y-2">{store.events.map((e,i)=><button key={e.id} onClick={()=>setSelectedEvent(e.id)} className={cx('flex w-full items-center gap-3 rounded-xl p-3 text-left',e.id===selectedEventId?'bg-rose-50':'bg-slate-50 hover:bg-slate-100')}><span className={cx('flex h-8 w-8 items-center justify-center rounded-lg text-[9px] font-bold',i===0?'bg-[#7c0a02] text-white':'bg-white text-slate-500')}>0{i+1}</span><span className="min-w-0 flex-1"><b className="block truncate text-[10px] text-slate-800">{e.title}</b><small className="text-[8px] text-slate-400">{store.regs.filter(r=>r.event_id===e.id).length} ลงทะเบียน</small></span><span className={cx('h-2 w-2 rounded-full',e.status==='ACTIVE'?'bg-emerald-500':'bg-slate-300')}/></button>)}</div></div>
  </div></div>
