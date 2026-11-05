@@ -1,0 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --maroon:#7c0a02; --gold:#d4af37; --canvas:#eef1f6; }
+* { box-sizing:border-box; }
+html,body { min-height:100%; }
+body { margin:0; color:#1e293b; background:#eef1f6; font-family:'DM Sans','Noto Sans Thai',sans-serif; }
+button,input,select { font:inherit; }
+button { cursor:pointer; }
+.canvas-grid { background-color:#eef1f6; background-image:radial-gradient(#cbd2de 0.7px,transparent 0.7px); background-size:18px 18px; }
+.glass { background:rgba(255,255,255,.78); backdrop-filter:blur(18px); }
+.bento { border:1px solid rgba(255,255,255,.94); border-radius:28px; background:#fff; box-shadow:0 10px 35px rgba(37,48,69,.045); }
+.maroon-gradient { background:linear-gradient(135deg,#e11d48 0%,#991b1b 50%,#7c0a02 100%); }
+.gold-glow { box-shadow:0 0 0 5px rgba(212,175,55,.16),0 10px 28px rgba(124,10,2,.16); }
+.hex { clip-path:polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0 50%); }
+.scanner-flash-success { animation:greenflash .55s ease-out; }
+.scanner-flash-checkout { animation:goldflash .65s ease-out; }
+.scanner-flash-error { animation:redflash .55s ease-out; }
+@keyframes greenflash { 0%,100%{box-shadow:inset 0 0 0 0 transparent} 35%{box-shadow:inset 0 0 0 10px #22c55e} }
+@keyframes goldflash { 0%,100%{box-shadow:inset 0 0 0 0 transparent} 35%{box-shadow:inset 0 0 0 10px #facc15} }
+@keyframes redflash { 0%,100%{box-shadow:inset 0 0 0 0 transparent} 35%{box-shadow:inset 0 0 0 10px #ef4444} }
+input,select { outline:none; }
+input:focus,select:focus { border-color:#bda150!important; box-shadow:0 0 0 3px rgba(212,175,55,.14); }
+::selection { background:#f6d968; color:#4a0b08; }
