@@ -122,7 +122,7 @@ export default function Home() {
         const event=eventsRef.current.find(item=>item.id===message.event_id);
         const scanSucceeded=message.status==='ATTENDING'||message.status==='COMPLETED';
         if(Number(user.study_year)===1&&scanSucceeded&&event?.redirect_url_year1){setToast('สแกนสำเร็จ · กำลังเปิดหน้ากิจกรรม');window.setTimeout(()=>window.location.assign(event.redirect_url_year1),1400);}
-        else if(scanSucceeded)setToast(message.status==='COMPLETED'?'เข้าร่วมกิจกรรมสำเร็จ':'เช็กอินสำเร็จ · สถานะอัปเดตแล้ว');
+        else if(scanSucceeded)setToast(message.status==='COMPLETED'?'เข้าร่วมกิจกรรมสำเร็จ':'กำลังเข้าร่วมกิจกรรม');
       }
       void refresh();
     };
@@ -338,14 +338,14 @@ function StudentStatsView({user,events,regs}:{user:User;events:Event[];regs:Regi
 function AttendanceConfirmation({status,eventTitle}:{status?:Status;eventTitle?:string}){
   if(!status||status==='REGISTERED')return null;
   const completed=status==='COMPLETED';
-  return <section role="status" aria-live="polite" className={cx('flex items-center gap-4 rounded-2xl border p-4 shadow-sm sm:p-5',completed?'border-emerald-200 bg-emerald-50':'border-green-200 bg-green-50')}>
-    <div className={cx('flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-white shadow-md',completed?'bg-emerald-600':'bg-green-600')}><CheckCircle2 size={34} strokeWidth={2.7}/></div>
-    <div className="min-w-0 flex-1"><p className={cx('text-base font-extrabold sm:text-lg',completed?'text-emerald-900':'text-green-900')}>{completed?'เข้าร่วมสำเร็จ':'เช็กอินสำเร็จ'}</p><p className={cx('mt-0.5 text-xs font-semibold sm:text-sm',completed?'text-emerald-800':'text-green-800')}>{completed?'เจ้าหน้าที่เช็กเอาต์ให้แล้ว':'เจ้าหน้าที่เช็กอินให้แล้ว'}{eventTitle?` · ${eventTitle}`:''}</p></div>
-    <span className={cx('hidden rounded-full px-3 py-1.5 text-[10px] font-extrabold sm:inline-flex',completed?'bg-emerald-100 text-emerald-800':'bg-green-100 text-green-800')}>✓ ยืนยันแล้ว</span>
+  return <section role="status" aria-live="polite" className={cx('flex items-center gap-4 rounded-2xl border p-4 shadow-sm sm:p-5',completed?'border-emerald-200 bg-emerald-50':'border-amber-200 bg-amber-50')}>
+    <div className={cx('flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-white shadow-md',completed?'bg-emerald-600':'bg-amber-500')}>{completed?<CheckCircle2 size={34} strokeWidth={2.7}/>:<Clock3 size={32} strokeWidth={2.5}/>}</div>
+    <div className="min-w-0 flex-1"><p className={cx('text-base font-extrabold sm:text-lg',completed?'text-emerald-900':'text-amber-900')}>{completed?'เข้าร่วมกิจกรรมสำเร็จ':'กำลังเข้าร่วมกิจกรรม'}</p><p className={cx('mt-0.5 text-xs font-semibold sm:text-sm',completed?'text-emerald-800':'text-amber-800')}>{completed?'เช็กเอาต์เรียบร้อยแล้ว':'เช็กอินแล้ว · รอเช็กเอาต์'}{eventTitle?` · ${eventTitle}`:''}</p></div>
+    <span className={cx('hidden rounded-full px-3 py-1.5 text-[10px] font-extrabold sm:inline-flex',completed?'bg-emerald-100 text-emerald-800':'bg-amber-100 text-amber-800')}>{completed?'✓ สำเร็จ':'● กำลังเข้าร่วม'}</span>
   </section>;
 }
 
-function StatusPill({status}:{status:Status}){const label=status==='REGISTERED'?'รอสแกนเข้างาน':status==='ATTENDING'?'เช็กอินแล้ว':'เข้าร่วมสำเร็จ';return <span className={cx('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[8px] font-bold',status==='REGISTERED'?'bg-slate-100 text-slate-500':status==='ATTENDING'?'bg-green-100 text-green-800':'bg-emerald-100 text-emerald-800')}>{status!=='REGISTERED'&&<CheckCircle2 size={12} strokeWidth={3}/>}<span>{label}</span></span>}
+function StatusPill({status}:{status:Status}){const label=status==='REGISTERED'?'รอสแกนเข้างาน':status==='ATTENDING'?'กำลังเข้าร่วมกิจกรรม':'เข้าร่วมกิจกรรมสำเร็จ';return <span className={cx('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[8px] font-bold',status==='REGISTERED'?'bg-slate-100 text-slate-500':status==='ATTENDING'?'bg-amber-100 text-amber-800':'bg-emerald-100 text-emerald-800')}>{status==='ATTENDING'?<Clock3 size={12} strokeWidth={2.5}/>:status==='COMPLETED'?<CheckCircle2 size={12} strokeWidth={3}/>:null}<span>{label}</span></span>}
 function Empty({message}:{message:string}){return <div className="rounded-2xl border border-dashed border-slate-200 py-10 text-center text-xs text-slate-400">{message}</div>}
 
 function EventDetail({event,user,registration,back}:{event:Event;user:User;registration?:Registration;back:()=>void}){
