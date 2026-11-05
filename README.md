@@ -11,7 +11,7 @@
 
 ## เชื่อมต่อ Supabase Cloud
 
-1. สร้าง Supabase project แล้วรันไฟล์ใน `supabase/migrations/` ตามลำดับเลขใน SQL Editor (โปรเจกต์เดิมที่ใช้ `001_init.sql` แล้ว ให้รัน [`002_admin_update_event_redirect.sql`](supabase/migrations/002_admin_update_event_redirect.sql) เพิ่ม)
+1. สร้าง Supabase project แล้วรันไฟล์ใน `supabase/migrations/` ตามลำดับเลขใน SQL Editor หากใช้โปรเจกต์เดิม ให้รันเฉพาะ migration ที่ยังไม่เคยรัน โดยเรียงตามเลข (โปรเจกต์ที่ตั้งค่าถึง `002` แล้ว ต้องรันทั้ง `003` และ `004`)
 2. คัดลอก `.env.example` เป็น `.env.local` แล้วกรอก Project URL กับ publishable key จาก Project Settings → API Keys
 3. ปิดและเปิด dev server ใหม่
 4. ตรวจว่า `event_registrations` และ `event_passcodes` อยู่ใน publication `supabase_realtime` (migration เพิ่มให้เมื่อ publication มีอยู่แล้ว)
@@ -46,10 +46,10 @@ values ('admin001', crypt('CHANGE-THIS-TO-A-STRONG-PASSWORD', gen_salt('bf')), '
 ไฟล์ CSV ไม่มี header บังคับใช้แถวแรกเป็น header และคอลัมน์เรียงตามนี้:
 
 ```text
-student_id,full_name,faculty,major,class_group,enrollment_year,birth_date,phone,passcode
+student_id,full_name,faculty,major,class_group,enrollment_year,birth_date,phone
 ```
 
-รุ่นปี 2568 ลงไปต้องมี passcode ที่กำหนดไว้หรือใช้ Reserve Pool ส่วนรุ่นปี 2569 ขึ้นไปใช้ QR check-in/check-out
+แอดมินเติม Passcode สำรองไว้ในกิจกรรม แล้วระบบจับคู่ให้โดยอัตโนมัติกับนักศึกษาที่ปีเข้าศึกษา 2568 ลงไปตอนนำเข้า CSV ส่วนรุ่นปี 2569 ขึ้นไปใช้ QR check-in/check-out
 
 ## ขอบเขตการเชื่อมต่อ
 
