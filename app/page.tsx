@@ -152,7 +152,21 @@ export default function Home() {
     const picked=demoUser;sessionStorage.removeItem('aru-session-token');setSessionToken('');
     setUser(picked);sessionStorage.setItem('aru-user-v1',JSON.stringify(picked));setView('home');setToast('เข้าสู่โหมดนักศึกษาตัวอย่างแล้ว');
   }
-  function logout(){setUser(null);sessionStorage.removeItem('aru-user-v1');sessionStorage.removeItem('aru-session-token');localStorage.removeItem('aru-user-v1');setSessionToken('');setView('home');setScannerOn(false);void stopScanner();}
+  async function logout(){
+    if(user?.role==='STUDENT'){
+      if(isSupabaseConfigured&&supabase){
+        if(!sessionToken){setToast('กำลังตรวจสอบสถานะกิจกรรม กรุณาลองอีกครั้ง');return;}
+        const {data,error}=await supabase.rpc('load_workspace',{p_session_token:sessionToken});
+        if(error||!data?.success){setToast('ตรวจสอบสถานะไม่สำเร็จ กรุณาลองออกจากระบบอีกครั้ง');return;}
+        const registrations=(Array.isArray(data.registrations)?data.registrations:[]) as Registration[];
+        setStore(workspaceStore(data));
+        if(registrations.some(reg=>reg.status==='ATTENDING')){setToast('กำลังเข้าร่วมกิจกรรมอยู่ ต้องรอเจ้าหน้าที่เช็กเอาต์ก่อนจึงจะออกจากระบบได้');return;}
+      }else if(studentRegs.some(reg=>reg.status==='ATTENDING')){
+        setToast('กำลังเข้าร่วมกิจกรรมอยู่ ต้องรอเจ้าหน้าที่เช็กเอาต์ก่อนจึงจะออกจากระบบได้');return;
+      }
+    }
+    setUser(null);sessionStorage.removeItem('aru-user-v1');sessionStorage.removeItem('aru-session-token');localStorage.removeItem('aru-user-v1');setSessionToken('');setView('home');setScannerOn(false);void stopScanner();
+  }
   function save(next:Store){setStore(next)}
   async function scanPayload(raw:string) {
     let parsed:{e?:string;u?:string};try{parsed=JSON.parse(raw)}catch{setScanMessage({ok:false,title:'QR Code ไม่ถูกต้อง',detail:'รูปแบบรหัสไม่ตรงกับกิจกรรม'});setFlash('error');soundEngine.playError();return;}
