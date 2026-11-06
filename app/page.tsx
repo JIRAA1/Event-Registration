@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Bell, BookOpen, Check, CheckCircle2, ChevronDown, CircleHelp, Clipboard, Clock3, Download, ExternalLink, FileUp, Gauge, GraduationCap, LayoutDashboard, Loader2, Lock, LogOut, MapPin, Menu, Plus, QrCode, ScanLine, Settings2, ShieldCheck, Ticket, Trash2, Unlock, Users, X, Zap } from 'lucide-react';
+import { Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Clipboard, Clock3, Download, ExternalLink, Eye, FileSpreadsheet, FileUp, Filter, Gauge, GraduationCap, Layers, LayoutDashboard, Loader2, Lock, LogOut, MapPin, Menu, Phone, Plus, QrCode, RefreshCw, ScanLine, Search, Settings2, ShieldCheck, Sparkles, Ticket, Trash2, Unlock, UserCheck, Users, UserX, X, Zap } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { soundEngine } from '@/lib/sound';
 import { ARU_CATALOG } from '@/lib/aru-catalog';
@@ -417,21 +417,162 @@ export default function Home() {
   }
 
   return <main className="canvas-grid min-h-screen px-3 pb-8 pt-3 sm:px-6 sm:pt-5 lg:px-10">
-    <header className="glass mx-auto flex max-w-[1440px] items-center justify-between rounded-full border border-white/80 px-4 py-3 shadow-[0_12px_45px_rgba(52,61,78,.07)] sm:px-6">
-      <button className="flex items-center gap-3 text-left" onClick={()=>setView(user?.role==='ADMIN'?'admin':user?.role==='STAFF'?'scanner':'home')}>
-        <img src="/aru-icon.jpg" alt="ARU Student Organization" className="h-12 w-12 rounded-xl border-2 border-[#d4af37] object-cover"/>
-        <span><b className="block text-[15px] tracking-tight text-slate-900 sm:text-[17px]">ARU Event Pass</b><small className="hidden text-[11px] text-slate-500 sm:block">Student Organization · Ayutthaya Rajabhat University</small></span>
+    <header className="glass mx-auto flex max-w-[1440px] items-center justify-between rounded-full border border-white/80 px-4 py-2.5 shadow-[0_12px_45px_rgba(52,61,78,.07)] sm:px-6">
+      <button className="flex items-center gap-3 text-left transition hover:opacity-90" onClick={()=>setView(user?.role==='ADMIN'?'admin':user?.role==='STAFF'?'scanner':'home')}>
+        <div className="relative">
+          <img src="/aru-icon.jpg" alt="ARU Student Organization" className="h-11 w-11 rounded-xl border-2 border-[#d4af37] object-cover shadow-sm"/>
+          <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#7c0a02] text-[7px] font-black text-amber-300">A</span>
+        </div>
+        <div>
+          <div className="flex items-center gap-1.5">
+            <b className="text-[15px] tracking-tight text-slate-900 sm:text-[17px]">ARU Event Pass</b>
+            {user && <span className="hidden sm:inline-block"><RoleBadge role={user.role} size="sm"/></span>}
+          </div>
+          <small className="hidden text-[10px] font-medium text-slate-500 sm:block">องค์การนักศึกษา มหาวิทยาลัยราชภัฏพระนครศรีอยุธยา</small>
+        </div>
       </button>
-      <nav className="hidden items-center gap-1 rounded-full bg-slate-100/80 p-1 md:flex">
-        {user&&<><NavButton active={view==='home'} icon={<LayoutDashboard size={15}/>} onClick={()=>setView('home')}>{user.role==='STUDENT'?'กิจกรรม':'ภาพรวม'}</NavButton>{user.role==='STUDENT'&&<NavButton active={view==='studentStats'} icon={<Gauge size={15}/>} onClick={()=>setView('studentStats')}>สรุปของฉัน</NavButton>}{user.role!=='STUDENT'&&<NavButton active={view==='scanner'} icon={<ScanLine size={15}/>} onClick={()=>setView('scanner')}>เครื่องสแกน</NavButton>}{user.role==='ADMIN'&&<NavButton active={view==='admin'} icon={<Settings2 size={15}/>} onClick={()=>setView('admin')}>จัดการระบบ</NavButton>}</>}
+
+      {/* Desktop Navigation Tabs with clear category themes */}
+      <nav className="hidden items-center gap-1.5 rounded-full bg-slate-100/90 p-1.5 md:flex shadow-inner">
+        {user && (
+          <>
+            {user.role === 'STUDENT' && (
+              <>
+                <NavButton active={view==='home'} icon={<LayoutDashboard size={15}/>} theme="rose" onClick={()=>setView('home')}>
+                  กิจกรรมของฉัน
+                </NavButton>
+                <NavButton active={view==='studentStats'} icon={<Gauge size={15}/>} theme="emerald" onClick={()=>setView('studentStats')}>
+                  สรุปของฉัน
+                </NavButton>
+              </>
+            )}
+            {user.role !== 'STUDENT' && (
+              <NavButton active={view==='scanner'} icon={<ScanLine size={15}/>} theme="amber" onClick={()=>setView('scanner')}>
+                เครื่องสแกน QR
+              </NavButton>
+            )}
+            {user.role === 'ADMIN' && (
+              <NavButton active={view==='admin'} icon={<Settings2 size={15}/>} theme="slate" onClick={()=>setView('admin')}>
+                จัดการระบบ
+              </NavButton>
+            )}
+          </>
+        )}
       </nav>
+
+      {/* Right controls: Cloud status + User Profile Pill + Logout */}
       <div className="flex items-center gap-2 sm:gap-3">
-        <span className="hidden items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[10px] font-bold text-emerald-700 sm:flex"><i className="h-1.5 w-1.5 rounded-full bg-emerald-500"/>{isSupabaseConfigured?'CLOUD CONNECTED':'DEMO MODE'}</span>
-        {user?<><button className="hidden h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 sm:flex" title="การแจ้งเตือน"><Bell size={16}/></button><button className="flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1 pl-1 pr-3" onClick={()=>setMobileNav(!mobileNav)}><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#7c0a02] text-[11px] font-bold text-white">{initials(user.full_name)}</span><span className="hidden text-left sm:block"><b className="block text-[11px] leading-4">{user.full_name}</b><small className="text-[9px] text-slate-500">{roleName(user.role)}</small></span><ChevronDown size={13} className="text-slate-400"/></button><button onClick={()=>void withLoading('กำลังตรวจสอบสถานะ…',logout)} title="ออกจากระบบ" aria-label="ออกจากระบบ" className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-2 text-[10px] font-semibold text-slate-600 hover:border-rose-200 hover:text-[#7c0a02]"><LogOut size={14}/><span className="hidden sm:inline">ออกจากระบบ</span></button></>:<button className="rounded-full bg-[#7c0a02] px-4 py-2 text-xs font-bold text-white shadow-md shadow-rose-900/15" onClick={()=>document.getElementById('login-card')?.scrollIntoView({behavior:'smooth'})}>เข้าสู่ระบบ</button>}
+        <span className={cx(
+          'hidden items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-extrabold sm:flex shadow-sm',
+          isSupabaseConfigured
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            : 'border-amber-200 bg-amber-50 text-amber-800'
+        )}>
+          <i className={cx('h-1.5 w-1.5 rounded-full', isSupabaseConfigured ? 'animate-pulse bg-emerald-500' : 'bg-amber-500')}/>
+          {isSupabaseConfigured ? 'CLOUD CONNECTED' : 'DEMO MODE'}
+        </span>
+
+        {user ? (
+          <>
+            {/* User Pill */}
+            <div className="flex items-center gap-2 rounded-full border border-slate-200/90 bg-white/90 py-1 pl-1 pr-3 shadow-sm">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#941108] to-[#5a0601] text-[11px] font-extrabold text-amber-200 shadow-inner">
+                {initials(user.full_name)}
+              </span>
+              <div className="hidden text-left sm:block">
+                <b className="block max-w-[130px] truncate text-[11px] font-bold leading-4 text-slate-900">{user.full_name}</b>
+                <div className="flex items-center gap-1">
+                  <span className="font-mono text-[9px] font-semibold text-slate-400">{user.student_id}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile menu trigger */}
+            <button
+              onClick={()=>setMobileNav(!mobileNav)}
+              aria-label="เปิดเมนู"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 md:hidden"
+            >
+              {mobileNav ? <X size={17}/> : <Menu size={17}/>}
+            </button>
+
+            {/* Logout button */}
+            <button
+              onClick={()=>void withLoading('กำลังออกจากระบบ…',logout)}
+              title="ออกจากระบบ"
+              aria-label="ออกจากระบบ"
+              className="hidden sm:flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white px-3 py-2 text-[11px] font-bold text-slate-600 shadow-sm transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
+            >
+              <LogOut size={14}/>
+              <span>ออกจากระบบ</span>
+            </button>
+          </>
+        ) : (
+          <button
+            className="rounded-full bg-gradient-to-r from-[#7c0a02] to-[#a31508] px-5 py-2 text-xs font-bold text-white shadow-md shadow-rose-900/20 transition hover:shadow-lg hover:shadow-rose-900/30"
+            onClick={()=>document.getElementById('login-card')?.scrollIntoView({behavior:'smooth'})}
+          >
+            เข้าสู่ระบบ
+          </button>
+        )}
       </div>
     </header>
 
-    {user&&<div className="mx-auto mt-3 flex max-w-[1440px] justify-end md:hidden">{mobileNav&&<div className="glass flex gap-1 rounded-2xl border border-white p-2 shadow-lg"><NavButton active={view==='home'} onClick={()=>setView('home')}>{user.role==='STUDENT'?'กิจกรรม':'ภาพรวม'}</NavButton>{user.role==='STUDENT'&&<NavButton active={view==='studentStats'} onClick={()=>setView('studentStats')}>สรุปของฉัน</NavButton>}{user.role!=='STUDENT'&&<NavButton active={view==='scanner'} onClick={()=>setView('scanner')}>เครื่องสแกน</NavButton>}{user.role==='ADMIN'&&<NavButton active={view==='admin'} onClick={()=>setView('admin')}>จัดการระบบ</NavButton>}<button onClick={()=>void withLoading('กำลังตรวจสอบสถานะ…',logout)} className="rounded-full px-3 py-2 text-xs text-slate-500">ออกจากระบบ</button></div>}</div>}
+    {/* Mobile Navigation Drawer */}
+    {user && mobileNav && (
+      <div className="glass mx-auto mt-2 max-w-[1440px] rounded-3xl border border-white/80 p-4 shadow-xl md:hidden">
+        <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#7c0a02] font-bold text-white shadow-sm">
+              {initials(user.full_name)}
+            </span>
+            <div>
+              <b className="block text-xs font-bold text-slate-900">{user.full_name}</b>
+              <div className="mt-0.5 flex items-center gap-1.5">
+                <RoleBadge role={user.role} size="sm" />
+                <span className="font-mono text-[10px] text-slate-500">{user.student_id}</span>
+              </div>
+            </div>
+          </div>
+          <button onClick={() => setMobileNav(false)} className="rounded-full bg-slate-100 p-2 text-slate-500 hover:bg-slate-200">
+            <X size={16} />
+          </button>
+        </div>
+        
+        <div className="mt-3 grid gap-2">
+          {user.role === 'STUDENT' && (
+            <>
+              <NavButton active={view==='home'} icon={<LayoutDashboard size={16}/>} theme="rose" onClick={()=>{setView('home');setMobileNav(false);}}>
+                กิจกรรมของฉัน
+              </NavButton>
+              <NavButton active={view==='studentStats'} icon={<Gauge size={16}/>} theme="emerald" onClick={()=>{setView('studentStats');setMobileNav(false);}}>
+                สรุปข้อมูลของฉัน
+              </NavButton>
+            </>
+          )}
+          {user.role !== 'STUDENT' && (
+            <NavButton active={view==='scanner'} icon={<ScanLine size={16}/>} theme="amber" onClick={()=>{setView('scanner');setMobileNav(false);}}>
+              เครื่องสแกน QR ความเร็วสูง
+            </NavButton>
+          )}
+          {user.role === 'ADMIN' && (
+            <NavButton active={view==='admin'} icon={<Settings2 size={16}/>} theme="slate" onClick={()=>{setView('admin');setMobileNav(false);}}>
+              จัดการระบบ (Admin Console)
+            </NavButton>
+          )}
+        </div>
+
+        <div className="mt-4 border-t border-slate-200/60 pt-3">
+          <button
+            onClick={() => { setMobileNav(false); void withLoading('กำลังออกจากระบบ…', logout); }}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50/80 py-3 text-xs font-bold text-rose-700 hover:bg-rose-100"
+          >
+            <LogOut size={16} />
+            ออกจากระบบ
+          </button>
+        </div>
+      </div>
+    )}
 
     <div key={view} className="page-transition mx-auto mt-6 max-w-[1440px]">
       {!user?<Landing enterAs={()=>void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…',enterAs)} saving={saving||Boolean(loadingMessage)}/>:view==='scanner'&&user.role!=='STUDENT'?<ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={()=>setScannerLocked(value=>!value)} startScanner={()=>void withLoading('กำลังเปิดกล้อง…',startScanner)} stopScanner={()=>void withLoading('กำลังปิดกล้อง…',stopScanner)} scanMode={()=>void withLoading('กำลังเปลี่ยนโหมดสแกน…',setScanMode)} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async(raw:string)=>{await withLoading('กำลังตรวจสอบ QR…',()=>scanPayload(raw));}} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={()=>setModal('walkin')}/>:view==='admin'&&user.role==='ADMIN'?<AdminView sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args)=>withLoading('กำลังบันทึกคณะและสาขา…',()=>manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={()=>setModal('event')} openCodes={()=>setModal('codes')} openStaff={()=>setModal('staff')} editUser={(target:User)=>{setEditingUser(target);setEditingFaculty(target.faculty);setEditingMajor(target.major);setModal('editUser')}} deleteUser={(target:User)=>void withLoading('กำลังลบบัญชีผู้ใช้…',()=>deleteManagedUser(target))} deleteActivity={()=>void withLoading('กำลังลบกิจกรรม…',deleteActivity)} deleteRegistration={(id:string)=>void withLoading('กำลังนำรายชื่อออก…',()=>deleteRegistration(id))} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={()=>void withLoading('กำลังนำเข้ารายชื่อ…',importCsv)} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch:Partial<Event>)=>withLoading('กำลังบันทึกการเปลี่ยนแปลง…',()=>updateSelectedEvent(patch))} />:view==='studentStats'&&user.role==='STUDENT'?<StudentStatsView user={user} events={store.events.filter(e=>studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs}/>:view==='event'&&user.role==='STUDENT'?<EventDetail event={store.events.find(e=>e.id===activeEvent)||currentEvent} user={user} registration={studentRegs.find(r=>r.event_id===activeEvent)} back={()=>setView('home')}/>:<StudentHome user={user} events={store.events.filter(e=>e.status==='ACTIVE'&&studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs} select={(id:string)=>{setActiveEvent(id);setView('event')}} store={store}/>}
@@ -448,7 +589,81 @@ export default function Home() {
 }
 
 function roleName(role:Role){return role==='STUDENT'?'นักศึกษา':role==='STAFF'?'สตาฟกิจกรรม':'ผู้ดูแลระบบ';}
-function NavButton({active,icon,children,onClick}:{active:boolean;icon?:React.ReactNode;children:React.ReactNode;onClick:()=>void}){return <button onClick={onClick} className={cx('flex items-center gap-1.5 rounded-full px-4 py-2 text-[11px] font-semibold transition',active?'bg-white text-[#7c0a02] shadow-sm':'text-slate-500 hover:text-slate-900')}>{icon}{children}</button>}
+
+function RoleBadge({role, size='sm'}:{role:Role; size?:'sm'|'md'}){
+  if(role==='ADMIN'){
+    return <span className={cx('inline-flex items-center gap-1 rounded-full border border-rose-300/80 bg-rose-50 font-extrabold text-[#7c0a02] shadow-sm', size==='sm'?'px-2 py-0.5 text-[9px]':'px-3 py-1 text-[11px]')}><ShieldCheck size={size==='sm'?11:13}/>ผู้ดูแลระบบ</span>;
+  }
+  if(role==='STAFF'){
+    return <span className={cx('inline-flex items-center gap-1 rounded-full border border-amber-300/80 bg-amber-50 font-extrabold text-amber-900 shadow-sm', size==='sm'?'px-2 py-0.5 text-[9px]':'px-3 py-1 text-[11px]')}><ScanLine size={size==='sm'?11:13}/>สตาฟกิจกรรม</span>;
+  }
+  return <span className={cx('inline-flex items-center gap-1 rounded-full border border-emerald-300/80 bg-emerald-50 font-extrabold text-emerald-800 shadow-sm', size==='sm'?'px-2 py-0.5 text-[9px]':'px-3 py-1 text-[11px]')}><GraduationCap size={size==='sm'?11:13}/>นักศึกษา</span>;
+}
+
+function EventStatusPill({status}:{status:Event['status']}){
+  if(status==='ACTIVE'){
+    return <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[9px] font-extrabold text-emerald-700 shadow-sm"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"/>เปิดใช้งาน</span>;
+  }
+  if(status==='UPCOMING'){
+    return <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[9px] font-extrabold text-sky-700 shadow-sm"><Calendar size={11}/>เร็วๆ นี้</span>;
+  }
+  return <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-[9px] font-bold text-slate-500">ปิดกิจกรรม</span>;
+}
+
+function NavButton({
+  active,
+  icon,
+  children,
+  badge,
+  theme = 'rose',
+  onClick
+}:{
+  active: boolean;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+  badge?: string | number;
+  theme?: 'rose' | 'emerald' | 'amber' | 'slate';
+  onClick: () => void;
+}) {
+  const styles = {
+    rose: active
+      ? 'bg-[#7c0a02] text-white shadow-md shadow-rose-950/25 ring-2 ring-rose-900/10'
+      : 'text-slate-600 hover:text-[#7c0a02] hover:bg-rose-50/70',
+    emerald: active
+      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/25 ring-2 ring-emerald-600/10'
+      : 'text-slate-600 hover:text-emerald-700 hover:bg-emerald-50/70',
+    amber: active
+      ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-900/20 ring-2 ring-amber-500/20'
+      : 'text-slate-600 hover:text-amber-900 hover:bg-amber-50/70',
+    slate: active
+      ? 'bg-slate-900 text-amber-300 font-black shadow-md shadow-slate-950/25 ring-2 ring-slate-900/20'
+      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100',
+  }[theme];
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cx(
+        'group relative flex items-center gap-2 rounded-full px-4 py-2 text-[12px] font-bold transition-all duration-200',
+        styles
+      )}
+    >
+      <span className={cx('transition-transform duration-200 group-hover:scale-110', active ? 'opacity-100' : 'opacity-70 group-hover:opacity-100')}>
+        {icon}
+      </span>
+      <span>{children}</span>
+      {badge !== undefined && (
+        <span className={cx(
+          'ml-0.5 rounded-full px-1.5 py-0.2 text-[9px] font-extrabold',
+          active ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-700'
+        )}>
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+}
 function Field({label,...props}:{label:string;name:string;id?:string;type?:string;required?:boolean;placeholder?:string;defaultValue?:string|number;min?:string|number;max?:string|number;minLength?:number}){return <label className="block text-[11px] font-semibold text-slate-600">{label}<input {...props} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 placeholder:text-slate-300"/></label>}
 function Modal({title,subtitle,close,children}:{title:string;subtitle:string;close:()=>void;children:React.ReactNode}){return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-[28px] border border-white bg-white p-6 shadow-2xl"><div className="mb-5 flex items-start justify-between"><div><h2 className="text-lg font-bold text-slate-900">{title}</h2><p className="mt-1 text-xs text-slate-500">{subtitle}</p></div><button onClick={close} className="rounded-full bg-slate-100 p-2 text-slate-500"><X size={16}/></button></div>{children}</div></div>}
 
@@ -612,33 +827,266 @@ function ScanResultEffect({message,flash}:{message:{ok:boolean;title:string;deta
 function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,startScanner,stopScanner,scanMode,scanInput,setScanInput,scanPayload,scanMessage,flash,attendance,registered,reserveLeft,openWalkin,scannerLocked,toggleScannerLock}:{user:User;event:Event;events:Event[];activeEvent:string;setActiveEvent:(id:string)=>void;scannerOn:boolean;startScanner:()=>void;stopScanner:()=>void;scanMode:()=>void;scanInput:string;setScanInput:(s:string)=>void;scanPayload:(s:string)=>Promise<void>;scanMessage:{ok:boolean;title:string;detail:string}|null;flash:string;attendance:number;registered:number;reserveLeft:number;openWalkin:()=>void;scannerLocked:boolean;toggleScannerLock:()=>void}) {
  const pct=registered?Math.round(attendance/registered*100):0;
  return <div className={cx('space-y-5 rounded-[30px] p-1 transition',flash==='success'?'scanner-flash-success':flash==='checkout'?'scanner-flash-checkout':flash==='error'?'scanner-flash-error':'')}>
-   <div className="flex flex-wrap items-end justify-between gap-3 px-2"><div><div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.15em] text-slate-400"><span>Staff Console</span><span className="h-1 w-1 rounded-full bg-[#d4af37]"/>Parcel-style scanner</div><h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">เครื่องสแกนความเร็วสูง</h1><p className="mt-1 text-xs text-slate-500">สแกน QR นักศึกษาเพื่อเช็กอินและเช็กเอาต์แบบเรียลไทม์</p></div><div className="flex items-center gap-2"><span className="rounded-full bg-slate-900/90 px-3 py-1.5 text-[9px] font-bold text-amber-300">● {event.status}</span><span className="max-w-[250px] rounded-xl bg-white px-3 py-1.5 text-left"><b className="block truncate text-[9px] font-semibold text-slate-700">{user.full_name}</b><small className="block truncate text-[8px] text-slate-400">{user.student_id} · {user.faculty} · {user.major} · {user.phone||'—'}</small></span><button onClick={toggleScannerLock} aria-pressed={scannerLocked} className={cx('flex items-center gap-1.5 rounded-full border px-3 py-2 text-[9px] font-bold transition',scannerLocked?'border-amber-300 bg-amber-100 text-amber-900':'border-slate-200 bg-white text-slate-600 hover:border-amber-300 hover:text-amber-800')}>{scannerLocked?<Unlock size={13}/>:<Lock size={13}/>}<span>{scannerLocked?'ปลดล็อก':'ล็อกหน้าจอ'}</span></button></div></div>
-  <div className="grid gap-5 xl:grid-cols-[1.15fr_.85fr]"><section className="bento overflow-hidden p-4 sm:p-5">
-   <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div><span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">เลือกกิจกรรม</span><select value={activeEvent} onChange={e=>setActiveEvent(e.target.value)} className="mt-1 block max-w-[300px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800">{events.map(ev=><option key={ev.id} value={ev.id}>{ev.title}</option>)}</select></div><button onClick={scanMode} className={cx('rounded-full px-4 py-2 text-[10px] font-bold',event.scan_mode==='CHECKIN'?'bg-emerald-50 text-emerald-700':'bg-amber-100 text-amber-900')}>{event.scan_mode==='CHECKIN'?'↗ โหมดเช็กอิน':'↘ โหมดเช็กเอาต์'} · คลิกเพื่อสลับ</button></div>
-    <div className="relative flex min-h-[360px] items-center justify-center overflow-hidden rounded-[24px] bg-slate-950"><div className="absolute inset-0 opacity-30" style={{backgroundImage:'radial-gradient(#94a3b8 1px,transparent 1px)',backgroundSize:'20px 20px'}}/><div className="absolute left-5 top-5 z-10 flex items-center gap-2 rounded-full bg-slate-900/80 px-3 py-2 text-[9px] font-semibold text-white"><span className={cx('h-2 w-2 rounded-full',scannerOn?'animate-pulse bg-emerald-400':'bg-slate-500')}/>{scannerOn?'CAMERA LIVE':'CAMERA STANDBY'}</div><div className="absolute right-5 top-5 z-10 rounded-full bg-slate-900/80 px-3 py-2 text-[9px] font-semibold text-slate-300">20 FPS · 0.5s cooldown</div><div id="aru-reader" className="relative z-[1] w-full max-w-[520px] overflow-hidden rounded-xl [&_video]:rounded-xl [&_video]:object-cover [&_img]:hidden"/>
-    {!scannerOn&&<div className="absolute inset-0 z-[2] flex flex-col items-center justify-center px-6 text-center"><div className="mb-4 flex h-20 w-20 items-center justify-center rounded-[26px] border border-white/15 bg-white/10 text-amber-300"><ScanLine size={32}/></div><b className="text-sm text-white">พร้อมสแกน QR Code</b><span className="mt-1 max-w-xs text-[10px] leading-5 text-slate-400">กดปุ่มด้านล่างเพื่อเปิดกล้องและปลดล็อกเสียงสังเคราะห์</span><div className="pointer-events-none absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-[28px] border-2 border-amber-300/70"/></div>}
-     {scannerOn&&<div className="pointer-events-none absolute left-1/2 top-1/2 z-[2] h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-[28px] border-2 border-amber-300/80"/>}
-     <ScanResultEffect message={scanMessage} flash={flash}/>
-    <div className="absolute bottom-4 left-4 right-4 z-10 flex items-end justify-between gap-3"><div className="max-w-[72%] rounded-xl bg-slate-900/85 px-3 py-2 text-white"><span className="block text-[8px] uppercase tracking-wider text-slate-400">ผลการสแกนล่าสุด</span><b className="mt-0.5 block truncate text-xs">{scanMessage?.title||'รอการสแกน'}</b><span className="block truncate text-[9px] text-slate-400">{scanMessage?.detail||'เปิดกล้องเพื่อเริ่มต้น'}</span></div>{scanMessage&&<span className={cx('rounded-full px-3 py-2 text-[9px] font-bold',scanMessage.ok?'bg-emerald-400 text-emerald-950':'bg-rose-500 text-white')}>{scanMessage.ok?'SUCCESS':'ERROR'}</span>}</div>
+   {/* Scanner Header Bar */}
+   <div className="flex flex-wrap items-end justify-between gap-3 px-2">
+     <div>
+       <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.15em] text-slate-400">
+         <span>Staff Console</span>
+         <span className="h-1 w-1 rounded-full bg-[#d4af37]"/>
+         Fast QR Scanner
+       </div>
+       <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">เครื่องสแกนความเร็วสูง</h1>
+       <p className="mt-1 text-xs text-slate-500">สแกน QR นักศึกษาเพื่อเช็กอินและเช็กเอาต์แบบเรียลไทม์</p>
+     </div>
+     <div className="flex flex-wrap items-center gap-2">
+       <EventStatusPill status={event.status}/>
+       <div className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-left shadow-sm">
+         <b className="block truncate text-[10px] font-bold text-slate-800">{user.full_name}</b>
+         <small className="block truncate text-[9px] text-slate-400">{user.student_id} · {user.faculty}</small>
+       </div>
+       <button
+         type="button"
+         onClick={toggleScannerLock}
+         aria-pressed={scannerLocked}
+         className={cx(
+           'flex items-center gap-2 rounded-full border px-4 py-2 text-[11px] font-extrabold transition shadow-sm',
+           scannerLocked
+             ? 'border-amber-400 bg-amber-300 text-slate-950 ring-2 ring-amber-400/30'
+             : 'border-slate-300 bg-white text-slate-700 hover:border-amber-400 hover:bg-amber-50 hover:text-amber-900'
+         )}
+       >
+         {scannerLocked ? <Unlock size={14}/> : <Lock size={14}/>}
+         <span>{scannerLocked ? 'ปลดล็อก' : 'ล็อกหน้าจอ (Lock Screen)'}</span>
+       </button>
+     </div>
    </div>
-   <div className="mt-4 grid grid-cols-2 gap-2"><button onClick={()=>scannerOn?stopScanner():startScanner()} className={cx('flex items-center justify-center gap-2 rounded-xl py-3 text-xs font-bold text-white',scannerOn?'bg-slate-700':'bg-[#7c0a02]')}><Zap size={15}/>{scannerOn?'ปิดกล้อง':'เปิดกล้อง'}</button><button onClick={openWalkin} className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-xs font-bold text-slate-700"><Plus size={15}/>เพิ่มรายชื่อหน้างาน</button></div>
-   <form className="mt-3 flex gap-2" onSubmit={e=>{e.preventDefault();void scanPayload(scanInput);setScanInput('')}}><input value={scanInput} onChange={e=>setScanInput(e.target.value)} placeholder={'ทดสอบ QR · {"e":"event_id","u":"user_id"}'} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[10px]"/><button className="rounded-xl bg-slate-900 px-4 text-[10px] font-bold text-white">ทดสอบ</button></form>
-  </section>
-  <div className="space-y-5"><section className="bento p-5"><div className="flex items-center justify-between"><div><span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Check-in Progress</span><h2 className="mt-1 text-sm font-extrabold text-slate-900">ความคืบหน้าการสแกน</h2></div><span className="rounded-xl bg-rose-50 p-2 text-[#7c0a02]"><Gauge size={19}/></span></div><div className="mt-5 flex items-center gap-5"><div className="relative h-28 w-40 overflow-hidden"><div className="absolute left-1/2 top-2 h-36 w-36 -translate-x-1/2 rounded-full border-[14px] border-slate-100"/><div className="absolute left-1/2 top-2 h-36 w-36 -translate-x-1/2 rounded-full border-[14px] border-[#7c0a02]" style={{clipPath:'inset(0 0 50% 0)',transform:'translateX(-50%) rotate('+(pct*1.8-90)+'deg)'}}/><div className="absolute inset-x-0 bottom-0 text-center"><b className="text-3xl text-slate-900">{pct}<small className="text-sm">%</small></b><span className="block text-[8px] text-slate-400">CHECKED IN</span></div></div><div className="flex-1 space-y-3"><StatLine label="ลงทะเบียนทั้งหมด" value={registered} icon={<Users size={14}/>} color="text-slate-500"/><StatLine label="เช็กอินแล้ว" value={attendance} icon={<CheckCircle2 size={14}/>} color="text-emerald-600"/><StatLine label="Passcode สำรอง" value={reserveLeft} icon={<Ticket size={14}/>} color="text-amber-600"/></div></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-gradient-to-r from-rose-700 to-amber-400 transition-all" style={{width:pct+'%'}}/></div></section>
-   </div></div>
-   {scannerLocked&&<div className="fixed inset-0 z-[100] flex touch-none select-none items-center justify-center bg-slate-950/80 p-5 text-center text-white backdrop-blur-md" onContextMenu={e=>e.preventDefault()}><div className="max-w-sm rounded-[28px] border border-white/15 bg-slate-900/90 p-7 shadow-2xl"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-300/15 text-amber-300"><Lock size={30}/></div><h2 className="mt-5 text-xl font-extrabold">หน้าจอเครื่องสแกนถูกล็อก</h2><p className="mt-2 text-sm leading-6 text-slate-300">ป้องกันการแตะหรือคลิกโดยไม่ตั้งใจ · กล้องยังทำงานอยู่</p><button onClick={toggleScannerLock} className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 py-3 font-bold text-slate-950 transition hover:bg-amber-200"><Unlock size={17}/>ปลดล็อกหน้าจอ</button></div></div>}
+
+   {/* Main Grid */}
+   <div className="grid gap-5 xl:grid-cols-[1.15fr_.85fr]">
+     <section className="bento overflow-hidden p-4 sm:p-5">
+       {/* Selector + Mode Toggle with distinct colors */}
+       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+         <div>
+           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">เลือกกิจกรรมที่สแกน</span>
+           <div className="mt-1 flex items-center gap-2">
+             <select
+               value={activeEvent}
+               onChange={e=>setActiveEvent(e.target.value)}
+               className="h-10 max-w-[320px] rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-800 shadow-sm"
+             >
+               {events.map(ev=><option key={ev.id} value={ev.id}>{ev.title}</option>)}
+             </select>
+           </div>
+         </div>
+
+         {/* Mode Switcher */}
+         <div className="flex items-center rounded-2xl bg-slate-100 p-1 shadow-inner">
+           <button
+             type="button"
+             onClick={() => { if(event.scan_mode !== 'CHECKIN') scanMode(); }}
+             className={cx(
+               'flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[11px] font-extrabold transition-all duration-200',
+               event.scan_mode === 'CHECKIN'
+                 ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/20 ring-2 ring-emerald-500/20'
+                 : 'text-slate-600 hover:text-emerald-700'
+             )}
+           >
+             <span className={cx('h-2 w-2 rounded-full', event.scan_mode === 'CHECKIN' ? 'animate-pulse bg-emerald-200' : 'bg-slate-400')}/>
+             <ArrowDownRight size={14}/>
+             โหมดเช็กอิน (เข้างาน)
+           </button>
+           <button
+             type="button"
+             onClick={() => { if(event.scan_mode !== 'CHECKOUT') scanMode(); }}
+             className={cx(
+               'flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[11px] font-extrabold transition-all duration-200',
+               event.scan_mode === 'CHECKOUT'
+                 ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-950/20 ring-2 ring-amber-400/20 font-black'
+                 : 'text-slate-600 hover:text-amber-800'
+             )}
+           >
+             <span className={cx('h-2 w-2 rounded-full', event.scan_mode === 'CHECKOUT' ? 'animate-pulse bg-amber-900' : 'bg-slate-400')}/>
+             <ArrowUpRight size={14}/>
+             โหมดเช็กเอาต์ (ออกงาน)
+           </button>
+         </div>
+       </div>
+
+       {/* Camera Viewport */}
+       <div className="relative flex min-h-[360px] items-center justify-center overflow-hidden rounded-[24px] bg-slate-950">
+         <div className="absolute inset-0 opacity-30" style={{backgroundImage:'radial-gradient(#94a3b8 1px,transparent 1px)',backgroundSize:'20px 20px'}}/>
+         <div className="absolute left-5 top-5 z-10 flex items-center gap-2 rounded-full bg-slate-900/80 px-3 py-2 text-[9px] font-semibold text-white">
+           <span className={cx('h-2 w-2 rounded-full',scannerOn?'animate-pulse bg-emerald-400':'bg-slate-500')}/>
+           {scannerOn?'CAMERA LIVE':'CAMERA STANDBY'}
+         </div>
+         <div className="absolute right-5 top-5 z-10 rounded-full bg-slate-900/80 px-3 py-2 text-[9px] font-semibold text-slate-300">
+           20 FPS · 0.5s cooldown
+         </div>
+         <div id="aru-reader" className="relative z-[1] w-full max-w-[520px] overflow-hidden rounded-xl [&_video]:rounded-xl [&_video]:object-cover [&_img]:hidden"/>
+         {!scannerOn&&<div className="absolute inset-0 z-[2] flex flex-col items-center justify-center px-6 text-center">
+           <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-[26px] border border-white/15 bg-white/10 text-amber-300">
+             <ScanLine size={32}/>
+           </div>
+           <b className="text-sm text-white">พร้อมสแกน QR Code</b>
+           <span className="mt-1 max-w-xs text-[10px] leading-5 text-slate-400">กดปุ่มด้านล่างเพื่อเปิดกล้องและเริ่มสแกน</span>
+           <div className="pointer-events-none absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-[28px] border-2 border-amber-300/70"/>
+         </div>}
+         {scannerOn&&<div className="pointer-events-none absolute left-1/2 top-1/2 z-[2] h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-[28px] border-2 border-amber-300/80"/>}
+         <ScanResultEffect message={scanMessage} flash={flash}/>
+         <div className="absolute bottom-4 left-4 right-4 z-10 flex items-end justify-between gap-3">
+           <div className="max-w-[72%] rounded-xl bg-slate-900/85 px-3 py-2 text-white">
+             <span className="block text-[8px] uppercase tracking-wider text-slate-400">ผลการสแกนล่าสุด</span>
+             <b className="mt-0.5 block truncate text-xs">{scanMessage?.title||'รอการสแกน'}</b>
+             <span className="block truncate text-[9px] text-slate-400">{scanMessage?.detail||'เปิดกล้องเพื่อเริ่มต้น'}</span>
+           </div>
+           {scanMessage&&<span className={cx('rounded-full px-3 py-2 text-[9px] font-bold',scanMessage.ok?'bg-emerald-400 text-emerald-950':'bg-rose-500 text-white')}>{scanMessage.ok?'SUCCESS':'ERROR'}</span>}
+         </div>
+       </div>
+
+       {/* Camera Action Buttons */}
+       <div className="mt-4 grid grid-cols-2 gap-3">
+         <button
+           onClick={()=>scannerOn?stopScanner():startScanner()}
+           className={cx(
+             'flex items-center justify-center gap-2 rounded-xl py-3 text-xs font-bold text-white shadow-sm transition',
+             scannerOn ? 'bg-slate-700 hover:bg-slate-800' : 'bg-[#7c0a02] hover:bg-[#620701]'
+           )}
+         >
+           <Zap size={15}/>
+           {scannerOn ? 'ปิดกล้อง' : 'เปิดกล้อง'}
+         </button>
+         <button
+           onClick={openWalkin}
+           className="flex items-center justify-center gap-2 rounded-xl border border-sky-300 bg-sky-50 py-3 text-xs font-bold text-sky-800 shadow-sm transition hover:bg-sky-100"
+         >
+           <Plus size={15}/>
+           เพิ่มรายชื่อหน้างาน (Walk-in)
+         </button>
+       </div>
+       <form className="mt-3 flex gap-2" onSubmit={e=>{e.preventDefault();void scanPayload(scanInput);setScanInput('')}}>
+         <input value={scanInput} onChange={e=>setScanInput(e.target.value)} placeholder={'ทดสอบ QR Code · {"e":"event_id","u":"user_id"}'} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[10px]"/>
+         <button className="rounded-xl bg-slate-900 px-4 text-[10px] font-bold text-white">ทดสอบ</button>
+       </form>
+     </section>
+
+     {/* Progress Sidebar */}
+     <div className="space-y-5">
+       <section className="bento p-5">
+         <div className="flex items-center justify-between">
+           <div>
+             <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Check-in Progress</span>
+             <h2 className="mt-1 text-sm font-extrabold text-slate-900">ความคืบหน้าการสแกน</h2>
+           </div>
+           <span className="rounded-xl bg-rose-50 p-2 text-[#7c0a02]"><Gauge size={19}/></span>
+         </div>
+         <div className="mt-5 flex items-center gap-5">
+           <div className="relative h-28 w-40 overflow-hidden">
+             <div className="absolute left-1/2 top-2 h-36 w-36 -translate-x-1/2 rounded-full border-[14px] border-slate-100"/>
+             <div className="absolute left-1/2 top-2 h-36 w-36 -translate-x-1/2 rounded-full border-[14px] border-[#7c0a02]" style={{clipPath:'inset(0 0 50% 0)',transform:'translateX(-50%) rotate('+(pct*1.8-90)+'deg)'}}/>
+             <div className="absolute inset-x-0 bottom-0 text-center">
+               <b className="text-3xl text-slate-900">{pct}<small className="text-sm">%</small></b>
+               <span className="block text-[8px] text-slate-400">CHECKED IN</span>
+             </div>
+           </div>
+           <div className="flex-1 space-y-3">
+             <StatLine label="ลงทะเบียนทั้งหมด" value={registered} icon={<Users size={14}/>} color="text-slate-500"/>
+             <StatLine label="เช็กอินแล้ว" value={attendance} icon={<CheckCircle2 size={14}/>} color="text-emerald-600"/>
+             <StatLine label="Passcode สำรอง" value={reserveLeft} icon={<Ticket size={14}/>} color="text-amber-600"/>
+           </div>
+         </div>
+         <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+           <div className="h-full rounded-full bg-gradient-to-r from-rose-700 to-amber-400 transition-all" style={{width:pct+'%'}}/>
+         </div>
+       </section>
+     </div>
+   </div>
+
+   {/* Lock Overlay */}
+   {scannerLocked&&<div className="fixed inset-0 z-[100] flex touch-none select-none items-center justify-center bg-slate-950/80 p-5 text-center text-white backdrop-blur-md" onContextMenu={e=>e.preventDefault()}>
+     <div className="max-w-sm rounded-[28px] border border-white/15 bg-slate-900/90 p-7 shadow-2xl">
+       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-300/15 text-amber-300">
+         <Lock size={30}/>
+       </div>
+       <h2 className="mt-5 text-xl font-extrabold">หน้าจอเครื่องสแกนถูกล็อก</h2>
+       <p className="mt-2 text-sm leading-6 text-slate-300">ป้องกันการแตะหรือคลิกโดยไม่ตั้งใจ · กล้องยังทำงานอยู่</p>
+       <button onClick={toggleScannerLock} className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 py-3 font-bold text-slate-950 transition hover:bg-amber-200">
+         <Unlock size={17}/>
+         ปลดล็อกหน้าจอ
+       </button>
+     </div>
+   </div>}
  </div>;
 }
 function StatLine({label,value,icon,color}:{label:string;value:number;icon:React.ReactNode;color:string}){return <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-1.5 text-[9px] text-slate-500"><span className={color}>{icon}</span>{label}</span><b className="text-xs text-slate-800">{value}</b></div>}
 
 function UserProfileSummary({user}:{user:User}){
- return <section className="bento flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3" aria-label="ข้อมูลบัญชีผู้ใช้"><div className="flex min-w-[190px] items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-50 text-sm font-extrabold text-[#7c0a02]">{initials(user.full_name)}</span><span className="min-w-0"><b className="block truncate text-xs text-slate-900">{user.full_name}</b><small className="block truncate text-[9px] text-slate-500">{user.student_id} · {roleName(user.role)}</small></span></div><span className="text-[10px] text-slate-600"><small className="mr-1 text-slate-400">คณะ/หน่วยงาน</small>{user.faculty||'—'}</span><span className="text-[10px] text-slate-600"><small className="mr-1 text-slate-400">สาขา/ฝ่าย</small>{user.major||'—'}</span><span className="text-[10px] text-slate-600"><small className="mr-1 text-slate-400">โทร.</small>{user.phone||'—'}</span></section>;
+  return <section className="bento relative overflow-hidden p-5 shadow-sm" aria-label="ข้อมูลบัญชีผู้ใช้">
+    <div className="pointer-events-none absolute right-0 top-0 h-28 w-28 translate-x-8 -translate-y-8 rounded-full bg-amber-400/10 blur-xl"/>
+    <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* User Identity */}
+      <div className="flex min-w-[240px] items-center gap-3.5">
+        <div className="relative">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#7c0a02] to-[#b91c1c] text-base font-extrabold text-amber-200 shadow-md">
+            {initials(user.full_name)}
+          </span>
+          <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-white">
+            <span className="h-1.5 w-1.5 rounded-full bg-white"/>
+          </span>
+        </div>
+        <div>
+          <div className="flex items-center gap-2">
+            <b className="text-sm font-extrabold text-slate-900">{user.full_name}</b>
+            <RoleBadge role={user.role} size="sm"/>
+          </div>
+          <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+            <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono font-bold text-slate-700">
+              {user.student_id}
+            </span>
+            {user.study_year > 0 && (
+              <span className="rounded-md bg-amber-100/80 px-2 py-0.5 font-bold text-amber-800">
+                ปี {user.study_year}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Meta Chips with category icons */}
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        {user.faculty && (
+          <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-[11px] font-semibold text-slate-700">
+            <Building2 size={13} className="text-[#7c0a02]"/>
+            <span className="text-slate-400">คณะ:</span> {user.faculty}
+          </span>
+        )}
+        {user.major && (
+          <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-[11px] font-semibold text-slate-700">
+            <BookOpen size={13} className="text-amber-600"/>
+            <span className="text-slate-400">สาขา:</span> {user.major}
+          </span>
+        )}
+        {user.class_group && (
+          <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-[11px] font-semibold text-slate-700">
+            <Layers size={13} className="text-sky-600"/>
+            <span className="text-slate-400">หมู่เรียน:</span> {user.class_group}
+          </span>
+        )}
+        {user.phone && (
+          <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-[11px] font-semibold text-slate-700">
+            <Phone size={13} className="text-emerald-600"/>
+            {user.phone}
+          </span>
+        )}
+      </div>
+    </div>
+  </section>;
 }
 
 function AdminView({sessionToken,store,academicCatalog,manageAcademicCatalog,selectedEvent,selectedEventId,setSelectedEvent,openCreate,openCodes,openStaff,editUser,deleteUser,deleteActivity,deleteRegistration,csvFile,setCsvFile,importCsv,refreshWorkspace,loadEventDashboard,updateEvent}:{sessionToken:string;store:Store;academicCatalog:AcademicFaculty[];manageAcademicCatalog:(action:CatalogAction,facultyId:string,facultyName:string,majorId:string,majorName:string)=>unknown;selectedEvent:Event;selectedEventId:string;setSelectedEvent:(id:string)=>void;openCreate:()=>void;openCodes:()=>void;openStaff:()=>void;editUser:(user:User)=>void;deleteUser:(user:User)=>void;deleteActivity:()=>void;deleteRegistration:(userId:string)=>void;csvFile:File|null;setCsvFile:(f:File|null)=>void;importCsv:()=>void;refreshWorkspace:()=>Promise<void>;loadEventDashboard:()=>Promise<EventDashboardRow[]>;updateEvent:(p:Partial<Event>)=>void|Promise<void>}) {
+ const [adminTab, setAdminTab] = useState<'dashboard' | 'events' | 'report' | 'users' | 'catalog' | 'all'>('dashboard');
  const [redirectDraft,setRedirectDraft]=useState(selectedEvent.redirect_url_year1);
  const [bannerDraft,setBannerDraft]=useState(selectedEvent.banner_url||'');
-  const [dashboardRows,setDashboardRows]=useState<EventDashboardRow[]>([]);
+ const [dashboardRows,setDashboardRows]=useState<EventDashboardRow[]>([]);
  const [dashboardLive,setDashboardLive]=useState(false);
  const [userQuery,setUserQuery]=useState('');
  const [newFaculty,setNewFaculty]=useState('');
@@ -688,45 +1136,549 @@ function AdminView({sessionToken,store,academicCatalog,manageAcademicCatalog,sel
   const noCheckinCount=regs.filter(reg=>reg.status==='REGISTERED').length,noCheckoutCount=regs.filter(reg=>reg.status==='ATTENDING').length,attendedCount=regs.filter(reg=>reg.status!=='REGISTERED').length;
  const managedUsers=store.users.filter(account=>(account.role==='STUDENT'||account.role==='STAFF')&&[account.full_name,account.student_id,account.faculty,account.major,account.class_group].some(value=>value?.toLocaleLowerCase('th').includes(userQuery.trim().toLocaleLowerCase('th'))));
   function exportAttendance(){const csvRows=[['รหัสนักศึกษา','ชื่อ-นามสกุล','ชั้นปี','คณะ','สาขาวิชา','หมู่เรียน','เบอร์โทรศัพท์','สถานะ','เวลาเช็กอิน','สตาฟเช็กอิน','เวลาเช็กเอาต์','สตาฟเช็กเอาต์'],...selectedReportRows.map(({reg,person})=>[person.student_id,person.full_name,person.study_year,person.faculty,person.major,person.class_group,person.phone||'',reg.status,reg.checkin_at||'',reg.checkin_staff_name||store.users.find(u=>u.id===reg.checked_in_by)?.full_name||'',reg.checkout_at||'',reg.checkout_staff_name||store.users.find(u=>u.id===reg.checked_out_by)?.full_name||''])];const quote=(value:string|number)=>'"'+String(value).replace(/"/g,'""')+'"';const csv='\uFEFF'+csvRows.map(row=>row.map(quote).join(',')).join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='aru-attendance-'+reportStatus.toLowerCase()+'-'+selectedEventId+'.csv';link.click();URL.revokeObjectURL(url);}
- return <div className="space-y-5"><div className="flex flex-wrap items-end justify-between gap-3 px-2"><div><div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.15em] text-slate-400"><span>Admin Console</span><span className="h-1 w-1 rounded-full bg-[#d4af37]"/>Management</div><h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">จัดการกิจกรรมและสิทธิ์</h1><p className="mt-1 text-xs text-slate-500">ตั้งค่ากิจกรรม · นำเข้ารายชื่อ · เติม Passcode สำรอง</p></div><div className="flex gap-2"><button onClick={openStaff} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-[10px] font-bold text-slate-700"><Users size={14}/>เพิ่มผู้ใช้</button><button onClick={openCreate} className="flex items-center gap-2 rounded-full bg-[#7c0a02] px-4 py-2.5 text-[10px] font-bold text-white"><Plus size={14}/>สร้างกิจกรรม</button></div></div>
- <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><AdminMetric label="กิจกรรมทั้งหมด" value={store.events.length} note="รายการในระบบ" icon={<Activity size={17}/>} tone="rose"/><AdminMetric label="ผู้เข้าร่วม" value={store.users.filter(u=>u.role==='STUDENT').length} note="บัญชีนักศึกษา" icon={<Users size={17}/>} tone="gold"/><AdminMetric label="ลงทะเบียน" value={regs.length} note={selectedEvent.title} icon={<QrCode size={17}/>} tone="blue"/><AdminMetric label="เข้าร่วมครบแล้ว" value={completed} note="เช็กเอาต์สำเร็จ" icon={<CheckCircle2 size={17}/>} tone="green"/></div>
- <section className="bento p-5">
-   <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-sm font-extrabold text-slate-900">แดชบอร์ดกิจกรรม</h2><p className="mt-1 text-[9px] text-slate-500">จำนวนผู้เข้าร่วมและผู้ใช้งานออนไลน์ แยกตามกิจกรรม · อัปเดตผ่าน Supabase Realtime</p></div><span className={cx('flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[8px] font-bold',dashboardLive?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-800')}><i className={cx('h-1.5 w-1.5 rounded-full',dashboardLive?'animate-pulse bg-emerald-500':'bg-amber-500')}/>{dashboardLive?'LIVE':'RECONNECTING'}</span></div>
-   <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{dashboardRows.map(row=><article key={row.event_id} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><b className="block truncate text-xs text-slate-900">{row.title}</b><small className="text-[8px] text-slate-400">{row.registered_count} รายชื่อ · {row.status}</small></div><Activity size={16} className="shrink-0 text-[#7c0a02]"/></div><div className="mt-4 grid grid-cols-2 gap-2"><DashboardCount icon={<ArrowDownRight size={14}/>} label="เช็กอินแล้ว" value={row.checked_in_count} tone="text-emerald-700 bg-emerald-50"/><DashboardCount icon={<ArrowUpRight size={14}/>} label="เช็กเอาต์แล้ว" value={row.checked_out_count} tone="text-amber-700 bg-amber-50"/><DashboardCount icon={<Users size={14}/>} label="นักศึกษาออนไลน์" value={row.online_students} tone="text-sky-700 bg-sky-50"/><DashboardCount icon={<ScanLine size={14}/>} label="สตาฟออนไลน์" value={row.online_staff} tone="text-rose-800 bg-rose-50"/></div></article>)}{dashboardRows.length===0&&<p className="col-span-full rounded-xl bg-slate-50 p-5 text-center text-[10px] text-slate-400">กำลังโหลดข้อมูลกิจกรรม…</p>}</div>
-  </section>
-  <div className="grid gap-5 xl:grid-cols-[1.1fr_.9fr]"><section className="bento p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-base font-extrabold text-slate-900">การจัดการกิจกรรม</h2><p className="mt-1 text-[10px] text-slate-500">เลือกและตั้งค่าการลงทะเบียนของแต่ละกิจกรรม</p></div><select value={selectedEventId} onChange={e=>setSelectedEvent(e.target.value)} className="max-w-[240px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-bold">{store.events.map(e=><option value={e.id} key={e.id}>{e.title}</option>)}</select></div>
-  <div className="mt-4 rounded-2xl border border-slate-100 bg-cover bg-center p-4" style={selectedEvent.banner_url?{backgroundImage:`linear-gradient(90deg,rgba(255,255,255,.94) 0%,rgba(255,255,255,.84) 62%,rgba(255,255,255,.68) 100%),url("${selectedEvent.banner_url}")`}:undefined}><div className="flex items-start justify-between gap-3"><div><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[8px] font-bold text-emerald-700">{selectedEvent.status}</span><h3 className="mt-2 text-sm font-extrabold text-slate-900">{selectedEvent.title}</h3><p className="mt-1 text-[9px] text-slate-500">{selectedEvent.location} · {selectedEvent.activity_hours} ชั่วโมง</p></div><span className="rounded-xl bg-rose-50 p-2 text-[#7c0a02]"><BookOpen size={18}/></span></div><div className="mt-4 grid gap-3 sm:grid-cols-2"><div><label className="text-[9px] font-semibold text-slate-500">URL Redirect · รุ่นปี 1</label><div className="mt-1 flex gap-2"><input type="url" value={redirectDraft} onChange={e=>setRedirectDraft(e.target.value)} placeholder="https://..." className="h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 text-[10px]"/><button type="button" onClick={()=>void updateEvent({redirect_url_year1:redirectDraft})} className="shrink-0 rounded-lg bg-[#7c0a02] px-3 text-[9px] font-bold text-white">บันทึก URL</button></div></div><label className="text-[9px] font-semibold text-slate-500">สถานะกิจกรรม<select value={selectedEvent.status} onChange={e=>updateEvent({status:e.target.value as Event['status']})} className="mt-1 block h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-[10px]"><option value="ACTIVE">เปิดใช้งาน</option><option value="UPCOMING">กำลังจะมาถึง</option><option value="CLOSED">ปิดกิจกรรม</option></select></label></div><div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]"><label className="text-[9px] font-semibold text-slate-500">ภาพแบนเนอร์กิจกรรม<input type="url" value={bannerDraft} onChange={e=>setBannerDraft(e.target.value)} placeholder="วาง URL รูปภาพโดยตรง เช่น https://..." className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-[10px]"/></label><button type="button" onClick={()=>void updateEvent({banner_url:bannerDraft})} className="self-end rounded-lg bg-[#7c0a02] px-4 py-3 text-[9px] font-bold text-white">บันทึกแบนเนอร์</button></div><div className="mt-4 flex flex-wrap gap-2"><button onClick={deleteActivity} className="flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-2 text-[9px] font-bold text-rose-700"><Trash2 size={13}/>ลบกิจกรรม</button><button onClick={openCodes} className="flex items-center gap-1.5 rounded-lg bg-amber-100 px-3 py-2 text-[9px] font-bold text-amber-900"><Ticket size={13}/>เติม Passcode สำรอง</button><span className="rounded-lg bg-slate-50 px-3 py-2 text-[9px] text-slate-500">เหลือ <b className="text-slate-800">{remaining}</b> / {reserves.length} รหัสสำรอง</span></div></div>
-  <div className="mt-5"><div className="flex items-center justify-between"><div><h3 className="text-xs font-extrabold text-slate-900">นำเข้ารายชื่อนักศึกษา</h3><p className="mt-1 text-[9px] text-slate-500">CSV: student_id,full_name,faculty,major,class_group,study_year,birth_date,phone</p><p className="mt-1 text-[9px] text-slate-400">รองรับหัวตารางภาษาไทย · ชั้นปีปัจจุบัน 1–8</p></div><FileUp size={17} className="text-slate-400"/></div><label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-[10px] text-slate-500 hover:border-amber-400 hover:bg-amber-50"><Download size={15}/>{csvFile?csvFile.name:'เลือกไฟล์ .csv'}<input type="file" accept=".csv,text/csv" className="hidden" onChange={e=>setCsvFile(e.target.files?.[0]||null)}/></label><button disabled={!csvFile} onClick={importCsv} className="mt-2 w-full rounded-xl bg-slate-900 py-2.5 text-[10px] font-bold text-white disabled:bg-slate-300">นำเข้ารายชื่อและจับคู่ Passcode</button></div>
- </section><div className="space-y-5"><div className="bento p-5"><div className="flex items-center justify-between"><div><span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Reserve Passcode Pool</span><h2 className="mt-1 text-sm font-extrabold text-slate-900">Passcode สำรองคงเหลือ</h2></div><span className="rounded-xl bg-amber-50 p-2 text-amber-600"><Ticket size={18}/></span></div><div className="mt-4 flex items-center gap-5"><div className="relative flex h-32 w-32 shrink-0 items-center justify-center rounded-full" style={{background:'conic-gradient(#d4af37 '+(reserves.length?remaining/reserves.length*360:0)+'deg,#f1f5f9 0deg)'}}><div className="flex h-24 w-24 flex-col items-center justify-center rounded-full bg-white"><b className="text-3xl text-slate-900">{remaining}</b><span className="text-[8px] text-slate-400">AVAILABLE</span></div></div><div><b className="text-xs text-slate-900">{remaining===0?'ต้องเติม Passcode':'พร้อมสำหรับ Walk-in'}</b><p className="mt-1 max-w-[180px] text-[9px] leading-5 text-slate-500">โค้ดจะถูกจับคู่ด้วย transaction ป้องกันการแจกซ้ำ</p><button onClick={openCodes} className="mt-3 rounded-lg bg-[#7c0a02] px-3 py-2 text-[9px] font-bold text-white">เติมรหัสสำรอง</button></div></div></div>
-   <div className="bento p-5"><h2 className="text-sm font-extrabold text-slate-900">กิจกรรมทั้งหมด</h2><div className="mt-3 space-y-2">{store.events.map((e,i)=><button key={e.id} onClick={()=>setSelectedEvent(e.id)} style={e.banner_url?{backgroundImage:`linear-gradient(90deg,rgba(255,255,255,.96),rgba(255,255,255,.76)),url("${e.banner_url}")`,backgroundSize:'cover',backgroundPosition:'center'}:undefined} className={cx('flex w-full items-center gap-3 rounded-xl p-3 text-left',e.id===selectedEventId?'bg-rose-50':'bg-slate-50 hover:bg-slate-100')}><span className={cx('flex h-8 w-8 items-center justify-center rounded-lg text-[9px] font-bold',i===0?'bg-[#7c0a02] text-white':'bg-white text-slate-500')}>0{i+1}</span><span className="min-w-0 flex-1"><b className="block truncate text-[10px] text-slate-800">{e.title}</b><small className="text-[8px] text-slate-400">{store.regs.filter(r=>r.event_id===e.id).length} ลงทะเบียน</small></span><span className={cx('h-2 w-2 rounded-full',e.status==='ACTIVE'?'bg-emerald-500':'bg-slate-300')}/></button>)}</div></div>
- </div></div>
-
- <section className="bento overflow-hidden">
-   <div className="flex flex-wrap items-center justify-between gap-3 p-5">
-    <div><h2 className="text-sm font-extrabold text-slate-900">รายงานผู้เข้าร่วมกิจกรรม</h2><p className="mt-1 text-[9px] text-slate-500">{reportStatus==='NO_CHECKIN'?'ลงทะเบียนแล้วแต่ไม่เช็กอิน · ไม่เข้าร่วมกิจกรรม':reportStatus==='NO_CHECKOUT'?'เช็กอินแล้วแต่ไม่เช็กเอาต์':reportStatus==='ALL'?'รายชื่อทั้งหมดและสถานะการเข้าร่วม':'รายชื่อผู้เช็กอินแล้ว'} · {selectedEvent.title}</p></div>
-    <div className="flex flex-wrap items-center gap-2">
-     <select value={reportStatus} onChange={e=>setReportStatus(e.target.value as typeof reportStatus)} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[9px]"><option value="ALL">ทุกรายชื่อ · {reportPopulation.length}</option><option value="ATTENDED">เช็กอินแล้ว · {attendedCount}</option><option value="NO_CHECKIN">ไม่เช็กอิน / ไม่เข้าร่วม · {noCheckinCount}</option><option value="NO_CHECKOUT">ยังไม่เช็กเอาต์ · {noCheckoutCount}</option></select>
-     <select value={reportStudyYear} onChange={e=>{setReportStudyYear(e.target.value);setReportMajor('ALL');setReportClassGroup('ALL')}} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[9px]"><option value="ALL">ทุกชั้นปี</option>{reportStudyYears.map(year=><option key={year} value={year}>ปี {year}</option>)}</select>
-     <select value={reportFaculty} onChange={e=>{setReportFaculty(e.target.value);setReportMajor('ALL');setReportClassGroup('ALL')}} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[9px]"><option value="ALL">ทุกคณะ</option>{reportFaculties.map(f=><option key={f}>{f}</option>)}</select>
-     <select value={reportMajor} onChange={e=>{setReportMajor(e.target.value);setReportClassGroup('ALL')}} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[9px]"><option value="ALL">ทุกสาขา</option>{reportMajors.map(m=><option key={m}>{m}</option>)}</select>
-     <select value={reportClassGroup} onChange={e=>setReportClassGroup(e.target.value)} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[9px]"><option value="ALL">ทุกหมู่เรียน</option>{reportClassGroups.map(group=><option key={group}>{group}</option>)}</select>
-     <button onClick={exportAttendance} className="flex items-center gap-1.5 rounded-lg bg-[#7c0a02] px-3 py-2 text-[9px] font-bold text-white"><Download size={12}/>ส่งออก CSV</button>
+ return <div className="space-y-6">
+  {/* Header Section */}
+  <div className="flex flex-wrap items-end justify-between gap-3 px-2">
+    <div>
+      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.15em] text-slate-400">
+        <span>Admin Console</span>
+        <span className="h-1 w-1 rounded-full bg-[#d4af37]"/>
+        System Management
+      </div>
+      <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">จัดการกิจกรรมและสิทธิ์</h1>
+      <p className="mt-1 text-xs text-slate-500">แดชบอร์ดสถิติ · ตั้งค่ากิจกรรม · นำเข้ารายชื่อ · จัดการผู้ใช้และคณะ/สาขา</p>
     </div>
-   </div>
-   <div className="grid gap-2 px-5 pb-4 sm:grid-cols-2 lg:grid-cols-4">{groupedCounts.map(item=><div key={item.faculty+item.major} className="rounded-xl bg-slate-50 px-3 py-2"><span className="block truncate text-[8px] text-slate-500">{item.faculty}</span><b className="block truncate text-[9px] text-slate-800">{item.major}</b><span className="mt-1 block text-[9px] text-[#7c0a02]">{item.count} คน</span></div>)}{groupedCounts.length===0&&<p className="col-span-full rounded-xl bg-slate-50 p-4 text-center text-[10px] text-slate-400">ไม่มีรายชื่อตรงกับตัวกรองนี้</p>}</div>
-   <div className="overflow-x-auto"><table className="w-full min-w-[1500px] text-left"><thead className="bg-slate-50 text-[8px] font-bold uppercase tracking-wider text-slate-400"><tr><th className="px-4 py-3">ผู้เข้าร่วม</th><th className="px-4 py-3">ชั้นปี</th><th className="px-4 py-3">คณะ</th><th className="px-4 py-3">สาขาวิชา</th><th className="px-4 py-3">หมู่เรียน</th><th className="px-4 py-3">เบอร์โทร</th><th className="px-4 py-3">สถานะ</th><th className="px-4 py-3">เวลาเช็กอิน</th><th className="px-4 py-3">สตาฟเช็กอิน</th><th className="px-4 py-3">เวลาเช็กเอาต์</th><th className="px-4 py-3">สตาฟเช็กเอาต์</th><th className="px-4 py-3">จัดการ</th></tr></thead><tbody className="divide-y divide-slate-50">{selectedReportRows.map(({reg,person})=>{const checkinStaff=reg.checkin_staff_name||store.users.find(u=>u.id===reg.checked_in_by)?.full_name;const checkoutStaff=reg.checkout_staff_name||store.users.find(u=>u.id===reg.checked_out_by)?.full_name;return <tr key={reg.user_id} className="text-[10px]"><td className="px-5 py-3"><b className="block text-slate-800">{person.full_name}</b><small className="text-[8px] text-slate-400">{person.student_id}</small></td><td className="px-4 py-3 text-slate-500">ปี {person.study_year||'—'}</td><td className="px-4 py-3 text-slate-500">{person.faculty}</td><td className="px-4 py-3 text-slate-500">{person.major}</td><td className="px-4 py-3 text-slate-500">{person.class_group||'—'}</td><td className="px-4 py-3 text-slate-500">{person.phone||'—'}</td><td className="px-4 py-3"><StatusPill status={reg.status}/></td><td className="px-4 py-3 text-slate-500">{reg.checkin_at?new Date(reg.checkin_at).toLocaleString('th-TH'):'—'}</td><td className="px-4 py-3 text-slate-500">{checkinStaff||'—'}</td><td className="px-4 py-3 text-slate-500">{reg.checkout_at?new Date(reg.checkout_at).toLocaleString('th-TH'):'—'}</td><td className="px-4 py-3 text-slate-500">{checkoutStaff||'—'}</td><td className="px-4 py-3"><button onClick={()=>deleteRegistration(reg.user_id)} title="ลบการลงทะเบียนกิจกรรม" aria-label="ลบการลงทะเบียนกิจกรรม" className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-700"><Trash2 size={14}/></button></td></tr>})}{selectedReportRows.length===0&&<tr><td colSpan={12} className="p-8 text-center text-xs text-slate-400">ไม่มีรายชื่อในหมวดนี้</td></tr>}</tbody></table></div>
-  </section>
- <section className="bento overflow-hidden"><div className="flex items-center justify-between p-5"><div><h2 className="text-sm font-extrabold text-slate-900">รายชื่อนักศึกษาที่ลงทะเบียน</h2><p className="mt-1 text-[9px] text-slate-500">{selectedEvent.title}</p></div><span className="rounded-full bg-slate-100 px-3 py-1.5 text-[9px] font-bold text-slate-600">{regs.length} คน</span></div><div className="overflow-x-auto"><table className="w-full min-w-[1040px] text-left"><thead className="bg-slate-50 text-[8px] font-bold uppercase tracking-wider text-slate-400"><tr><th className="px-4 py-3">นักศึกษา</th><th className="px-4 py-3">ชั้นปี</th><th className="px-4 py-3">คณะ</th><th className="px-4 py-3">สาขาวิชา</th><th className="px-4 py-3">หมู่เรียน</th><th className="px-4 py-3">สถานะ</th><th className="px-4 py-3">Passcode</th><th className="px-4 py-3">จัดการ</th></tr></thead><tbody className="divide-y divide-slate-50">{regs.map(reg=>{const p=store.users.find(u=>u.id===reg.user_id);if(!p)return null;const assignedPasscode=reg.passcode||store.codes.find(code=>code.event_id===selectedEventId&&code.assigned_to===p.id)?.code;return <tr key={reg.user_id} className="text-[10px]"><td className="px-5 py-3"><b className="block text-slate-800">{p.full_name}</b><small className="text-[8px] text-slate-400">{p.student_id}</small></td><td className="px-4 py-3 text-slate-500">{p.study_year>0?`ปี ${p.study_year}`:'—'}</td><td className="px-4 py-3 text-slate-500">{p.faculty}</td><td className="px-4 py-3 text-slate-500">{p.major}</td><td className="px-4 py-3 text-slate-500">{p.class_group||'—'}</td><td className="px-4 py-3"><StatusPill status={reg.status}/></td><td className="px-4 py-3 font-mono text-slate-500">{p.study_year>1?(assignedPasscode||'รอจ่ายรหัส'):'ไม่ใช้'}</td><td className="px-4 py-3"><button onClick={()=>deleteRegistration(reg.user_id)} title="ลบการลงทะเบียนกิจกรรม" aria-label="ลบการลงทะเบียนกิจกรรม" className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-700"><Trash2 size={14}/></button></td></tr>})}{regs.length===0&&<tr><td colSpan={8} className="p-8 text-center text-xs text-slate-400">ยังไม่มีผู้ลงทะเบียน</td></tr>}</tbody></table></div></section>
- <section className="bento overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-3 p-5"><div><h2 className="text-sm font-extrabold text-slate-900">จัดการบัญชีผู้ใช้</h2><p className="mt-1 text-[9px] text-slate-500">แก้ไขข้อมูลและรหัสผ่าน หรือลบบัญชีนักศึกษาและสตาฟ</p></div><span className="rounded-full bg-slate-100 px-3 py-1.5 text-[9px] font-bold text-slate-600">{managedUsers.length} บัญชี</span></div><div className="px-5 pb-4"><input value={userQuery} onChange={e=>setUserQuery(e.target.value)} placeholder="ค้นหาชื่อ รหัสผู้ใช้ คณะ หรือสาขา" aria-label="ค้นหาผู้ใช้" className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs"/></div><div className="grid gap-3 p-5 pt-0 sm:grid-cols-2 xl:grid-cols-3">{managedUsers.map(account=><article key={account.id} className="flex min-w-0 items-start gap-3 rounded-2xl border border-slate-100 p-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-600">{initials(account.full_name)}</span><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><b className="truncate text-[10px] text-slate-800">{account.full_name}</b><span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[8px] font-bold text-slate-600">{account.role==='STUDENT'?'นักศึกษา':'สตาฟ'}</span></div><small className="mt-1 block truncate text-[9px] text-slate-500">{account.student_id} · {account.role==='STUDENT'?`ปี ${account.study_year}`:account.major}</small><small className="block truncate text-[8px] text-slate-400">{account.faculty} · {account.major} · {account.class_group} · {account.phone||'ไม่มีเบอร์โทร'}</small></div><div className="flex shrink-0 flex-col gap-1.5"><button type="button" onClick={()=>editUser(account)} className="rounded-lg border border-slate-200 px-2.5 py-2 text-[9px] font-bold text-slate-600 hover:border-[#7c0a02] hover:text-[#7c0a02]">แก้ไข</button><button type="button" onClick={()=>deleteUser(account)} className="rounded-lg border border-rose-200 px-2.5 py-2 text-[9px] font-bold text-rose-700 hover:bg-rose-50">ลบบัญชี</button></div></article>)}{managedUsers.length===0&&<p className="col-span-full rounded-xl bg-slate-50 p-5 text-center text-[10px] text-slate-400">ไม่พบผู้ใช้ตามคำค้นนี้</p>}</div></section>
- <section className="bento overflow-hidden">
-  <div className="flex flex-wrap items-center justify-between gap-3 p-5"><div><h2 className="text-sm font-extrabold text-slate-900">จัดการคณะและสาขาวิชา</h2><p className="mt-1 text-[9px] text-slate-500">เพิ่ม แก้ไข หรือลบรายการที่ใช้ในแบบฟอร์มลงทะเบียน</p></div><span className="rounded-full bg-slate-100 px-3 py-1.5 text-[9px] font-bold text-slate-600">{academicCatalog.length} คณะ · {academicCatalog.reduce((count,item)=>count+item.majors.length,0)} สาขา</span></div>
-  <form onSubmit={e=>{e.preventDefault();const name=newFaculty.trim();if(name){void manageAcademicCatalog('ADD_FACULTY','',name,'','');setNewFaculty('');}}} className="flex gap-2 px-5 pb-4"><input value={newFaculty} onChange={e=>setNewFaculty(e.target.value)} maxLength={150} placeholder="ชื่อคณะใหม่" aria-label="ชื่อคณะใหม่" className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs"/><button className="flex shrink-0 items-center gap-1.5 rounded-xl bg-[#7c0a02] px-4 text-[10px] font-bold text-white"><Plus size={14}/>เพิ่มคณะ</button></form>
-  <div className="space-y-3 px-5 pb-5">{academicCatalog.map(faculty=><article key={faculty.id} className="rounded-2xl border border-slate-200 p-4"><div className="flex flex-wrap items-center gap-2"><input value={facultyDrafts[faculty.id]??faculty.name} onChange={e=>setFacultyDrafts(old=>({...old,[faculty.id]:e.target.value}))} maxLength={150} aria-label={`ชื่อคณะ ${faculty.name}`} className="h-10 min-w-[180px] flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-semibold"/><button type="button" onClick={()=>{const name=(facultyDrafts[faculty.id]??faculty.name).trim();if(name){void manageAcademicCatalog('UPDATE_FACULTY',faculty.id,name,'','');setFacultyDrafts(old=>({...old,[faculty.id]:name}));}}} className="rounded-lg border border-slate-200 px-3 py-2.5 text-[9px] font-bold text-slate-700 hover:border-amber-400">บันทึกคณะ</button><button type="button" onClick={()=>saveCatalogItem('DELETE_FACULTY',faculty)} className="rounded-lg border border-rose-200 px-3 py-2.5 text-[9px] font-bold text-rose-700 hover:bg-rose-50">ลบคณะ</button></div>
-   <div className="mt-3 space-y-2">{faculty.majors.map(major=><div key={major.id} className="flex flex-wrap items-center gap-2 pl-2 sm:pl-5"><input value={majorDrafts[major.id]??major.name} onChange={e=>setMajorDrafts(old=>({...old,[major.id]:e.target.value}))} maxLength={150} aria-label={`ชื่อสาขา ${major.name}`} className="h-9 min-w-[160px] flex-1 rounded-lg border border-slate-200 bg-white px-3 text-[10px]"/><button type="button" onClick={()=>{const name=(majorDrafts[major.id]??major.name).trim();if(name){void manageAcademicCatalog('UPDATE_MAJOR',faculty.id,faculty.name,major.id,name);setMajorDrafts(old=>({...old,[major.id]:name}));}}} className="rounded-lg border border-slate-200 px-3 py-2 text-[9px] font-bold text-slate-600">บันทึก</button><button type="button" onClick={()=>saveCatalogItem('DELETE_MAJOR',faculty,'',major)} className="rounded-lg px-3 py-2 text-[9px] font-bold text-rose-700 hover:bg-rose-50">ลบ</button></div>)}
-    <form onSubmit={e=>{e.preventDefault();const name=(newMajor[faculty.id]||'').trim();if(name){void manageAcademicCatalog('ADD_MAJOR',faculty.id,faculty.name,'',name);setNewMajor(old=>({...old,[faculty.id]:''}));}}} className="flex flex-wrap gap-2 pl-2 sm:pl-5"><input value={newMajor[faculty.id]||''} onChange={e=>setNewMajor(old=>({...old,[faculty.id]:e.target.value}))} maxLength={150} placeholder={`เพิ่มสาขาใน${faculty.name}`} aria-label={`เพิ่มสาขาใน${faculty.name}`} className="h-9 min-w-[160px] flex-1 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 text-[10px]"/><button className="flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-2 text-[9px] font-bold text-white"><Plus size={12}/>เพิ่มสาขา</button></form>
-   </div></article>)}{academicCatalog.length===0&&<p className="rounded-xl bg-slate-50 p-5 text-center text-[10px] text-slate-400">ยังไม่มีคณะในระบบ</p>}</div>
- </section>
+    <div className="flex gap-2">
+      <button onClick={openStaff} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-[10px] font-bold text-slate-700 shadow-sm transition hover:border-[#7c0a02] hover:text-[#7c0a02]">
+        <Users size={14}/>
+        เพิ่มผู้ใช้
+      </button>
+      <button onClick={openCreate} className="flex items-center gap-2 rounded-full bg-gradient-to-r from-[#7c0a02] to-[#a31508] px-4 py-2.5 text-[10px] font-bold text-white shadow-md shadow-rose-900/20 transition hover:shadow-lg">
+        <Plus size={14}/>
+        สร้างกิจกรรมใหม่
+      </button>
+    </div>
+  </div>
+
+  {/* Metric Cards */}
+  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <AdminMetric label="กิจกรรมทั้งหมด" value={store.events.length} note="รายการในระบบ" icon={<Activity size={18}/>} tone="rose"/>
+    <AdminMetric label="ผู้เข้าร่วมทั้งหมด" value={store.users.filter(u=>u.role==='STUDENT').length} note="บัญชีนักศึกษา" icon={<Users size={18}/>} tone="gold"/>
+    <AdminMetric label="ลงทะเบียนกิจกรรมนี้" value={regs.length} note={selectedEvent.title} icon={<QrCode size={18}/>} tone="blue"/>
+    <AdminMetric label="เข้าร่วมครบแล้ว" value={completed} note="เช็กเอาต์สำเร็จ" icon={<CheckCircle2 size={18}/>} tone="green"/>
+  </div>
+
+  {/* Admin Sub-Navigation Category Tabs */}
+  <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200/80 bg-white p-2 shadow-sm">
+    <div className="flex flex-wrap items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => setAdminTab('dashboard')}
+        className={cx(
+          'flex items-center gap-2 rounded-xl px-3.5 py-2 text-[11px] font-extrabold transition-all',
+          adminTab === 'dashboard'
+            ? 'bg-[#7c0a02] text-white shadow-md shadow-rose-950/25 ring-2 ring-rose-900/10'
+            : 'text-slate-600 hover:text-[#7c0a02] hover:bg-rose-50/60'
+        )}
+      >
+        <Activity size={14} />
+        <span>แดชบอร์ดภาพรวม</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => setAdminTab('events')}
+        className={cx(
+          'flex items-center gap-2 rounded-xl px-3.5 py-2 text-[11px] font-extrabold transition-all',
+          adminTab === 'events'
+            ? 'bg-sky-700 text-white shadow-md shadow-sky-950/25 ring-2 ring-sky-700/10'
+            : 'text-slate-600 hover:text-sky-700 hover:bg-sky-50/60'
+        )}
+      >
+        <BookOpen size={14} />
+        <span>จัดการกิจกรรม</span>
+        <span className={cx('rounded-full px-1.5 py-0.2 text-[9px] font-bold', adminTab==='events'?'bg-white/25 text-white':'bg-slate-100 text-slate-700')}>{store.events.length}</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => setAdminTab('report')}
+        className={cx(
+          'flex items-center gap-2 rounded-xl px-3.5 py-2 text-[11px] font-extrabold transition-all',
+          adminTab === 'report'
+            ? 'bg-emerald-700 text-white shadow-md shadow-emerald-950/25 ring-2 ring-emerald-700/10'
+            : 'text-slate-600 hover:text-emerald-700 hover:bg-emerald-50/60'
+        )}
+      >
+        <FileSpreadsheet size={14} />
+        <span>รายงานผู้เข้าร่วม</span>
+        <span className={cx('rounded-full px-1.5 py-0.2 text-[9px] font-bold', adminTab==='report'?'bg-white/25 text-white':'bg-slate-100 text-slate-700')}>{regs.length}</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => setAdminTab('users')}
+        className={cx(
+          'flex items-center gap-2 rounded-xl px-3.5 py-2 text-[11px] font-extrabold transition-all',
+          adminTab === 'users'
+            ? 'bg-amber-600 text-white shadow-md shadow-amber-950/25 ring-2 ring-amber-600/10'
+            : 'text-slate-600 hover:text-amber-800 hover:bg-amber-50/60'
+        )}
+      >
+        <Users size={14} />
+        <span>จัดการบัญชีผู้ใช้</span>
+        <span className={cx('rounded-full px-1.5 py-0.2 text-[9px] font-bold', adminTab==='users'?'bg-white/25 text-white':'bg-slate-100 text-slate-700')}>{store.users.length}</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => setAdminTab('catalog')}
+        className={cx(
+          'flex items-center gap-2 rounded-xl px-3.5 py-2 text-[11px] font-extrabold transition-all',
+          adminTab === 'catalog'
+            ? 'bg-purple-700 text-white shadow-md shadow-purple-950/25 ring-2 ring-purple-700/10'
+            : 'text-slate-600 hover:text-purple-800 hover:bg-purple-50/60'
+        )}
+      >
+        <Building2 size={14} />
+        <span>คณะ & สาขาวิชา</span>
+        <span className={cx('rounded-full px-1.5 py-0.2 text-[9px] font-bold', adminTab==='catalog'?'bg-white/25 text-white':'bg-slate-100 text-slate-700')}>{academicCatalog.length}</span>
+      </button>
+    </div>
+
+    <button
+      type="button"
+      onClick={() => setAdminTab(adminTab === 'all' ? 'dashboard' : 'all')}
+      className={cx(
+        'flex items-center gap-2 rounded-xl px-3.5 py-2 text-[11px] font-bold transition shadow-sm',
+        adminTab === 'all'
+          ? 'bg-slate-900 text-amber-300 ring-2 ring-slate-800'
+          : 'border border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+      )}
+    >
+      <Layers size={14} />
+      <span>{adminTab === 'all' ? 'แสดงแบบแท็บ' : 'แสดงทั้งหมด (All)'}</span>
+    </button>
+  </div>
+
+  {/* TAB 1: Dashboard Section */}
+  {(adminTab === 'all' || adminTab === 'dashboard') && (
+    <section className="bento p-5 sm:p-6 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+        <div>
+          <h2 className="text-base font-extrabold text-slate-900">แดชบอร์ดกิจกรรมแบบเรียลไทม์</h2>
+          <p className="mt-0.5 text-[10px] text-slate-500">จำนวนผู้เข้าร่วมและผู้ใช้งานออนไลน์ แยกตามกิจกรรม · อัปเดตผ่าน Supabase Realtime</p>
+        </div>
+        <span className={cx('flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[9px] font-extrabold shadow-sm',dashboardLive?'bg-emerald-50 text-emerald-700 border border-emerald-200':'bg-amber-50 text-amber-800 border border-amber-200')}>
+          <i className={cx('h-1.5 w-1.5 rounded-full',dashboardLive?'animate-pulse bg-emerald-500':'bg-amber-500')}/>
+          {dashboardLive?'LIVE REALTIME':'RECONNECTING'}
+        </span>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {dashboardRows.map(row=><article key={row.event_id} className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm hover:shadow-md transition">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <b className="block truncate text-xs font-extrabold text-slate-900">{row.title}</b>
+              <div className="mt-1 flex items-center gap-1.5">
+                <EventStatusPill status={row.status}/>
+                <span className="text-[9px] text-slate-400 font-semibold">{row.registered_count} รายชื่อ</span>
+              </div>
+            </div>
+            <Activity size={16} className="shrink-0 text-[#7c0a02]"/>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <DashboardCount icon={<ArrowDownRight size={14}/>} label="เช็กอินแล้ว" value={row.checked_in_count} tone="text-emerald-700 bg-emerald-50"/>
+            <DashboardCount icon={<ArrowUpRight size={14}/>} label="เช็กเอาต์แล้ว" value={row.checked_out_count} tone="text-amber-700 bg-amber-50"/>
+            <DashboardCount icon={<Users size={14}/>} label="นักศึกษาออนไลน์" value={row.online_students} tone="text-sky-700 bg-sky-50"/>
+            <DashboardCount icon={<ScanLine size={14}/>} label="สตาฟออนไลน์" value={row.online_staff} tone="text-rose-800 bg-rose-50"/>
+          </div>
+        </article>)}
+        {dashboardRows.length===0&&<p className="col-span-full rounded-xl bg-slate-50 p-6 text-center text-xs text-slate-400">กำลังโหลดข้อมูลกิจกรรม…</p>}
+      </div>
+    </section>
+  )}
+
+  {/* TAB 2: Events & Codes Management */}
+  {(adminTab === 'all' || adminTab === 'events') && (
+    <div className="grid gap-5 xl:grid-cols-[1.1fr_.9fr]">
+      <section className="bento p-5 sm:p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
+          <div>
+            <h2 className="text-base font-extrabold text-slate-900">การจัดการกิจกรรม</h2>
+            <p className="mt-0.5 text-[10px] text-slate-500">เลือกและตั้งค่าการลงทะเบียนของแต่ละกิจกรรม</p>
+          </div>
+          <select value={selectedEventId} onChange={e=>setSelectedEvent(e.target.value)} className="max-w-[240px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold shadow-sm">
+            {store.events.map(e=><option value={e.id} key={e.id}>{e.title}</option>)}
+          </select>
+        </div>
+        <div className="mt-4 rounded-2xl border border-slate-200/80 bg-cover bg-center p-4 shadow-sm" style={selectedEvent.banner_url?{backgroundImage:`linear-gradient(90deg,rgba(255,255,255,.94) 0%,rgba(255,255,255,.84) 62%,rgba(255,255,255,.68) 100%),url("${selectedEvent.banner_url}")`}:undefined}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <EventStatusPill status={selectedEvent.status}/>
+              <h3 className="mt-2 text-sm font-extrabold text-slate-900">{selectedEvent.title}</h3>
+              <p className="mt-1 text-[10px] text-slate-500">{selectedEvent.location} · {selectedEvent.activity_hours} ชั่วโมง</p>
+            </div>
+            <span className="rounded-xl bg-rose-50 p-2 text-[#7c0a02]"><BookOpen size={18}/></span>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-[10px] font-semibold text-slate-500">URL Redirect · รุ่นปี 1</label>
+              <div className="mt-1 flex gap-2">
+                <input type="url" value={redirectDraft} onChange={e=>setRedirectDraft(e.target.value)} placeholder="https://..." className="h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 text-[10px]"/>
+                <button type="button" onClick={()=>void updateEvent({redirect_url_year1:redirectDraft})} className="shrink-0 rounded-lg bg-[#7c0a02] px-3 text-[9px] font-bold text-white shadow-sm hover:bg-[#620701]">บันทึก URL</button>
+              </div>
+            </div>
+            <label className="text-[10px] font-semibold text-slate-500">สถานะกิจกรรม
+              <select value={selectedEvent.status} onChange={e=>updateEvent({status:e.target.value as Event['status']})} className="mt-1 block h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-[10px]">
+                <option value="ACTIVE">เปิดใช้งาน (Active)</option>
+                <option value="UPCOMING">กำลังจะมาถึง (Upcoming)</option>
+                <option value="CLOSED">ปิดกิจกรรม (Closed)</option>
+              </select>
+            </label>
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
+            <label className="text-[10px] font-semibold text-slate-500">ภาพแบนเนอร์กิจกรรม
+              <input type="url" value={bannerDraft} onChange={e=>setBannerDraft(e.target.value)} placeholder="วาง URL รูปภาพโดยตรง เช่น https://..." className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-[10px]"/>
+            </label>
+            <button type="button" onClick={()=>void updateEvent({banner_url:bannerDraft})} className="self-end rounded-lg bg-[#7c0a02] px-4 py-3 text-[9px] font-bold text-white shadow-sm hover:bg-[#620701]">บันทึกแบนเนอร์</button>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+            <button onClick={deleteActivity} className="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-2 text-[9px] font-bold text-rose-700 hover:bg-rose-50 shadow-sm">
+              <Trash2 size={13}/>
+              ลบกิจกรรมนี้
+            </button>
+            <button onClick={openCodes} className="flex items-center gap-1.5 rounded-lg bg-amber-100 px-3 py-2 text-[9px] font-bold text-amber-900 shadow-sm hover:bg-amber-200">
+              <Ticket size={13}/>
+              เติม Passcode สำรอง
+            </button>
+            <span className="rounded-lg bg-slate-100 px-3 py-2 text-[9px] text-slate-600 font-medium">เหลือ <b className="text-slate-900 font-bold">{remaining}</b> / {reserves.length} รหัสสำรอง</span>
+          </div>
+        </div>
+
+        {/* CSV Import Section */}
+        <div className="mt-6 border-t border-slate-100 pt-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xs font-extrabold text-slate-900">นำเข้ารายชื่อนักศึกษาผ่าน CSV</h3>
+              <p className="mt-0.5 text-[9px] text-slate-500">student_id, full_name, faculty, major, class_group, study_year, birth_date, phone</p>
+              <p className="mt-0.5 text-[9px] text-slate-400">รองรับหัวตารางภาษาไทยหรืออังกฤษ · ชั้นปีปัจจุบัน 1–8</p>
+            </div>
+            <FileUp size={17} className="text-slate-400"/>
+          </div>
+          <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-[10px] text-slate-500 hover:border-amber-400 hover:bg-amber-50/50 transition">
+            <Download size={15}/>
+            {csvFile?csvFile.name:'คลิกเพื่อเลือกไฟล์ .csv'}
+            <input type="file" accept=".csv,text/csv" className="hidden" onChange={e=>setCsvFile(e.target.files?.[0]||null)}/>
+          </label>
+          <button disabled={!csvFile} onClick={importCsv} className="mt-2 w-full rounded-xl bg-slate-900 py-2.5 text-[10px] font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:bg-slate-300">
+            นำเข้ารายชื่อและจับคู่ Passcode อัตโนมัติ
+          </button>
+        </div>
+      </section>
+
+      {/* Right column: Passcodes Pool + All Events */}
+      <div className="space-y-5">
+        <div className="bento p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Reserve Passcode Pool</span>
+              <h2 className="mt-1 text-sm font-extrabold text-slate-900">Passcode สำรองคงเหลือ</h2>
+            </div>
+            <span className="rounded-xl bg-amber-50 p-2 text-amber-600"><Ticket size={18}/></span>
+          </div>
+          <div className="mt-4 flex items-center gap-5">
+            <div className="relative flex h-32 w-32 shrink-0 items-center justify-center rounded-full shadow-inner" style={{background:'conic-gradient(#d4af37 '+(reserves.length?remaining/reserves.length*360:0)+'deg,#f1f5f9 0deg)'}}>
+              <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full bg-white shadow-sm">
+                <b className="text-3xl text-slate-900 font-extrabold">{remaining}</b>
+                <span className="text-[8px] font-bold text-slate-400">AVAILABLE</span>
+              </div>
+            </div>
+            <div>
+              <b className="text-xs text-slate-900">{remaining===0?'ต้องเติม Passcode':'พร้อมสำหรับ Walk-in'}</b>
+              <p className="mt-1 max-w-[180px] text-[9px] leading-5 text-slate-500">โค้ดจะถูกจับคู่ด้วย database transaction ป้องกันการแจกซ้ำ</p>
+              <button onClick={openCodes} className="mt-3 rounded-lg bg-[#7c0a02] px-3 py-2 text-[9px] font-bold text-white shadow-sm hover:bg-[#620701]">เติมรหัสสำรอง</button>
+            </div>
+          </div>
+        </div>
+
+        <div className="bento p-5 shadow-sm">
+          <h2 className="text-sm font-extrabold text-slate-900">กิจกรรมทั้งหมดในระบบ</h2>
+          <div className="mt-3 space-y-2">
+            {store.events.map((e,i)=><button key={e.id} onClick={()=>setSelectedEvent(e.id)} style={e.banner_url?{backgroundImage:`linear-gradient(90deg,rgba(255,255,255,.96),rgba(255,255,255,.76)),url("${e.banner_url}")`,backgroundSize:'cover',backgroundPosition:'center'}:undefined} className={cx('flex w-full items-center gap-3 rounded-xl p-3 text-left transition',e.id===selectedEventId?'bg-rose-50 border border-rose-200 shadow-sm':'bg-slate-50 hover:bg-slate-100')}>
+              <span className={cx('flex h-8 w-8 items-center justify-center rounded-lg text-[9px] font-bold',i===0?'bg-[#7c0a02] text-white':'bg-white text-slate-600 shadow-sm')}>0{i+1}</span>
+              <span className="min-w-0 flex-1">
+                <b className="block truncate text-[11px] font-bold text-slate-800">{e.title}</b>
+                <small className="text-[9px] text-slate-400">{store.regs.filter(r=>r.event_id===e.id).length} ลงทะเบียน</small>
+              </span>
+              <EventStatusPill status={e.status}/>
+            </button>)}
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {/* TAB 3: Attendance Report & Registered Students */}
+  {(adminTab === 'all' || adminTab === 'report') && (
+    <div className="space-y-5">
+      <section className="bento overflow-hidden shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-5 border-b border-slate-100">
+          <div>
+            <h2 className="text-sm font-extrabold text-slate-900">รายงานผู้เข้าร่วมกิจกรรม</h2>
+            <p className="mt-0.5 text-[9px] text-slate-500">
+              {reportStatus==='NO_CHECKIN'?'ลงทะเบียนแล้วแต่ไม่เช็กอิน · ไม่เข้าร่วม':reportStatus==='NO_CHECKOUT'?'เช็กอินแล้วแต่ยังไม่เช็กเอาต์':reportStatus==='ALL'?'รายชื่อทั้งหมดและสถานะ':'รายชื่อผู้เช็กอินแล้ว'} · {selectedEvent.title}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select value={reportStatus} onChange={e=>setReportStatus(e.target.value as typeof reportStatus)} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-bold shadow-sm">
+              <option value="ALL">ทุกรายชื่อ ({reportPopulation.length})</option>
+              <option value="ATTENDED">เช็กอินแล้ว ({attendedCount})</option>
+              <option value="NO_CHECKIN">ไม่เช็กอิน / ไม่เข้าร่วม ({noCheckinCount})</option>
+              <option value="NO_CHECKOUT">ยังไม่เช็กเอาต์ ({noCheckoutCount})</option>
+            </select>
+            <select value={reportStudyYear} onChange={e=>{setReportStudyYear(e.target.value);setReportMajor('ALL');setReportClassGroup('ALL')}} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px]">
+              <option value="ALL">ทุกชั้นปี</option>
+              {reportStudyYears.map(year=><option key={year} value={year}>ปี {year}</option>)}
+            </select>
+            <select value={reportFaculty} onChange={e=>{setReportFaculty(e.target.value);setReportMajor('ALL');setReportClassGroup('ALL')}} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px]">
+              <option value="ALL">ทุกคณะ</option>
+              {reportFaculties.map(f=><option key={f}>{f}</option>)}
+            </select>
+            <select value={reportMajor} onChange={e=>{setReportMajor(e.target.value);setReportClassGroup('ALL')}} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px]">
+              <option value="ALL">ทุกสาขา</option>
+              {reportMajors.map(m=><option key={m}>{m}</option>)}
+            </select>
+            <select value={reportClassGroup} onChange={e=>setReportClassGroup(e.target.value)} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px]">
+              <option value="ALL">ทุกหมู่เรียน</option>
+              {reportClassGroups.map(group=><option key={group}>{group}</option>)}
+            </select>
+            <button onClick={exportAttendance} className="flex items-center gap-1.5 rounded-lg bg-[#7c0a02] px-3.5 py-2 text-[10px] font-bold text-white shadow-sm hover:bg-[#620701]">
+              <Download size={13}/>
+              ส่งออก CSV
+            </button>
+          </div>
+        </div>
+
+        {/* Breakdown by Faculty & Major */}
+        <div className="grid gap-2 px-5 py-4 sm:grid-cols-2 lg:grid-cols-4 bg-slate-50/50">
+          {groupedCounts.map(item=><div key={item.faculty+item.major} className="rounded-xl border border-slate-200/70 bg-white px-3.5 py-2.5 shadow-xs">
+            <span className="block truncate text-[8px] font-semibold text-slate-400">{item.faculty}</span>
+            <b className="block truncate text-[10px] text-slate-800">{item.major}</b>
+            <span className="mt-1 block text-[11px] font-extrabold text-[#7c0a02]">{item.count} คน</span>
+          </div>)}
+          {groupedCounts.length===0&&<p className="col-span-full rounded-xl bg-white p-4 text-center text-xs text-slate-400">ไม่มีรายชื่อตรงกับตัวกรองนี้</p>}
+        </div>
+
+        {/* Detailed Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1500px] text-left">
+            <thead className="bg-slate-50 text-[9px] font-bold uppercase tracking-wider text-slate-400 border-y border-slate-100">
+              <tr>
+                <th className="px-4 py-3">ผู้เข้าร่วม</th>
+                <th className="px-4 py-3">ชั้นปี</th>
+                <th className="px-4 py-3">คณะ</th>
+                <th className="px-4 py-3">สาขาวิชา</th>
+                <th className="px-4 py-3">หมู่เรียน</th>
+                <th className="px-4 py-3">เบอร์โทร</th>
+                <th className="px-4 py-3">สถานะ</th>
+                <th className="px-4 py-3">เวลาเช็กอิน</th>
+                <th className="px-4 py-3">สตาฟเช็กอิน</th>
+                <th className="px-4 py-3">เวลาเช็กเอาต์</th>
+                <th className="px-4 py-3">สตาฟเช็กเอาต์</th>
+                <th className="px-4 py-3">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {selectedReportRows.map(({reg,person})=>{
+                const checkinStaff=reg.checkin_staff_name||store.users.find(u=>u.id===reg.checked_in_by)?.full_name;
+                const checkoutStaff=reg.checkout_staff_name||store.users.find(u=>u.id===reg.checked_out_by)?.full_name;
+                return <tr key={reg.user_id} className="text-[10px] hover:bg-slate-50/80 transition">
+                  <td className="px-5 py-3"><b className="block text-slate-800 font-bold">{person.full_name}</b><small className="font-mono text-[9px] text-slate-400">{person.student_id}</small></td>
+                  <td className="px-4 py-3 text-slate-600 font-semibold">ปี {person.study_year||'—'}</td>
+                  <td className="px-4 py-3 text-slate-600">{person.faculty}</td>
+                  <td className="px-4 py-3 text-slate-600">{person.major}</td>
+                  <td className="px-4 py-3 text-slate-600">{person.class_group||'—'}</td>
+                  <td className="px-4 py-3 text-slate-600 font-mono">{person.phone||'—'}</td>
+                  <td className="px-4 py-3"><StatusPill status={reg.status}/></td>
+                  <td className="px-4 py-3 text-slate-600 font-mono">{reg.checkin_at?new Date(reg.checkin_at).toLocaleString('th-TH'):'—'}</td>
+                  <td className="px-4 py-3 text-slate-600">{checkinStaff||'—'}</td>
+                  <td className="px-4 py-3 text-slate-600 font-mono">{reg.checkout_at?new Date(reg.checkout_at).toLocaleString('th-TH'):'—'}</td>
+                  <td className="px-4 py-3 text-slate-600">{checkoutStaff||'—'}</td>
+                  <td className="px-4 py-3"><button onClick={()=>deleteRegistration(reg.user_id)} title="ลบการลงทะเบียนกิจกรรม" aria-label="ลบการลงทะเบียนกิจกรรม" className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-700 transition"><Trash2 size={14}/></button></td>
+                </tr>;
+              })}
+              {selectedReportRows.length===0&&<tr><td colSpan={12} className="p-8 text-center text-xs text-slate-400">ไม่มีรายชื่อในหมวดนี้</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="bento overflow-hidden shadow-sm">
+        <div className="flex items-center justify-between p-5 border-b border-slate-100">
+          <div>
+            <h2 className="text-sm font-extrabold text-slate-900">รายชื่อนักศึกษาที่ลงทะเบียนกิจกรรมนี้</h2>
+            <p className="mt-0.5 text-[9px] text-slate-500">{selectedEvent.title}</p>
+          </div>
+          <span className="rounded-full bg-slate-100 px-3 py-1.5 text-[9px] font-bold text-slate-700">{regs.length} คน</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1040px] text-left">
+            <thead className="bg-slate-50 text-[9px] font-bold uppercase tracking-wider text-slate-400 border-y border-slate-100">
+              <tr>
+                <th className="px-4 py-3">นักศึกษา</th>
+                <th className="px-4 py-3">ชั้นปี</th>
+                <th className="px-4 py-3">คณะ</th>
+                <th className="px-4 py-3">สาขาวิชา</th>
+                <th className="px-4 py-3">หมู่เรียน</th>
+                <th className="px-4 py-3">สถานะ</th>
+                <th className="px-4 py-3">Passcode</th>
+                <th className="px-4 py-3">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {regs.map(reg=>{
+                const p=store.users.find(u=>u.id===reg.user_id);
+                if(!p)return null;
+                const assignedPasscode=reg.passcode||store.codes.find(code=>code.event_id===selectedEventId&&code.assigned_to===p.id)?.code;
+                return <tr key={reg.user_id} className="text-[10px] hover:bg-slate-50/80 transition">
+                  <td className="px-5 py-3"><b className="block text-slate-800 font-bold">{p.full_name}</b><small className="font-mono text-[9px] text-slate-400">{p.student_id}</small></td>
+                  <td className="px-4 py-3 text-slate-600 font-semibold">{p.study_year>0?`ปี ${p.study_year}`:'—'}</td>
+                  <td className="px-4 py-3 text-slate-600">{p.faculty}</td>
+                  <td className="px-4 py-3 text-slate-600">{p.major}</td>
+                  <td className="px-4 py-3 text-slate-600">{p.class_group||'—'}</td>
+                  <td className="px-4 py-3"><StatusPill status={reg.status}/></td>
+                  <td className="px-4 py-3 font-mono text-slate-600 font-bold">{p.study_year>1?(assignedPasscode||'รอจ่ายรหัส'):'ไม่ใช้'}</td>
+                  <td className="px-4 py-3"><button onClick={()=>deleteRegistration(reg.user_id)} title="ลบการลงทะเบียนกิจกรรม" aria-label="ลบการลงทะเบียนกิจกรรม" className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-700 transition"><Trash2 size={14}/></button></td>
+                </tr>;
+              })}
+              {regs.length===0&&<tr><td colSpan={8} className="p-8 text-center text-xs text-slate-400">ยังไม่มีผู้ลงทะเบียน</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  )}
+
+  {/* TAB 4: User Accounts Management */}
+  {(adminTab === 'all' || adminTab === 'users') && (
+    <section className="bento overflow-hidden shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-5 border-b border-slate-100">
+        <div>
+          <h2 className="text-sm font-extrabold text-slate-900">จัดการบัญชีผู้ใช้งานในระบบ</h2>
+          <p className="mt-0.5 text-[9px] text-slate-500">แก้ไขข้อมูล รีเซ็ตรหัสผ่าน หรือลบบัญชีนักศึกษาและสตาฟ</p>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1.5 text-[9px] font-bold text-slate-700">{managedUsers.length} บัญชี</span>
+      </div>
+      <div className="p-5 pb-3 bg-slate-50/50">
+        <div className="relative">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"/>
+          <input
+            value={userQuery}
+            onChange={e=>setUserQuery(e.target.value)}
+            placeholder="ค้นหาชื่อ, รหัสนักศึกษา, คณะ, สาขา, หมู่เรียน..."
+            aria-label="ค้นหาผู้ใช้"
+            className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-xs font-medium shadow-xs"
+          />
+        </div>
+      </div>
+      <div className="grid gap-3 p-5 pt-2 sm:grid-cols-2 xl:grid-cols-3">
+        {managedUsers.map(account=><article key={account.id} className="flex min-w-0 items-start gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs hover:shadow-md transition">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-700 shadow-inner">
+            {initials(account.full_name)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <b className="truncate text-xs font-bold text-slate-900">{account.full_name}</b>
+              <RoleBadge role={account.role} size="sm"/>
+            </div>
+            <small className="mt-1 block truncate font-mono text-[10px] font-bold text-slate-600">
+              {account.student_id} {account.role==='STUDENT'?`· ปี ${account.study_year}`:''}
+            </small>
+            <small className="block truncate text-[9px] text-slate-400">
+              {account.faculty} · {account.major} · {account.class_group||'—'}
+            </small>
+          </div>
+          <div className="flex shrink-0 flex-col gap-1.5">
+            <button type="button" onClick={()=>editUser(account)} className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[9px] font-bold text-slate-700 hover:border-[#7c0a02] hover:text-[#7c0a02] hover:bg-white shadow-xs transition">
+              แก้ไข
+            </button>
+            <button type="button" onClick={()=>deleteUser(account)} className="rounded-lg border border-rose-200 bg-rose-50/50 px-2.5 py-1.5 text-[9px] font-bold text-rose-700 hover:bg-rose-100 shadow-xs transition">
+              ลบ
+            </button>
+          </div>
+        </article>)}
+        {managedUsers.length===0&&<p className="col-span-full rounded-xl bg-slate-50 p-6 text-center text-xs text-slate-400">ไม่พบผู้ใช้ตามคำค้นนี้</p>}
+      </div>
+    </section>
+  )}
+
+  {/* TAB 5: Academic Catalog (Faculties & Majors) */}
+  {(adminTab === 'all' || adminTab === 'catalog') && (
+    <section className="bento overflow-hidden shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-5 border-b border-slate-100">
+        <div>
+          <h2 className="text-sm font-extrabold text-slate-900">จัดการคณะและสาขาวิชา</h2>
+          <p className="mt-0.5 text-[9px] text-slate-500">เพิ่ม แก้ไข หรือลบรายการที่ใช้ในแบบฟอร์มลงทะเบียนและการจัดหมวดหมู่นักศึกษา</p>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1.5 text-[9px] font-bold text-slate-700">{academicCatalog.length} คณะ · {academicCatalog.reduce((count,item)=>count+item.majors.length,0)} สาขา</span>
+      </div>
+      <form onSubmit={e=>{e.preventDefault();const name=newFaculty.trim();if(name){void manageAcademicCatalog('ADD_FACULTY','',name,'','');setNewFaculty('');}}} className="flex gap-2 p-5 pb-3 bg-slate-50/50">
+        <input value={newFaculty} onChange={e=>setNewFaculty(e.target.value)} maxLength={150} placeholder="พิมพ์ชื่อคณะใหม่ที่ต้องการเพิ่ม..." aria-label="ชื่อคณะใหม่" className="h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-medium shadow-xs"/>
+        <button className="flex shrink-0 items-center gap-1.5 rounded-xl bg-[#7c0a02] px-4 text-xs font-bold text-white shadow-sm hover:bg-[#620701] transition">
+          <Plus size={15}/>
+          เพิ่มคณะใหม่
+        </button>
+      </form>
+      <div className="space-y-3 p-5 pt-2">
+        {academicCatalog.map(faculty=><article key={faculty.id} className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-3">
+            <Building2 size={16} className="text-[#7c0a02]"/>
+            <input value={facultyDrafts[faculty.id]??faculty.name} onChange={e=>setFacultyDrafts(old=>({...old,[faculty.id]:e.target.value}))} maxLength={150} aria-label={`ชื่อคณะ ${faculty.name}`} className="h-10 min-w-[200px] flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-800"/>
+            <button type="button" onClick={()=>{const name=(facultyDrafts[faculty.id]??faculty.name).trim();if(name){void manageAcademicCatalog('UPDATE_FACULTY',faculty.id,name,'','');setFacultyDrafts(old=>({...old,[faculty.id]:name}));}}} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-bold text-slate-700 hover:border-amber-400 hover:bg-white transition">
+              บันทึกคณะ
+            </button>
+            <button type="button" onClick={()=>saveCatalogItem('DELETE_FACULTY',faculty)} className="rounded-lg border border-rose-200 bg-rose-50/50 px-3 py-2 text-[10px] font-bold text-rose-700 hover:bg-rose-100 transition">
+              ลบคณะ
+            </button>
+          </div>
+          <div className="mt-3 space-y-2">
+            {faculty.majors.map(major=><div key={major.id} className="flex flex-wrap items-center gap-2 pl-2 sm:pl-6">
+              <span className="text-slate-300">↳</span>
+              <input value={majorDrafts[major.id]??major.name} onChange={e=>setMajorDrafts(old=>({...old,[major.id]:e.target.value}))} maxLength={150} aria-label={`ชื่อสาขา ${major.name}`} className="h-9 min-w-[180px] flex-1 rounded-lg border border-slate-200 bg-white px-3 text-[11px]"/>
+              <button type="button" onClick={()=>{const name=(majorDrafts[major.id]??major.name).trim();if(name){void manageAcademicCatalog('UPDATE_MAJOR',faculty.id,faculty.name,major.id,name);setMajorDrafts(old=>({...old,[major.id]:name}));}}} className="rounded-lg border border-slate-200 px-3 py-1.5 text-[9px] font-bold text-slate-600 hover:bg-slate-50">
+                บันทึก
+              </button>
+              <button type="button" onClick={()=>saveCatalogItem('DELETE_MAJOR',faculty,'',major)} className="rounded-lg px-2.5 py-1.5 text-[9px] font-bold text-rose-600 hover:bg-rose-50">
+                ลบสาขา
+              </button>
+            </div>)}
+            <form onSubmit={e=>{e.preventDefault();const name=(newMajor[faculty.id]||'').trim();if(name){void manageAcademicCatalog('ADD_MAJOR',faculty.id,faculty.name,'',name);setNewMajor(old=>({...old,[faculty.id]:''}));}}} className="flex flex-wrap gap-2 pl-2 sm:pl-6 pt-1">
+              <input value={newMajor[faculty.id]||''} onChange={e=>setNewMajor(old=>({...old,[faculty.id]:e.target.value}))} maxLength={150} placeholder={`+ เพิ่มสาขาใหม่ใน ${faculty.name}...`} aria-label={`เพิ่มสาขาใน${faculty.name}`} className="h-9 min-w-[180px] flex-1 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 text-[11px]"/>
+              <button className="flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-slate-800 transition">
+                <Plus size={12}/>
+                เพิ่มสาขา
+              </button>
+            </form>
+          </div>
+        </article>)}
+        {academicCatalog.length===0&&<p className="rounded-xl bg-slate-50 p-6 text-center text-xs text-slate-400">ยังไม่มีคณะในระบบ</p>}
+      </div>
+    </section>
+  )}
  </div>;
 }
-function AdminMetric({label,value,note,icon,tone}:{label:string;value:number;note:string;icon:React.ReactNode;tone:string}){const colors:Record<string,string>={rose:'bg-rose-50 text-[#7c0a02]',gold:'bg-amber-50 text-amber-700',blue:'bg-sky-50 text-sky-700',green:'bg-emerald-50 text-emerald-700'};return <div className="bento p-4"><div className="flex items-start justify-between"><span className="text-[9px] font-semibold text-slate-500">{label}</span><span className={cx('rounded-lg p-2',colors[tone])}>{icon}</span></div><b className="mt-2 block text-3xl text-slate-900">{value}</b><span className="mt-0.5 block truncate text-[8px] text-slate-400">{note}</span></div>}
+
+function AdminMetric({label,value,note,icon,tone}:{label:string;value:number;note:string;icon:React.ReactNode;tone:string}){
+  const styles:Record<string,{bg:string;iconBg:string;text:string;border:string}>={
+    rose:{bg:'bg-gradient-to-br from-rose-50/90 to-white',iconBg:'bg-rose-100 text-[#7c0a02]',text:'text-[#7c0a02]',border:'border-rose-200/70'},
+    gold:{bg:'bg-gradient-to-br from-amber-50/90 to-white',iconBg:'bg-amber-100 text-amber-800',text:'text-amber-800',border:'border-amber-200/70'},
+    blue:{bg:'bg-gradient-to-br from-sky-50/90 to-white',iconBg:'bg-sky-100 text-sky-800',text:'text-sky-800',border:'border-sky-200/70'},
+    green:{bg:'bg-gradient-to-br from-emerald-50/90 to-white',iconBg:'bg-emerald-100 text-emerald-800',text:'text-emerald-800',border:'border-emerald-200/70'}
+  };
+  const current = styles[tone] || styles.rose;
+  return <div className={cx('bento border p-5 shadow-sm transition-all hover:shadow-md', current.bg, current.border)}>
+    <div className="flex items-start justify-between">
+      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</span>
+      <span className={cx('rounded-xl p-2 shadow-sm', current.iconBg)}>{icon}</span>
+    </div>
+    <b className={cx('mt-3 block text-3xl font-extrabold sm:text-4xl', current.text)}>{value}</b>
+    <span className="mt-1 block truncate text-[10px] font-semibold text-slate-400">{note}</span>
+  </div>;
+}
 function DashboardCount({icon,label,value,tone}:{icon:React.ReactNode;label:string;value:number;tone:string}){return <div className="flex items-center justify-between gap-2 rounded-xl bg-white px-2.5 py-2"><span className="flex min-w-0 items-center gap-1.5 text-[8px] text-slate-500"><span className={cx('rounded-lg p-1.5',tone)}>{icon}</span><span className="truncate">{label}</span></span><b className="text-sm text-slate-900">{value}</b></div>}

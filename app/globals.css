@@ -42,3 +42,23 @@ button { cursor:pointer; }
 input,select { outline:none; }
 input:focus,select:focus { border-color:#bda150!important; box-shadow:0 0 0 3px rgba(212,175,55,.14); }
 ::selection { background:#f6d968; color:#4a0b08; }
+
+/* Custom scrollbars for data tables and panels */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.03); border-radius: 9999px; }
+::-webkit-scrollbar-thumb { background: rgba(124,10,2,0.18); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(124,10,2,0.36); }
+
+/* Category badge animations and tab highlights */
+.tab-pill-active { position: relative; }
+.tab-pill-active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  border-radius: 9999px;
+  background: currentColor;
+}
+
