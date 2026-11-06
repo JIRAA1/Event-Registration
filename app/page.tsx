@@ -369,11 +369,40 @@ function NavButton({active,icon,children,onClick}:{active:boolean;icon?:React.Re
 function Field({label,...props}:{label:string;name:string;id?:string;type?:string;required?:boolean;placeholder?:string;defaultValue?:string|number;min?:string|number;max?:string|number;minLength?:number}){return <label className="block text-[11px] font-semibold text-slate-600">{label}<input {...props} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 placeholder:text-slate-300"/></label>}
 function Modal({title,subtitle,close,children}:{title:string;subtitle:string;close:()=>void;children:React.ReactNode}){return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-[28px] border border-white bg-white p-6 shadow-2xl"><div className="mb-5 flex items-start justify-between"><div><h2 className="text-lg font-bold text-slate-900">{title}</h2><p className="mt-1 text-xs text-slate-500">{subtitle}</p></div><button onClick={close} className="rounded-full bg-slate-100 p-2 text-slate-500"><X size={16}/></button></div>{children}</div></div>}
 
-function Landing({enterAs,saving}:{enterAs:()=>void;saving:boolean}){return <div className="grid gap-5 lg:grid-cols-[1.1fr_.9fr]">
-  <section className="maroon-gradient relative min-h-[555px] overflow-hidden rounded-[34px] p-7 text-white shadow-xl shadow-rose-950/20 sm:p-10"><div className="absolute -right-10 -top-8 h-72 w-72 rounded-full border border-white/10"/><div className="absolute -right-2 top-1 h-56 w-56 rounded-full border border-white/10"/><div className="absolute bottom-0 right-0 h-64 w-64 rounded-full bg-rose-300/10 blur-3xl"/><div className="relative z-10 flex h-full flex-col"><div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-amber-200"><Sparkles size={14}/> Student Organization · ARU</div><div className="mt-12 max-w-xl"><h1 className="text-4xl font-extrabold leading-[1.2] tracking-tight sm:text-[54px]">ทุกกิจกรรม<br/><span className="text-amber-300">อยู่ในมือคุณ</span></h1><p className="mt-5 max-w-md text-sm leading-7 text-rose-50/80">ระบบลงทะเบียนและเช็กอินกิจกรรมมหาวิทยาลัย เชื่อมต่อด้วย QR Code พร้อมติดตามสถานะได้แบบเรียลไทม์</p></div><div className="mt-10 grid max-w-lg grid-cols-3 gap-3"><MetricChip icon={<QrCode size={15}/>} label="QR Check-in" value="รวดเร็ว"/><MetricChip icon={<Zap size={15}/>} label="Live Status" value="Real-time"/><MetricChip icon={<Ticket size={15}/>} label="Passcode" value="ปลอดภัย"/></div><div className="mt-auto flex items-center gap-3 pt-12"><div className="hex flex h-14 w-14 items-center justify-center border-2 border-amber-400 bg-[#610700] text-center text-[8px] font-black leading-tight text-amber-300">ARU<br/>STUDENT<br/>ORG.</div><div><b className="block text-xs">องค์การนักศึกษา</b><span className="text-[10px] text-rose-100/70">มหาวิทยาลัยราชภัฏพระนครศรีอยุธยา</span></div></div></div></section>
-  <section id="login-card" className="bento p-6 sm:p-8"><div className="flex items-start justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-[#a47c13]">WELCOME TO ARU</p><h2 className="mt-2 text-2xl font-extrabold text-slate-900">เข้าสู่ระบบ</h2><p className="mt-1 text-xs text-slate-500">กรอกรหัสผู้ใช้และรหัสผ่านเพื่อเข้าสู่ระบบ</p></div><div className="rounded-2xl bg-amber-50 p-3 text-amber-600"><GraduationCap size={23}/></div></div>
-    <div className="mt-6 space-y-3"><Field label="รหัสนักศึกษา / รหัสเจ้าหน้าที่" name="login-id" id="login-id" placeholder="กรอกรหัสผู้ใช้งาน"/><Field label="รหัสผ่าน" name="login-password" id="login-password" type="password" placeholder="••••••••"/><button onClick={enterAs} disabled={saving} className="mt-1 flex w-full items-center justify-between rounded-xl bg-[#7c0a02] px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-rose-900/10 hover:bg-[#671006] disabled:opacity-60"><span>เข้าสู่ระบบ</span><ArrowRight size={17}/></button></div>
-    </section>
+function Landing({enterAs,saving}:{enterAs:()=>void;saving:boolean}){return <div className="space-y-5">
+  {/* — Login card first — */}
+  <section id="login-card" className="bento mx-auto max-w-md p-6 sm:p-8">
+    <div className="flex flex-col items-center text-center">
+      <img src="/aru-icon.jpg" alt="ARU" className="h-16 w-16 rounded-2xl border-2 border-[#d4af37] object-cover shadow-md"/>
+      <h2 className="mt-4 text-2xl font-extrabold text-slate-900">เข้าสู่ระบบ</h2>
+      <p className="mt-1 text-xs text-slate-500">ระบบลงทะเบียนกิจกรรม · องค์การนักศึกษา ARU</p>
+    </div>
+    <div className="mt-6 space-y-3">
+      <Field label="รหัสนักศึกษา / รหัสเจ้าหน้าที่" name="login-id" id="login-id" placeholder="กรอกรหัสผู้ใช้งาน"/>
+      <Field label="รหัสผ่าน" name="login-password" id="login-password" type="password" placeholder="••••••••"/>
+      <button onClick={enterAs} disabled={saving} className="mt-1 flex w-full items-center justify-between rounded-xl bg-[#7c0a02] px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-rose-900/10 hover:bg-[#671006] disabled:opacity-60"><span>เข้าสู่ระบบ</span><ArrowRight size={17}/></button>
+    </div>
+  </section>
+
+  {/* — Banner + info below — */}
+  <section className="maroon-gradient relative overflow-hidden rounded-[34px] p-7 text-white shadow-xl shadow-rose-950/20 sm:p-10">
+    <div className="absolute -right-10 -top-8 h-72 w-72 rounded-full border border-white/10"/>
+    <div className="absolute -right-2 top-1 h-56 w-56 rounded-full border border-white/10"/>
+    <div className="absolute bottom-0 right-0 h-64 w-64 rounded-full bg-rose-300/10 blur-3xl"/>
+    <div className="relative z-10 flex flex-col items-center gap-8 lg:flex-row lg:items-start lg:gap-12">
+      {/* Banner logo */}
+      <div className="flex w-full max-w-[280px] shrink-0 flex-col items-center lg:max-w-[260px]">
+        <img src="/aru-banner.jpg" alt="องค์การนักศึกษา มหาวิทยาลัยราชภัฏพระนครศรีอยุธยา" className="w-full rounded-2xl border-2 border-white/20 bg-white/95 p-4 shadow-lg"/>
+      </div>
+      {/* Info */}
+      <div className="flex-1 text-center lg:text-left">
+        <div className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-amber-200 lg:justify-start"><Sparkles size={14}/> Student Organization · ARU</div>
+        <h1 className="mt-4 text-3xl font-extrabold leading-[1.2] tracking-tight sm:text-4xl lg:text-[48px]">ทุกกิจกรรม<br/><span className="text-amber-300">อยู่ในมือคุณ</span></h1>
+        <p className="mx-auto mt-4 max-w-md text-sm leading-7 text-rose-50/80 lg:mx-0">ระบบลงทะเบียนและเช็กอินกิจกรรมมหาวิทยาลัย เชื่อมต่อด้วย QR Code พร้อมติดตามสถานะได้แบบเรียลไทม์</p>
+        <div className="mt-8 grid max-w-lg grid-cols-3 gap-3 mx-auto lg:mx-0"><MetricChip icon={<QrCode size={15}/>} label="QR Check-in" value="รวดเร็ว"/><MetricChip icon={<Zap size={15}/>} label="Live Status" value="Real-time"/><MetricChip icon={<Ticket size={15}/>} label="Passcode" value="ปลอดภัย"/></div>
+      </div>
+    </div>
+  </section>
   </div>}
 function MetricChip({icon,label,value}:{icon:React.ReactNode;label:string;value:string}){return <div className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur-md"><div className="flex items-center gap-1.5 text-amber-200">{icon}<span className="text-[9px] font-semibold text-white/70">{label}</span></div><b className="mt-1 block text-sm">{value}</b></div>}
 
