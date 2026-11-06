@@ -138,8 +138,8 @@ export default function Home() {
     const client=supabase;
     if(!sessionToken||!client)return;
     const heartbeat=()=>{const eventId=view==='scanner'?activeEvent:null;void client.rpc('heartbeat_session',{p_session_token:sessionToken,p_active_event_id:eventId});};
-    heartbeat();const timer=window.setInterval(heartbeat,25000);window.addEventListener('focus',heartbeat);
-    return()=>{window.clearInterval(timer);window.removeEventListener('focus',heartbeat);};
+    heartbeat();const timer=window.setInterval(heartbeat,15000);window.addEventListener('focus',heartbeat);document.addEventListener('visibilitychange',heartbeat);
+    return()=>{window.clearInterval(timer);window.removeEventListener('focus',heartbeat);document.removeEventListener('visibilitychange',heartbeat);};
   },[sessionToken,view,activeEvent,selectedEvent]);
   useEffect(()=>{
     if(!scannerLocked)return;
