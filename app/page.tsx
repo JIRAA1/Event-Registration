@@ -434,7 +434,11 @@ function Landing({enterAs,saving}:{enterAs:()=>void;saving:boolean}){return <div
     <div className="mt-6 space-y-3">
       <Field label="รหัสนักศึกษา / รหัสเจ้าหน้าที่" name="login-id" id="login-id" placeholder="กรอกรหัสผู้ใช้งาน"/>
       <Field label="รหัสผ่าน" name="login-password" id="login-password" type="password" placeholder="••••••••"/>
-      <button onClick={enterAs} disabled={saving} className="mt-1 flex w-full items-center justify-between rounded-xl bg-[#7c0a02] px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-rose-900/10 hover:bg-[#671006] disabled:opacity-60"><span>{saving?"กำลังเข้าสู่ระบบ…":"เข้าสู่ระบบ"}</span>{saving?<Loader2 size={17} className="animate-spin"/>:<ArrowRight size={17}/>}</button>
+      <button onClick={enterAs} disabled={saving} className="login-action group relative mt-2 flex w-full items-center justify-between overflow-hidden rounded-2xl px-5 py-4 text-sm font-extrabold text-white transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(124,10,2,.28)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300/70 disabled:translate-y-0 disabled:cursor-wait disabled:opacity-75">
+        <span className="pointer-events-none absolute inset-0 login-action-shine"/>
+        <span className="relative flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-amber-200 shadow-inner">{saving?<Loader2 size={19} className="animate-spin"/>:<ShieldCheck size={19}/>}</span><span className="text-left"><span className="block text-[15px]">{saving?"กำลังเข้าสู่ระบบ…":"เข้าสู่ระบบ"}</span><span className="mt-0.5 block text-[9px] font-medium tracking-wide text-white/65">ARU EVENT PASS</span></span></span>
+        <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-amber-300 text-[#57100b] transition duration-300 group-hover:translate-x-1 group-hover:rotate-[-35deg]">{saving?<Loader2 size={16} className="animate-spin"/>:<ArrowRight size={17}/>}</span>
+      </button>
     </div>
   </section>
 
@@ -508,15 +512,45 @@ function EventDetail({event,user,registration,back}:{event:Event;user:User;regis
   </div>;
 }
 
+function ScanResultEffect({message,flash}:{message:{ok:boolean;title:string;detail:string}|null;flash:string}) {
+ const [visible,setVisible]=useState(false);
+ const [animationKey,setAnimationKey]=useState(0);
+ useEffect(()=>{
+  if(!message||!['success','checkout','error'].includes(flash)){setVisible(false);return;}
+  setAnimationKey(key=>key+1);
+  setVisible(true);
+  const timer=window.setTimeout(()=>setVisible(false),1550);
+  return()=>window.clearTimeout(timer);
+ },[message,flash]);
+ if(!visible||!message)return null;
+ const success=message.ok;
+ return <div className="pointer-events-none absolute inset-0 z-[8] flex items-center justify-center px-5" aria-live="polite">
+  <div key={animationKey} className={cx('scan-result-card w-full max-w-[280px] rounded-[26px] border px-6 py-5 text-center shadow-2xl backdrop-blur-xl',success?'border-emerald-200/30 bg-slate-950/85':'border-rose-200/30 bg-slate-950/85')}>
+   <div className={cx('scan-result-orbit mx-auto mb-3 flex h-[76px] w-[76px] items-center justify-center rounded-full',flash==='checkout'?'text-amber-300':success?'text-emerald-300':'text-rose-300')}>
+    <span className="scan-result-halo absolute h-[76px] w-[76px] rounded-full border"/>
+    <span className="scan-result-halo scan-result-halo-delay absolute h-[76px] w-[76px] rounded-full border"/>
+    <span className={cx('relative flex h-14 w-14 items-center justify-center rounded-full shadow-lg',flash==='checkout'?'bg-amber-300 text-amber-950':success?'bg-emerald-300 text-emerald-950':'bg-rose-400 text-rose-950')}>
+     {success?<Check size={30} strokeWidth={3}/>:<X size={28} strokeWidth={3}/>}
+    </span>
+    {success&&<><i className="scan-result-spark scan-result-spark-one"/><i className="scan-result-spark scan-result-spark-two"/><i className="scan-result-spark scan-result-spark-three"/></>}
+   </div>
+   <span className={cx('inline-flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-[.2em]',flash==='checkout'?'text-amber-300':success?'text-emerald-300':'text-rose-300')}><Sparkles size={12}/>{flash==='checkout'?'CHECK-OUT':success?'CHECK-IN COMPLETE':'SCAN ERROR'}</span>
+   <b className="mt-1 block truncate text-base font-extrabold text-white">{message.title}</b>
+   <span className="mt-1 block truncate text-[10px] text-slate-300">{message.detail}</span>
+  </div>
+ </div>;
+}
+
 function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,startScanner,stopScanner,scanMode,scanInput,setScanInput,scanPayload,scanMessage,flash,attendance,registered,reserveLeft,openWalkin,scannerLocked,toggleScannerLock}:{user:User;event:Event;events:Event[];activeEvent:string;setActiveEvent:(id:string)=>void;scannerOn:boolean;startScanner:()=>void;stopScanner:()=>void;scanMode:()=>void;scanInput:string;setScanInput:(s:string)=>void;scanPayload:(s:string)=>Promise<void>;scanMessage:{ok:boolean;title:string;detail:string}|null;flash:string;attendance:number;registered:number;reserveLeft:number;openWalkin:()=>void;scannerLocked:boolean;toggleScannerLock:()=>void}) {
  const pct=registered?Math.round(attendance/registered*100):0;
  return <div className={cx('space-y-5 rounded-[30px] p-1 transition',flash==='success'?'scanner-flash-success':flash==='checkout'?'scanner-flash-checkout':flash==='error'?'scanner-flash-error':'')}>
   <div className="flex flex-wrap items-end justify-between gap-3 px-2"><div><div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.15em] text-slate-400"><span>Staff Console</span><span className="h-1 w-1 rounded-full bg-[#d4af37]"/>Parcel-style scanner</div><h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">เครื่องสแกนความเร็วสูง</h1><p className="mt-1 text-xs text-slate-500">สแกน QR นักศึกษาเพื่อเช็กอินและเช็กเอาต์แบบเรียลไทม์</p></div><div className="flex items-center gap-2"><span className="rounded-full bg-slate-900/90 px-3 py-1.5 text-[9px] font-bold text-amber-300">● {event.status}</span><span className="rounded-full bg-white px-3 py-1.5 text-[9px] font-semibold text-slate-500">{user.full_name}</span><button onClick={toggleScannerLock} aria-pressed={scannerLocked} className={cx('flex items-center gap-1.5 rounded-full border px-3 py-2 text-[9px] font-bold transition',scannerLocked?'border-amber-300 bg-amber-100 text-amber-900':'border-slate-200 bg-white text-slate-600 hover:border-amber-300 hover:text-amber-800')}>{scannerLocked?<Unlock size={13}/>:<Lock size={13}/>}<span>{scannerLocked?'ปลดล็อก':'ล็อกหน้าจอ'}</span></button></div></div>
   <div className="grid gap-5 xl:grid-cols-[1.15fr_.85fr]"><section className="bento overflow-hidden p-4 sm:p-5">
    <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div><span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">เลือกกิจกรรม</span><select value={activeEvent} onChange={e=>setActiveEvent(e.target.value)} className="mt-1 block max-w-[300px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800">{events.map(ev=><option key={ev.id} value={ev.id}>{ev.title}</option>)}</select></div><button onClick={scanMode} className={cx('rounded-full px-4 py-2 text-[10px] font-bold',event.scan_mode==='CHECKIN'?'bg-emerald-50 text-emerald-700':'bg-amber-100 text-amber-900')}>{event.scan_mode==='CHECKIN'?'↗ โหมดเช็กอิน':'↘ โหมดเช็กเอาต์'} · คลิกเพื่อสลับ</button></div>
-   <div className="relative flex min-h-[360px] items-center justify-center overflow-hidden rounded-[24px] bg-slate-950"><div className="absolute inset-0 opacity-30" style={{backgroundImage:'radial-gradient(#94a3b8 1px,transparent 1px)',backgroundSize:'20px 20px'}}/><div className="absolute left-5 top-5 z-10 flex items-center gap-2 rounded-full bg-slate-900/80 px-3 py-2 text-[9px] font-semibold text-white"><span className={cx('h-2 w-2 rounded-full',scannerOn?'animate-pulse bg-emerald-400':'bg-slate-500')}/>{scannerOn?'CAMERA LIVE':'CAMERA STANDBY'}</div><div className="absolute right-5 top-5 z-10 rounded-full bg-slate-900/80 px-3 py-2 text-[9px] font-semibold text-slate-300">20 FPS · 3s cooldown</div><div id="aru-reader" className="relative z-[1] w-full max-w-[520px] overflow-hidden rounded-xl [&_video]:rounded-xl [&_video]:object-cover [&_img]:hidden"/>
+    <div className="relative flex min-h-[360px] items-center justify-center overflow-hidden rounded-[24px] bg-slate-950"><div className="absolute inset-0 opacity-30" style={{backgroundImage:'radial-gradient(#94a3b8 1px,transparent 1px)',backgroundSize:'20px 20px'}}/><div className="absolute left-5 top-5 z-10 flex items-center gap-2 rounded-full bg-slate-900/80 px-3 py-2 text-[9px] font-semibold text-white"><span className={cx('h-2 w-2 rounded-full',scannerOn?'animate-pulse bg-emerald-400':'bg-slate-500')}/>{scannerOn?'CAMERA LIVE':'CAMERA STANDBY'}</div><div className="absolute right-5 top-5 z-10 rounded-full bg-slate-900/80 px-3 py-2 text-[9px] font-semibold text-slate-300">20 FPS · 3s cooldown</div><div id="aru-reader" className="relative z-[1] w-full max-w-[520px] overflow-hidden rounded-xl [&_video]:rounded-xl [&_video]:object-cover [&_img]:hidden"/>
     {!scannerOn&&<div className="absolute inset-0 z-[2] flex flex-col items-center justify-center px-6 text-center"><div className="mb-4 flex h-20 w-20 items-center justify-center rounded-[26px] border border-white/15 bg-white/10 text-amber-300"><ScanLine size={32}/></div><b className="text-sm text-white">พร้อมสแกน QR Code</b><span className="mt-1 max-w-xs text-[10px] leading-5 text-slate-400">กดปุ่มด้านล่างเพื่อเปิดกล้องและปลดล็อกเสียงสังเคราะห์</span><div className="pointer-events-none absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-[28px] border-2 border-amber-300/70"/></div>}
-    {scannerOn&&<div className="pointer-events-none absolute left-1/2 top-1/2 z-[2] h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-[28px] border-2 border-amber-300/80"/>}
+     {scannerOn&&<div className="pointer-events-none absolute left-1/2 top-1/2 z-[2] h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-[28px] border-2 border-amber-300/80"/>}
+     <ScanResultEffect message={scanMessage} flash={flash}/>
     <div className="absolute bottom-4 left-4 right-4 z-10 flex items-end justify-between gap-3"><div className="max-w-[72%] rounded-xl bg-slate-900/85 px-3 py-2 text-white"><span className="block text-[8px] uppercase tracking-wider text-slate-400">ผลการสแกนล่าสุด</span><b className="mt-0.5 block truncate text-xs">{scanMessage?.title||'รอการสแกน'}</b><span className="block truncate text-[9px] text-slate-400">{scanMessage?.detail||'เปิดกล้องเพื่อเริ่มต้น'}</span></div>{scanMessage&&<span className={cx('rounded-full px-3 py-2 text-[9px] font-bold',scanMessage.ok?'bg-emerald-400 text-emerald-950':'bg-rose-500 text-white')}>{scanMessage.ok?'SUCCESS':'ERROR'}</span>}</div>
    </div>
    <div className="mt-4 grid grid-cols-2 gap-2"><button onClick={()=>scannerOn?stopScanner():startScanner()} className={cx('flex items-center justify-center gap-2 rounded-xl py-3 text-xs font-bold text-white',scannerOn?'bg-slate-700':'bg-[#7c0a02]')}><Zap size={15}/>{scannerOn?'ปิดกล้อง':'เปิดกล้อง'}</button><button onClick={openWalkin} className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-xs font-bold text-slate-700"><Plus size={15}/>เพิ่มรายชื่อหน้างาน</button></div>

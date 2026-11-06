@@ -14,18 +14,32 @@ button { cursor:pointer; }
 .bento { border:1px solid rgba(255,255,255,.94); border-radius:28px; background:#fff; box-shadow:0 10px 35px rgba(37,48,69,.045); }
 .maroon-gradient { background:linear-gradient(135deg,#e11d48 0%,#991b1b 50%,#7c0a02 100%); }
 .gold-glow { box-shadow:0 0 0 5px rgba(212,175,55,.16),0 10px 28px rgba(124,10,2,.16); }
+.login-action { background:linear-gradient(112deg,#5f0804 0%,#8e1008 48%,#6b0b05 100%); box-shadow:0 12px 26px rgba(124,10,2,.2),inset 0 1px 0 rgba(255,255,255,.18); }
+.login-action-shine { background:linear-gradient(110deg,transparent 18%,rgba(255,255,255,.13) 42%,transparent 62%); transform:translateX(-120%); transition:transform .75s ease; }
+.login-action:hover .login-action-shine { transform:translateX(120%); }
 .hex { clip-path:polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0 50%); }
-.scanner-flash-success { animation:greenflash .55s ease-out; }
-.scanner-flash-checkout { animation:goldflash .65s ease-out; }
-.scanner-flash-error { animation:redflash .55s ease-out; }
-@keyframes greenflash { 0%,100%{box-shadow:inset 0 0 0 0 transparent} 35%{box-shadow:inset 0 0 0 10px #22c55e} }
-@keyframes goldflash { 0%,100%{box-shadow:inset 0 0 0 0 transparent} 35%{box-shadow:inset 0 0 0 10px #facc15} }
-@keyframes redflash { 0%,100%{box-shadow:inset 0 0 0 0 transparent} 35%{box-shadow:inset 0 0 0 10px #ef4444} }
+.scanner-flash-success { animation:greenflash .85s ease-out; }
+.scanner-flash-checkout { animation:goldflash .95s ease-out; }
+.scanner-flash-error { animation:redflash .75s ease-out; }
+@keyframes greenflash { 0%,100%{box-shadow:inset 0 0 0 0 transparent} 28%{box-shadow:inset 0 0 0 5px rgba(16,185,129,.75),0 0 34px rgba(16,185,129,.25)} }
+@keyframes goldflash { 0%,100%{box-shadow:inset 0 0 0 0 transparent} 28%{box-shadow:inset 0 0 0 5px rgba(250,204,21,.8),0 0 38px rgba(250,204,21,.3)} }
+@keyframes redflash { 0%,100%{box-shadow:inset 0 0 0 0 transparent} 28%{box-shadow:inset 0 0 0 5px rgba(244,63,94,.75),0 0 30px rgba(244,63,94,.25)} }
+.scan-result-card { animation:scan-result-enter 1.55s cubic-bezier(.2,.8,.2,1) both; }
+.scan-result-orbit { position:relative; }
+.scan-result-halo { border-color:currentColor; opacity:0; animation:scan-halo 1.15s ease-out both; }
+.scan-result-halo-delay { animation-delay:.16s; }
+.scan-result-spark { position:absolute; z-index:1; width:5px; height:5px; border-radius:2px; background:#fde68a; box-shadow:0 0 12px #facc15; animation:scan-spark .7s cubic-bezier(.16,.75,.35,1) both; }
+.scan-result-spark-one { top:7px; right:8px; }
+.scan-result-spark-two { bottom:12px; left:1px; animation-delay:.08s; }
+.scan-result-spark-three { top:14px; left:5px; animation-delay:.14s; }
+@keyframes scan-result-enter { 0%{opacity:0;transform:translateY(14px) scale(.86);filter:blur(5px)} 18%{opacity:1;transform:translateY(0) scale(1.03);filter:blur(0)} 30%,76%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-7px) scale(.97)} }
+@keyframes scan-halo { 0%{opacity:.7;transform:scale(.56)} 78%,100%{opacity:0;transform:scale(1.55)} }
+@keyframes scan-spark { 0%{opacity:0;transform:scale(.2) rotate(0)} 35%{opacity:1;transform:scale(1.35) rotate(55deg)} 100%{opacity:0;transform:translateY(-7px) scale(.2) rotate(110deg)} }
 .page-transition { animation:pageenter .24s ease-out both; }
 @keyframes pageenter { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
 @keyframes progress-sweep { from { transform:translateX(-150%); } to { transform:translateX(260%); } }
 .loading-progress i { animation:progress-sweep 1.2s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .page-transition,.loading-progress i { animation:none; } }
+@media (prefers-reduced-motion: reduce) { .page-transition,.loading-progress i,.login-action-shine,.scan-result-card,.scan-result-halo,.scan-result-spark { animation:none; transition:none; } }
 input,select { outline:none; }
 input:focus,select:focus { border-color:#bda150!important; box-shadow:0 0 0 3px rgba(212,175,55,.14); }
 ::selection { background:#f6d968; color:#4a0b08; }
