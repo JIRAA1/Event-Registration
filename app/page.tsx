@@ -417,7 +417,7 @@ export default function Home() {
   }
 
   return <main className="canvas-grid min-h-screen px-3 pb-8 pt-3 sm:px-6 sm:pt-5 lg:px-10">
-    <header className="glass mx-auto flex max-w-[1440px] items-center justify-between rounded-full border border-white/80 px-4 py-2.5 shadow-[0_12px_45px_rgba(52,61,78,.07)] sm:px-6">
+    <header className="glass sticky top-3 z-50 mx-auto flex max-w-[1440px] items-center justify-between rounded-full border border-white/80 px-4 py-2.5 shadow-[0_12px_45px_rgba(52,61,78,.07)] sm:px-6">
       <button className="flex items-center gap-3 text-left transition hover:opacity-90" onClick={()=>setView(user?.role==='ADMIN'?'admin':user?.role==='STAFF'?'scanner':'home')}>
         <div className="relative">
           <img src="/aru-icon.jpg" alt="ARU Student Organization" className="h-11 w-11 rounded-xl border-2 border-[#d4af37] object-cover shadow-sm"/>
