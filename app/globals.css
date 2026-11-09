@@ -62,3 +62,11 @@ input:focus,select:focus { border-color:#bda150!important; box-shadow:0 0 0 3px 
   background: currentColor;
 }
 
+
+:root { color-scheme: only light; }
+.qr-ticket { background: white; color-scheme: only light; forced-color-adjust: none; }
+.qr-ticket canvas { display: block; max-width: 100%; height: auto !important; }
+.bento { min-width: 0; }
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px; }
+}

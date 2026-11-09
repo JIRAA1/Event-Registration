@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeCanvas } from 'qrcode.react';
+import { StudentQr } from './student-qr';
+import BrowserGate from './browser-gate';
 import { Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Clipboard, Clock3, Download, ExternalLink, Eye, FileSpreadsheet, FileUp, Filter, Gauge, GraduationCap, Layers, LayoutDashboard, Loader2, Lock, LogOut, MapPin, Menu, Phone, Plus, QrCode, RefreshCw, ScanLine, Search, Settings2, ShieldCheck, Sparkles, Ticket, Trash2, Unlock, UserCheck, Users, UserX, X, Zap } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { soundEngine } from '@/lib/sound';
@@ -75,6 +77,10 @@ function defaultAcademicCatalog():AcademicFaculty[]{return Object.entries(ARU_CA
 function workspaceCatalog(data:{academic_catalog?:unknown}):AcademicFaculty[]{return Array.isArray(data.academic_catalog)?data.academic_catalog as AcademicFaculty[]:defaultAcademicCatalog();}
 
 export default function Home() {
+  return <BrowserGate><EventPass/></BrowserGate>;
+}
+
+function EventPass() {
   const [store,setStore]=useState<Store>(initialStore);
   const [academicCatalog,setAcademicCatalog]=useState<AcademicFaculty[]>(defaultAcademicCatalog);
   const [user,setUser]=useState<User|null>(null);
@@ -103,8 +109,8 @@ export default function Home() {
   const scannerRef=useRef<{clear:()=>void|Promise<void>;stop:()=>Promise<void>}|null>(null);
   const cooldown=useRef<Map<string,number>>(new Map());
   const loadingRef=useRef(false);
-  const eventsRef=useRef(store.events);
-  eventsRef.current=store.events;
+  const storeRef=useRef(store);
+  storeRef.current=store;
   const selected=store.events.find(e=>e.id===selectedEvent)||store.events[0]||initialStore.events[0];
   const currentEvent=store.events.find(e=>e.id===activeEvent)||store.events[0]||initialStore.events[0];
   const studentRegs=useMemo(()=>store.regs.filter(r=>r.user_id===user?.id),[store.regs,user?.id]);
@@ -153,8 +159,41 @@ export default function Home() {
     let disposed=false;
     let channel:ReturnType<typeof client.channel>|undefined;
     let pollTimer:ReturnType<typeof setInterval>|undefined;
-    const refresh=()=>{if(sessionToken)void client.rpc('load_workspace',{p_session_token:sessionToken}).then(({data,error})=>{if(!disposed&&!error&&data?.success)setStore(workspaceStore(data));});};
-    const startFallback=()=>{if(!pollTimer)pollTimer=setInterval(refresh,2500);};
+    const observed = new Map(storeRef.current.regs.filter(reg => reg.user_id === user.id).map(reg => [reg.event_id, reg.status]));
+    const opened = new Set<string>();
+    let pending: {event: Event; status: Status} | undefined;
+    const openAfterScan = (event: Event | undefined, status: Status) => {
+      if (!event || Number(user.study_year) !== 1 || status === 'REGISTERED') return;
+      const key = event.id + '/' + status;
+      if (opened.has(key) || !/^https?:\/\//i.test(event.redirect_url_year1)) return;
+      if (document.hidden) { pending = {event,status}; return; }
+      opened.add(key);
+      window.location.assign(event.redirect_url_year1);
+    };
+    let refreshing = false;
+    const refresh = async () => {
+      if (disposed || document.hidden) return;
+      if (pending) {
+        const {event,status} = pending;
+        pending = undefined;
+        openAfterScan(event,status);
+      }
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const {data,error} = await client.rpc('load_workspace',{p_session_token:sessionToken});
+        if (disposed || error || !data?.success) return;
+        const next = workspaceStore(data);
+        for (const reg of next.regs) {
+          if (reg.user_id !== user.id) continue;
+          const previous = observed.get(reg.event_id);
+          observed.set(reg.event_id,reg.status);
+          if (previous && previous !== reg.status) openAfterScan(next.events.find(event => event.id === reg.event_id),reg.status);
+        }
+        setStore(next);
+      } finally { refreshing = false; }
+    };
+    const startFallback=()=>{if(!disposed&&!pollTimer)pollTimer=setInterval(refresh,2500);};
     const stopFallback=()=>{if(pollTimer){clearInterval(pollTimer);pollTimer=undefined;}};
     const receiveUpdate=(message:{event_id?:string;user_id?:string;status?:Status;checkin_at?:string|null;checkout_at?:string|null;passcode?:string|null;operation?:string})=>{
       if(message.user_id!==user.id||!message.event_id)return;
@@ -165,13 +204,15 @@ export default function Home() {
       }
       if(message.status){
         setStore(old=>({...old,regs:old.regs.map(reg=>reg.event_id===message.event_id&&reg.user_id===user.id?{...reg,status:message.status!,checkin_at:message.checkin_at||reg.checkin_at,checkout_at:message.checkout_at||reg.checkout_at,passcode:message.passcode||reg.passcode}:reg)}));
-        const event=eventsRef.current.find(item=>item.id===message.event_id);
-        const scanSucceeded=message.status==='ATTENDING'||message.status==='COMPLETED';
-        if(Number(user.study_year)===1&&scanSucceeded&&event?.redirect_url_year1){setToast('สแกนสำเร็จ · กำลังเปิดหน้ากิจกรรม');window.setTimeout(()=>window.location.assign(event.redirect_url_year1),1400);}
-        else if(scanSucceeded)setToast(message.status==='COMPLETED'?'เข้าร่วมกิจกรรมสำเร็จ':'กำลังเข้าร่วมกิจกรรม');
+        observed.set(message.event_id,message.status);
+        openAfterScan(storeRef.current.events.find(event => event.id === message.event_id),message.status);
+        if(message.status==='ATTENDING'||message.status==='COMPLETED')setToast(message.status==='COMPLETED'?'เข้าร่วมกิจกรรมสำเร็จ':'กำลังเข้าร่วมกิจกรรม');
       }
       void refresh();
     };
+    document.addEventListener('visibilitychange',refresh);
+    window.addEventListener('pageshow',refresh);
+    startFallback();
     void hashSessionToken(sessionToken).then(tokenHash=>{
       if(disposed)return;
       channel=client.channel(`aru-student:${tokenHash}`,{config:{private:true}})
@@ -181,7 +222,7 @@ export default function Home() {
           else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED')startFallback();
         });
     }).catch(()=>startFallback());
-    return()=>{disposed=true;stopFallback();if(channel)void client.removeChannel(channel);};
+    return()=>{disposed=true;document.removeEventListener('visibilitychange',refresh);window.removeEventListener('pageshow',refresh);stopFallback();if(channel)void client.removeChannel(channel);};
   },[user?.id,user?.role,user?.study_year,sessionToken]);
 
   async function enterAs() {
@@ -199,28 +240,38 @@ export default function Home() {
     setUser(picked);sessionStorage.setItem('aru-user-v1',JSON.stringify(picked));setView('home');setToast('เข้าสู่โหมดนักศึกษาตัวอย่างแล้ว');
   }
   async function logout(){
-    if(user?.role==='STUDENT'){
-      if(isSupabaseConfigured&&supabase){
-        if(!sessionToken){setToast('กำลังตรวจสอบสถานะกิจกรรม กรุณาลองอีกครั้ง');return;}
-        const {data,error}=await supabase.rpc('load_workspace',{p_session_token:sessionToken});
-        if(error||!data?.success){setToast('ตรวจสอบสถานะไม่สำเร็จ กรุณาลองออกจากระบบอีกครั้ง');return;}
-        const registrations=(Array.isArray(data.registrations)?data.registrations:[]) as Registration[];
-        setStore(workspaceStore(data));
-        if(registrations.some(reg=>reg.status==='ATTENDING')){setToast('กำลังเข้าร่วมกิจกรรมอยู่ ต้องรอเจ้าหน้าที่เช็กเอาต์ก่อนจึงจะออกจากระบบได้');return;}
-      }else if(studentRegs.some(reg=>reg.status==='ATTENDING')){
-        setToast('กำลังเข้าร่วมกิจกรรมอยู่ ต้องรอเจ้าหน้าที่เช็กเอาต์ก่อนจึงจะออกจากระบบได้');return;
-      }
+    if (isSupabaseConfigured && supabase && sessionToken) {
+      const {data,error}=await supabase.rpc('logout_event_session',{p_session_token:sessionToken});
+      if (error || !data?.success) {setToast(data?.message || 'ออกจากระบบไม่สำเร็จ กรุณาลองอีกครั้ง');return;}
+    } else if (!isSupabaseConfigured && user?.role==='STUDENT' && studentRegs.some(reg=>reg.status==='ATTENDING')) {
+      setToast('ต้องรอเจ้าหน้าที่เช็กเอาต์ก่อนจึงจะออกจากระบบได้');return;
     }
     setUser(null);sessionStorage.removeItem('aru-user-v1');sessionStorage.removeItem('aru-session-token');localStorage.removeItem('aru-user-v1');setSessionToken('');setView('home');setScannerOn(false);void stopScanner();
   }
   function save(next:Store){setStore(next)}
   async function scanPayload(raw:string) {
+    if (isSupabaseConfigured && supabase) {
+      const match=/^ARU1:([\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12})$/i.exec(raw.trim());
+      if (!match) {
+        setScanMessage({ok:false,title:'กรุณาเปิด QR ใหม่',detail:'ให้นักศึกษาเปิดหน้าบัตรกิจกรรมอีกครั้ง'});
+        setFlash('error');soundEngine.playError();return;
+      }
+      const now=Date.now();
+      if (now-(cooldown.current.get(raw)||0)<2000) return;
+      cooldown.current.set(raw,now);
+      const {data,error}=await supabase.rpc('redeem_event_qr',{
+        p_session_token:sessionToken,p_event_id:activeEvent,p_scan_mode:currentEvent.scan_mode,p_ticket:match[1],
+      });
+      if (error || !data?.success) {
+        setScanMessage({ok:false,title:data?.message||'สแกนไม่สำเร็จ',detail:error?'ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง':'กรุณาตรวจสอบบัตรก่อนสแกนอีกครั้ง'});
+        setFlash('error');soundEngine.playError();return;
+      }
+      const isOut=data.new_status==='COMPLETED';
+      setScanMessage({ok:true,title:data.full_name,detail:isOut?'เข้าร่วมสำเร็จ · เช็กเอาต์เรียบร้อย':'เช็กอินสำเร็จ · ยินดีต้อนรับ'});
+      setFlash(isOut?'checkout':'success');isOut?soundEngine.playCheckOutSuccess():soundEngine.playCheckInSuccess();return;
+    }
     let parsed:{e?:string;u?:string};try{parsed=JSON.parse(raw)}catch{setScanMessage({ok:false,title:'QR Code ไม่ถูกต้อง',detail:'รูปแบบรหัสไม่ตรงกับกิจกรรม'});setFlash('error');soundEngine.playError();return;}
     const eventId=parsed.e||activeEvent,userId=parsed.u||'';const key=`${eventId}:${userId}`;const now=Date.now();if(now-(cooldown.current.get(key)||0)<500)return;cooldown.current.set(key,now);
-    if(isSupabaseConfigured&&supabase&&eventId.match(/^[0-9a-f-]{36}$/i)){
-      if(!sessionToken){setScanMessage({ok:false,title:'เซสชันหมดอายุ',detail:'กรุณาเข้าสู่ระบบสตาฟอีกครั้ง'});setFlash('error');soundEngine.playError();return;}const {data,error}=await supabase.rpc('process_qr_scan',{p_session_token:sessionToken,p_event_id:eventId,p_user_id:userId});if(error||!data?.success){setScanMessage({ok:false,title:data?.message||'สแกนไม่สำเร็จ',detail:data?.student_id||'ไม่พบสิทธิ์'});setFlash('error');soundEngine.playError();return;}
-      const isOut=data.new_status==='COMPLETED';setScanMessage({ok:true,title:data.full_name,detail:isOut?'เข้าร่วมสำเร็จ · เช็กเอาต์เรียบร้อย':'เช็กอินสำเร็จ · ยินดีต้อนรับ'});setFlash(isOut?'checkout':'success');isOut?soundEngine.playCheckOutSuccess():soundEngine.playCheckInSuccess();return;
-    }
     const event=store.events.find(e=>e.id===eventId),reg=store.regs.find(r=>r.event_id===eventId&&r.user_id===userId),person=store.users.find(u=>u.id===userId);
     if(!event||event.status!=='ACTIVE'||!reg||!person){setScanMessage({ok:false,title:'ไม่มีสิทธิ์เข้าร่วม',detail:'ไม่พบรายชื่อในกิจกรรมที่เลือก'});setFlash('error');soundEngine.playError();return;}
     const checkout=event.scan_mode==='CHECKOUT';
@@ -228,6 +279,8 @@ export default function Home() {
     const status:Status=checkout?'COMPLETED':'ATTENDING';const next={...store,regs:store.regs.map(r=>r===reg?{...r,status,...(checkout?{checkout_at:new Date().toISOString(),checked_out_by:user?.id}:{checkin_at:new Date().toISOString(),checked_in_by:user?.id})}:r)};save(next);
     setScanMessage({ok:true,title:person.full_name,detail:checkout?'เข้าร่วมสำเร็จ · เช็กเอาต์เรียบร้อย':'เช็กอินสำเร็จ · ยินดีต้อนรับ'});setFlash(checkout?'checkout':'success');checkout?soundEngine.playCheckOutSuccess():soundEngine.playCheckInSuccess();
   }
+  const latestScan = useRef(scanPayload);
+  latestScan.current = scanPayload;
   async function startScanner(){
     soundEngine.unlockAudio();
     if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia){const message='เบราว์เซอร์บล็อกกล้องบน HTTP ให้เปิดผ่าน HTTPS หรือ localhost';setScanMessage({ok:false,title:'ต้องใช้การเชื่อมต่อที่ปลอดภัย',detail:message});setToast(message);return;}
@@ -239,7 +292,7 @@ export default function Home() {
       const cameras=await Html5Qrcode.getCameras();
       if(!cameras.length)throw new DOMException('ไม่พบกล้องที่เชื่อมต่ออยู่','NotFoundError');
       const camera=cameras.find(({label})=>/back|rear|environment|หลัง/i.test(label))||cameras[0];
-      await scanner.start(camera.id,{fps:20,qrbox:{width:260,height:260}},(text)=>{void scanPayload(text)},()=>{});
+      await scanner.start(camera.id,{fps:20,qrbox:(width,height)=>{const size=Math.min(260,Math.floor(Math.min(width,height)*0.8));return {width:size,height:size};}},(text)=>{void latestScan.current(text)},()=>{});
       setScannerOn(true);
       setScanMessage({ok:true,title:'กล้องพร้อมทำงาน',detail:`กำลังใช้กล้อง ${camera.label||'เริ่มต้น'} · เล็ง QR Code ให้อยู่ในกรอบ`});
     }
@@ -433,7 +486,7 @@ export default function Home() {
       </button>
 
       {/* Desktop Navigation Tabs with clear category themes */}
-      <nav className="hidden items-center gap-1.5 rounded-full bg-slate-100/90 p-1.5 md:flex shadow-inner">
+      <nav className="hidden items-center gap-1.5 rounded-full bg-slate-100/90 p-1.5 xl:flex shadow-inner">
         {user && (
           <>
             {user.role === 'STUDENT' && (
@@ -491,7 +544,7 @@ export default function Home() {
             <button
               onClick={()=>setMobileNav(!mobileNav)}
               aria-label="เปิดเมนู"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 md:hidden"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 xl:hidden"
             >
               {mobileNav ? <X size={17}/> : <Menu size={17}/>}
             </button>
@@ -520,7 +573,7 @@ export default function Home() {
 
     {/* Mobile Navigation Drawer */}
     {user && mobileNav && (
-      <div className="glass mx-auto mt-2 max-w-[1440px] rounded-3xl border border-white/80 p-4 shadow-xl md:hidden">
+      <div className="glass mx-auto mt-2 max-w-[1440px] rounded-3xl border border-white/80 p-4 shadow-xl xl:hidden">
         <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
           <div className="flex items-center gap-2.5">
             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#7c0a02] font-bold text-white shadow-sm">
@@ -575,7 +628,7 @@ export default function Home() {
     )}
 
     <div key={view} className="page-transition mx-auto mt-6 max-w-[1440px]">
-      {!user?<Landing enterAs={()=>void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…',enterAs)} saving={saving||Boolean(loadingMessage)}/>:view==='scanner'&&user.role!=='STUDENT'?<ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={()=>setScannerLocked(value=>!value)} startScanner={()=>void withLoading('กำลังเปิดกล้อง…',startScanner)} stopScanner={()=>void withLoading('กำลังปิดกล้อง…',stopScanner)} scanMode={()=>void withLoading('กำลังเปลี่ยนโหมดสแกน…',setScanMode)} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async(raw:string)=>{await withLoading('กำลังตรวจสอบ QR…',()=>scanPayload(raw));}} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={()=>setModal('walkin')}/>:view==='admin'&&user.role==='ADMIN'?<AdminView sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args)=>withLoading('กำลังบันทึกคณะและสาขา…',()=>manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={()=>setModal('event')} openCodes={()=>setModal('codes')} openStaff={()=>setModal('staff')} editUser={(target:User)=>{setEditingUser(target);setEditingFaculty(target.faculty);setEditingMajor(target.major);setModal('editUser')}} deleteUser={(target:User)=>void withLoading('กำลังลบบัญชีผู้ใช้…',()=>deleteManagedUser(target))} deleteActivity={()=>void withLoading('กำลังลบกิจกรรม…',deleteActivity)} deleteRegistration={(id:string)=>void withLoading('กำลังนำรายชื่อออก…',()=>deleteRegistration(id))} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={()=>void withLoading('กำลังนำเข้ารายชื่อ…',importCsv)} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch:Partial<Event>)=>withLoading('กำลังบันทึกการเปลี่ยนแปลง…',()=>updateSelectedEvent(patch))} />:view==='studentStats'&&user.role==='STUDENT'?<StudentStatsView user={user} events={store.events.filter(e=>studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs}/>:view==='event'&&user.role==='STUDENT'?<EventDetail event={store.events.find(e=>e.id===activeEvent)||currentEvent} user={user} registration={studentRegs.find(r=>r.event_id===activeEvent)} back={()=>setView('home')}/>:<StudentHome user={user} events={store.events.filter(e=>e.status==='ACTIVE'&&studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs} select={(id:string)=>{setActiveEvent(id);setView('event')}} store={store}/>}
+      {!user?<Landing enterAs={()=>void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…',enterAs)} saving={saving||Boolean(loadingMessage)}/>:view==='scanner'&&user.role!=='STUDENT'?<ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={()=>setScannerLocked(value=>!value)} startScanner={()=>void withLoading('กำลังเปิดกล้อง…',startScanner)} stopScanner={()=>void withLoading('กำลังปิดกล้อง…',stopScanner)} scanMode={()=>void withLoading('กำลังเปลี่ยนโหมดสแกน…',setScanMode)} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async(raw:string)=>{await withLoading('กำลังตรวจสอบ QR…',()=>scanPayload(raw));}} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={()=>setModal('walkin')}/>:view==='admin'&&user.role==='ADMIN'?<AdminView sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args)=>withLoading('กำลังบันทึกคณะและสาขา…',()=>manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={()=>setModal('event')} openCodes={()=>setModal('codes')} openStaff={()=>setModal('staff')} editUser={(target:User)=>{setEditingUser(target);setEditingFaculty(target.faculty);setEditingMajor(target.major);setModal('editUser')}} deleteUser={(target:User)=>void withLoading('กำลังลบบัญชีผู้ใช้…',()=>deleteManagedUser(target))} deleteActivity={()=>void withLoading('กำลังลบกิจกรรม…',deleteActivity)} deleteRegistration={(id:string)=>void withLoading('กำลังนำรายชื่อออก…',()=>deleteRegistration(id))} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={()=>void withLoading('กำลังนำเข้ารายชื่อ…',importCsv)} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch:Partial<Event>)=>withLoading('กำลังบันทึกการเปลี่ยนแปลง…',()=>updateSelectedEvent(patch))} />:view==='studentStats'&&user.role==='STUDENT'?<StudentStatsView user={user} events={store.events.filter(e=>studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs}/>:view==='event'&&user.role==='STUDENT'?<EventDetail session={sessionToken} event={store.events.find(e=>e.id===activeEvent)||currentEvent} user={user} registration={studentRegs.find(r=>r.event_id===activeEvent)} back={()=>setView('home')}/>:<StudentHome user={user} events={store.events.filter(e=>e.status==='ACTIVE'&&studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs} select={(id:string)=>{setActiveEvent(id);setView('event')}} store={store}/>}
     </div>
     {user&&<div className="mx-auto mt-10 flex max-w-[1440px] items-center justify-between border-t border-slate-200/70 px-2 py-4 text-[10px] text-slate-500"><span>© 2026 ARU Student Organization · ระบบลงทะเบียนกิจกรรม</span><span className="hidden items-center gap-1 sm:flex"><ShieldCheck size={12}/>ข้อมูลกิจกรรมอัปเดตแบบเรียลไทม์</span></div>}
     {modal==='walkin'&&<Modal title="ลงทะเบียนหน้างาน" subtitle="เพิ่มนักศึกษาและผูกสิทธิ์กิจกรรม" close={()=>setModal(null)}><form onSubmit={e=>void withLoading('กำลังบันทึกรายชื่อ…',()=>addWalkin(e))} className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><Field label="รหัสนักศึกษา" name="student_id" required placeholder="เช่น 69123456"/><Field label="ชื่อ–นามสกุล" name="full_name" required placeholder="ชื่อ นามสกุล"/><label className="block text-[11px] font-semibold text-slate-600">คณะ<select name="faculty" value={walkinFaculty} required onChange={e=>{setWalkinFaculty(e.target.value);setWalkinMajor('')}} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800"><option value="">เลือกคณะ</option>{academicCatalog.map(faculty=><option key={faculty.id} value={faculty.name}>{faculty.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">สาขาวิชา<select name="major" value={walkinMajor} required disabled={!walkinFaculty} onChange={e=>setWalkinMajor(e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 disabled:opacity-50"><option value="">เลือกสาขา</option>{(academicCatalog.find(faculty=>faculty.name===walkinFaculty)?.majors||[]).map(major=><option key={major.id} value={major.name}>{major.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">ชั้นปีที่กำลังศึกษา<select name="study_year" value={walkinStudyYear} onChange={e=>setWalkinStudyYear(Number(e.target.value))} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{Array.from({length:8},(_,i)=>i+1).map(year=><option key={year} value={year}>ปี {year}</option>)}</select></label><Field label="หมู่เรียน" name="class_group" placeholder="เช่น 6901.1"/><Field label="วันเกิด (DDMMYYYY)" name="birth_date" required placeholder="22062549"/><Field label="เบอร์โทรศัพท์" name="phone" placeholder="08X-XXX-XXXX"/></div><div className={cx('flex items-center justify-between rounded-2xl px-4 py-3 text-xs',reserveLeft?'bg-amber-50 text-amber-900':'bg-rose-50 text-rose-700')}><span className="flex items-center gap-2"><Ticket size={15}/>Passcode สำรองคงเหลือ</span><b>{reserveLeft} รหัส</b></div><button className="w-full rounded-xl bg-[#7c0a02] py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300" disabled={walkinStudyYear>1&&reserveLeft===0} type="submit">บันทึกรายชื่อ</button><p className="text-center text-[10px] leading-5 text-slate-400">นักศึกษาชั้นปี 2 ขึ้นไปจะได้รับ Passcode หลังเช็กเอาต์ · ปี 1 ใช้ QR Check-in/Check-out</p></form></Modal>}
@@ -740,7 +793,7 @@ function Landing({enterAs,saving}:{enterAs:()=>void;saving:boolean}){return <div
         <div className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-white/75 lg:justify-start"><Activity size={14}/> ARU EVENT PASS</div>
         <h1 className="mt-4 text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-[64px]">ARU<br/><span className="text-amber-300">Event Pass</span></h1>
         <p className="mx-auto mt-4 max-w-md text-sm leading-7 text-rose-50/80 lg:mx-0">ระบบลงทะเบียนและเช็กอินกิจกรรมมหาวิทยาลัย เชื่อมต่อด้วย QR Code พร้อมติดตามสถานะได้แบบเรียลไทม์</p>
-        <div className="mt-8 grid max-w-lg grid-cols-3 gap-3 mx-auto lg:mx-0"><MetricChip icon={<QrCode size={15}/>} label="QR Check-in" value="รวดเร็ว"/><MetricChip icon={<Zap size={15}/>} label="Live Status" value="Real-time"/><MetricChip icon={<Ticket size={15}/>} label="Passcode" value="ปลอดภัย"/></div>
+        <div className="mt-8 grid max-w-lg grid-cols-1 min-[400px]:grid-cols-3 gap-3 mx-auto lg:mx-0"><MetricChip icon={<QrCode size={15}/>} label="QR Check-in" value="รวดเร็ว"/><MetricChip icon={<Zap size={15}/>} label="Live Status" value="Real-time"/><MetricChip icon={<Ticket size={15}/>} label="Passcode" value="ปลอดภัย"/></div>
       </div>
     </div>
   </section>
@@ -775,10 +828,10 @@ function AttendanceConfirmation({status,eventTitle}:{status?:Status;eventTitle?:
 function StatusPill({status}:{status:Status}){const label=status==='REGISTERED'?'รอสแกนเข้างาน':status==='ATTENDING'?'กำลังเข้าร่วมกิจกรรม':'เข้าร่วมกิจกรรมสำเร็จ';return <span className={cx('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[8px] font-bold',status==='REGISTERED'?'bg-slate-100 text-slate-500':status==='ATTENDING'?'bg-amber-100 text-amber-800':'bg-emerald-100 text-emerald-800')}>{status==='ATTENDING'?<Clock3 size={12} strokeWidth={2.5}/>:status==='COMPLETED'?<CheckCircle2 size={12} strokeWidth={3}/>:null}<span>{label}</span></span>}
 function Empty({message}:{message:string}){return <div className="rounded-2xl border border-dashed border-slate-200 py-10 text-center text-xs text-slate-400">{message}</div>}
 
-function EventDetail({event,user,registration,back}:{event:Event;user:User;registration?:Registration;back:()=>void}){
+function EventDetail({event,user,registration,back,session}:{session:string;event:Event;user:User;registration?:Registration;back:()=>void}){
   const [done,setDone]=useState(false);
   const passcode=registration?.status==='COMPLETED'&&user.study_year>1?registration.passcode:undefined;
-  const yearOneRedirect=user.study_year===1&&registration?.status!=='REGISTERED'&&event.redirect_url_year1;
+  const yearOneRedirect=user.study_year===1&&registration && registration.status!=='REGISTERED'&&event.redirect_url_year1;
   return <div className="mx-auto max-w-5xl">
     <button onClick={back} className="mb-4 flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-[#7c0a02]">← กลับหน้ากิจกรรม</button>
     <div className="grid gap-5 lg:grid-cols-[1.2fr_.8fr]">
@@ -786,8 +839,12 @@ function EventDetail({event,user,registration,back}:{event:Event;user:User;regis
       <section className="bento p-6">
         <AttendanceConfirmation status={registration?.status} eventTitle={event.title}/>
         <div className="flex items-center justify-between"><div><span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">สถานะการเข้าร่วม</span><div className="mt-2"><StatusPill status={registration?.status||'REGISTERED'}/></div></div><div className="rounded-2xl bg-amber-50 p-3 text-amber-600"><QrCode size={22}/></div></div>
-        <div className="my-5 flex justify-center rounded-2xl bg-slate-50 p-5"><div className="relative rounded-xl bg-white p-3 shadow-sm"><QRCodeSVG value={JSON.stringify({e:event.id,u:user.id})} size={170} level="M"/><div className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-lg bg-[#7c0a02] text-[9px] font-black text-amber-300">ARU</div></div></div>
-        <p className="text-center text-[10px] leading-5 text-slate-500">แสดง QR Code นี้ให้เจ้าหน้าที่สแกนเมื่อเข้างาน<br/>ระบบจะแจ้งสถานะใหม่ให้โดยอัตโนมัติ</p>
+        {isSupabaseConfigured ? registration && registration.status!=='COMPLETED' && event.status==='ACTIVE' &&
+          <StudentQr key={event.id+':'+session+':'+registration.status} session={session} eventId={event.id}/>
+          : <><div className="qr-ticket my-5 flex justify-center rounded-2xl p-2">
+          <QRCodeCanvas value={JSON.stringify({e:event.id,u:user.id})} size={256} marginSize={4} level="M" fgColor="#000000" bgColor="#ffffff" role="img" aria-label="QR สำหรับสแกนเข้าและออกจากกิจกรรม"/>
+        </div>
+        <p className="text-center text-[10px] leading-5 text-slate-500">แสดง QR Code นี้ให้เจ้าหน้าที่สแกนเมื่อเข้างาน<br/>ระบบจะแจ้งสถานะใหม่ให้โดยอัตโนมัติ</p></>}
         {passcode&&<div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center"><span className="text-[9px] font-bold uppercase tracking-wider text-amber-800">Passcode ปลดล็อกแล้ว</span><div className="mt-1 flex items-center justify-center gap-2"><b className="text-xl tracking-[.18em] text-[#7c0a02]">{passcode}</b><button className="rounded-lg bg-white p-2 text-[#7c0a02]" onClick={()=>{navigator.clipboard?.writeText(passcode);setDone(true);setTimeout(()=>setDone(false),1800)}}>{done?<Check size={15}/>:<Clipboard size={15}/>}</button></div><span className="mt-1 block text-[9px] text-amber-800">{done?'คัดลอกแล้ว':'คัดลอกรหัสเพื่อยืนยันสิทธิ์'}</span></div>}
         {yearOneRedirect&&<a href={event.redirect_url_year1} className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-[#7c0a02] py-3 text-xs font-bold text-white">ไปยังหน้ากิจกรรม <ExternalLink size={13}/></a>}
       </section>
@@ -830,13 +887,7 @@ function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,sta
    {/* Scanner Header Bar */}
    <div className="flex flex-wrap items-end justify-between gap-3 px-2">
      <div>
-       <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.15em] text-slate-400">
-         <span>Staff Console</span>
-         <span className="h-1 w-1 rounded-full bg-[#d4af37]"/>
-         Fast QR Scanner
-       </div>
-       <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">เครื่องสแกนความเร็วสูง</h1>
-       <p className="mt-1 text-xs text-slate-500">สแกน QR นักศึกษาเพื่อเช็กอินและเช็กเอาต์แบบเรียลไทม์</p>
+       <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">จุดสแกนหน้างาน</h1>
      </div>
      <div className="flex flex-wrap items-center gap-2">
        <EventStatusPill status={event.status}/>
@@ -856,7 +907,7 @@ function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,sta
          )}
        >
          {scannerLocked ? <Unlock size={14}/> : <Lock size={14}/>}
-         <span>{scannerLocked ? 'ปลดล็อก' : 'ล็อกหน้าจอ (Lock Screen)'}</span>
+         <span>{scannerLocked ? 'ปลดล็อก' : 'ล็อกหน้าจอ'}</span>
        </button>
      </div>
    </div>
@@ -866,13 +917,14 @@ function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,sta
      <section className="bento overflow-hidden p-4 sm:p-5">
        {/* Selector + Mode Toggle with distinct colors */}
        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-         <div>
+         <div className="min-w-0 max-w-full">
            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">เลือกกิจกรรมที่สแกน</span>
            <div className="mt-1 flex items-center gap-2">
              <select
+               aria-label="กิจกรรมที่สแกน"
                value={activeEvent}
                onChange={e=>setActiveEvent(e.target.value)}
-               className="h-10 max-w-[320px] rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-800 shadow-sm"
+               className="h-10 w-full min-w-0 max-w-[320px] rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-800 shadow-sm"
              >
                {events.map(ev=><option key={ev.id} value={ev.id}>{ev.title}</option>)}
              </select>
@@ -883,9 +935,10 @@ function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,sta
          <div className="flex items-center rounded-2xl bg-slate-100 p-1 shadow-inner">
            <button
              type="button"
+             aria-pressed={event.scan_mode==='CHECKIN'}
              onClick={() => { if(event.scan_mode !== 'CHECKIN') scanMode(); }}
              className={cx(
-               'flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[11px] font-extrabold transition-all duration-200',
+               'flex min-h-11 items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-extrabold transition-all duration-200',
                event.scan_mode === 'CHECKIN'
                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/20 ring-2 ring-emerald-500/20'
                  : 'text-slate-600 hover:text-emerald-700'
@@ -893,13 +946,14 @@ function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,sta
            >
              <span className={cx('h-2 w-2 rounded-full', event.scan_mode === 'CHECKIN' ? 'animate-pulse bg-emerald-200' : 'bg-slate-400')}/>
              <ArrowDownRight size={14}/>
-             โหมดเช็กอิน (เข้างาน)
+             สแกนเข้า
            </button>
            <button
              type="button"
+             aria-pressed={event.scan_mode==='CHECKOUT'}
              onClick={() => { if(event.scan_mode !== 'CHECKOUT') scanMode(); }}
              className={cx(
-               'flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[11px] font-extrabold transition-all duration-200',
+               'flex min-h-11 items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-extrabold transition-all duration-200',
                event.scan_mode === 'CHECKOUT'
                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-950/20 ring-2 ring-amber-400/20 font-black'
                  : 'text-slate-600 hover:text-amber-800'
@@ -907,44 +961,13 @@ function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,sta
            >
              <span className={cx('h-2 w-2 rounded-full', event.scan_mode === 'CHECKOUT' ? 'animate-pulse bg-amber-900' : 'bg-slate-400')}/>
              <ArrowUpRight size={14}/>
-             โหมดเช็กเอาต์ (ออกงาน)
+             สแกนออก
            </button>
          </div>
        </div>
 
-       {/* Camera Viewport */}
-       <div className="relative flex min-h-[360px] items-center justify-center overflow-hidden rounded-[24px] bg-slate-950">
-         <div className="absolute inset-0 opacity-30" style={{backgroundImage:'radial-gradient(#94a3b8 1px,transparent 1px)',backgroundSize:'20px 20px'}}/>
-         <div className="absolute left-5 top-5 z-10 flex items-center gap-2 rounded-full bg-slate-900/80 px-3 py-2 text-[9px] font-semibold text-white">
-           <span className={cx('h-2 w-2 rounded-full',scannerOn?'animate-pulse bg-emerald-400':'bg-slate-500')}/>
-           {scannerOn?'CAMERA LIVE':'CAMERA STANDBY'}
-         </div>
-         <div className="absolute right-5 top-5 z-10 rounded-full bg-slate-900/80 px-3 py-2 text-[9px] font-semibold text-slate-300">
-           20 FPS · 0.5s cooldown
-         </div>
-         <div id="aru-reader" className="relative z-[1] w-full max-w-[520px] overflow-hidden rounded-xl [&_video]:rounded-xl [&_video]:object-cover [&_img]:hidden"/>
-         {!scannerOn&&<div className="absolute inset-0 z-[2] flex flex-col items-center justify-center px-6 text-center">
-           <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-[26px] border border-white/15 bg-white/10 text-amber-300">
-             <ScanLine size={32}/>
-           </div>
-           <b className="text-sm text-white">พร้อมสแกน QR Code</b>
-           <span className="mt-1 max-w-xs text-[10px] leading-5 text-slate-400">กดปุ่มด้านล่างเพื่อเปิดกล้องและเริ่มสแกน</span>
-           <div className="pointer-events-none absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-[28px] border-2 border-amber-300/70"/>
-         </div>}
-         {scannerOn&&<div className="pointer-events-none absolute left-1/2 top-1/2 z-[2] h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-[28px] border-2 border-amber-300/80"/>}
-         <ScanResultEffect message={scanMessage} flash={flash}/>
-         <div className="absolute bottom-4 left-4 right-4 z-10 flex items-end justify-between gap-3">
-           <div className="max-w-[72%] rounded-xl bg-slate-900/85 px-3 py-2 text-white">
-             <span className="block text-[8px] uppercase tracking-wider text-slate-400">ผลการสแกนล่าสุด</span>
-             <b className="mt-0.5 block truncate text-xs">{scanMessage?.title||'รอการสแกน'}</b>
-             <span className="block truncate text-[9px] text-slate-400">{scanMessage?.detail||'เปิดกล้องเพื่อเริ่มต้น'}</span>
-           </div>
-           {scanMessage&&<span className={cx('rounded-full px-3 py-2 text-[9px] font-bold',scanMessage.ok?'bg-emerald-400 text-emerald-950':'bg-rose-500 text-white')}>{scanMessage.ok?'SUCCESS':'ERROR'}</span>}
-         </div>
-       </div>
-
        {/* Camera Action Buttons */}
-       <div className="mt-4 grid grid-cols-2 gap-3">
+       <div className="mb-4 grid grid-cols-2 gap-3">
          <button
            onClick={()=>scannerOn?stopScanner():startScanner()}
            className={cx(
@@ -960,13 +983,41 @@ function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,sta
            className="flex items-center justify-center gap-2 rounded-xl border border-sky-300 bg-sky-50 py-3 text-xs font-bold text-sky-800 shadow-sm transition hover:bg-sky-100"
          >
            <Plus size={15}/>
-           เพิ่มรายชื่อหน้างาน (Walk-in)
+           เพิ่มรายชื่อหน้างาน
          </button>
        </div>
+       {/* Camera Viewport */}
+       <div className="relative flex min-h-[240px] sm:min-h-[320px] items-center justify-center overflow-hidden rounded-[24px] bg-slate-950">
+         <div className="absolute inset-0 opacity-30" style={{backgroundImage:'radial-gradient(#94a3b8 1px,transparent 1px)',backgroundSize:'20px 20px'}}/>
+         <div className="absolute left-5 top-5 z-10 flex items-center gap-2 rounded-full bg-slate-900/80 px-3 py-2 text-[9px] font-semibold text-white">
+           <span className={cx('h-2 w-2 rounded-full',scannerOn?'animate-pulse bg-emerald-400':'bg-slate-500')}/>
+           {scannerOn?'กล้องเปิดอยู่':'กล้องปิดอยู่'}
+         </div>
+         <div id="aru-reader" className="relative z-[1] w-full max-w-[520px] overflow-hidden rounded-xl [&_video]:rounded-xl [&_video]:object-cover [&_img]:hidden"/>
+         {!scannerOn&&<div className="absolute inset-0 z-[2] flex flex-col items-center justify-center px-6 text-center">
+           <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-[26px] border border-white/15 bg-white/10 text-amber-300">
+             <ScanLine size={32}/>
+           </div>
+           <b className="text-sm text-white">พร้อมสแกน QR Code</b>
+           <span className="mt-1 max-w-xs text-[10px] leading-5 text-slate-400">แตะ “เปิดกล้อง” แล้วให้นักศึกษาแสดง QR</span>
+           <div className="pointer-events-none absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-[28px] border-2 border-amber-300/70"/>
+         </div>}
+         {scannerOn&&<div className="pointer-events-none absolute left-1/2 top-1/2 z-[2] h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-[28px] border-2 border-amber-300/80"/>}
+         <ScanResultEffect message={scanMessage} flash={flash}/>
+       </div>
+       <div role="status" aria-live="polite" aria-atomic="true" className={cx('mt-3 rounded-xl border px-4 py-3',
+         !scanMessage?'border-slate-200 bg-slate-50':scanMessage.ok?'border-emerald-200 bg-emerald-50':'border-rose-200 bg-rose-50')}>
+         <p className="text-xs font-semibold text-slate-600">สถานะเครื่องสแกน</p>
+         <p className="mt-1 break-words text-base font-bold text-slate-900">{scanMessage?.title || 'รอเปิดกล้อง'}</p>
+         {scanMessage && <p className="mt-1 break-words text-sm text-slate-700">{scanMessage.detail}</p>}
+       </div>
+
+       <details className="mt-3"><summary className="cursor-pointer py-2 text-sm text-slate-600">ทดสอบด้วยข้อมูล QR</summary>
        <form className="mt-3 flex gap-2" onSubmit={e=>{e.preventDefault();void scanPayload(scanInput);setScanInput('')}}>
-         <input value={scanInput} onChange={e=>setScanInput(e.target.value)} placeholder={'ทดสอบ QR Code · {"e":"event_id","u":"user_id"}'} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[10px]"/>
+         <input value={scanInput} onChange={e=>setScanInput(e.target.value)} placeholder={isSupabaseConfigured?'วางข้อมูล QR จากบัตรกิจกรรม':'ทดสอบ QR Code · {"e":"event_id","u":"user_id"}'} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[10px]"/>
          <button className="rounded-xl bg-slate-900 px-4 text-[10px] font-bold text-white">ทดสอบ</button>
        </form>
+       </details>
      </section>
 
      {/* Progress Sidebar */}
@@ -974,7 +1025,7 @@ function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,sta
        <section className="bento p-5">
          <div className="flex items-center justify-between">
            <div>
-             <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Check-in Progress</span>
+
              <h2 className="mt-1 text-sm font-extrabold text-slate-900">ความคืบหน้าการสแกน</h2>
            </div>
            <span className="rounded-xl bg-rose-50 p-2 text-[#7c0a02]"><Gauge size={19}/></span>
@@ -985,7 +1036,7 @@ function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,sta
              <div className="absolute left-1/2 top-2 h-36 w-36 -translate-x-1/2 rounded-full border-[14px] border-[#7c0a02]" style={{clipPath:'inset(0 0 50% 0)',transform:'translateX(-50%) rotate('+(pct*1.8-90)+'deg)'}}/>
              <div className="absolute inset-x-0 bottom-0 text-center">
                <b className="text-3xl text-slate-900">{pct}<small className="text-sm">%</small></b>
-               <span className="block text-[8px] text-slate-400">CHECKED IN</span>
+               <span className="block text-[8px] text-slate-400">เช็กอินแล้ว</span>
              </div>
            </div>
            <div className="flex-1 space-y-3">
@@ -1024,7 +1075,7 @@ function UserProfileSummary({user}:{user:User}){
     <div className="pointer-events-none absolute right-0 top-0 h-28 w-28 translate-x-8 -translate-y-8 rounded-full bg-amber-400/10 blur-xl"/>
     <div className="flex flex-wrap items-center justify-between gap-4">
       {/* User Identity */}
-      <div className="flex min-w-[240px] items-center gap-3.5">
+      <div className="flex min-w-0 sm:min-w-[240px] items-center gap-3.5">
         <div className="relative">
           <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#7c0a02] to-[#b91c1c] text-base font-extrabold text-amber-200 shadow-md">
             {initials(user.full_name)}
@@ -1140,13 +1191,7 @@ function AdminView({sessionToken,store,academicCatalog,manageAcademicCatalog,sel
   {/* Header Section */}
   <div className="flex flex-wrap items-end justify-between gap-3 px-2">
     <div>
-      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.15em] text-slate-400">
-        <span>Admin Console</span>
-        <span className="h-1 w-1 rounded-full bg-[#d4af37]"/>
-        System Management
-      </div>
-      <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">จัดการกิจกรรมและสิทธิ์</h1>
-      <p className="mt-1 text-xs text-slate-500">แดชบอร์ดสถิติ · ตั้งค่ากิจกรรม · นำเข้ารายชื่อ · จัดการผู้ใช้และคณะ/สาขา</p>
+      <h1 className="text-2xl font-extrabold text-slate-900 sm:text-3xl">พื้นที่ผู้ดูแลระบบ</h1>
     </div>
     <div className="flex gap-2">
       <button onClick={openStaff} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-[10px] font-bold text-slate-700 shadow-sm transition hover:border-[#7c0a02] hover:text-[#7c0a02]">
@@ -1160,103 +1205,40 @@ function AdminView({sessionToken,store,academicCatalog,manageAcademicCatalog,sel
     </div>
   </div>
 
-  {/* Metric Cards */}
-  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  <nav aria-label="เมนูผู้ดูแลระบบ" className="grid grid-cols-2 gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm sm:grid-cols-3 xl:grid-cols-6">
+    {([
+      ['dashboard','ภาพรวม',Activity],
+      ['events','จัดการกิจกรรม',BookOpen],
+      ['report','รายงานผู้เข้าร่วม',FileSpreadsheet],
+      ['users','บัญชีผู้ใช้',Users],
+      ['catalog','คณะและสาขา',Building2],
+      ['all','แสดงทั้งหมด',Layers],
+    ] as const).map(([tab,label,Icon])=>(
+      <button key={tab} type="button" aria-pressed={adminTab===tab} onClick={()=>setAdminTab(tab)}
+        className={cx('flex min-h-11 items-center justify-center gap-2 rounded-xl px-2 text-sm font-bold transition',
+          adminTab===tab?'bg-[#7c0a02] text-white':'text-slate-600 hover:bg-rose-50 hover:text-[#7c0a02]')}>
+        <Icon size={16}/>{label}
+      </button>
+    ))}
+  </nav>
+  {adminTab!=='users' && adminTab!=='catalog' && (
+    <label className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-bold text-slate-700 sm:flex-row sm:items-center sm:gap-5">
+      กิจกรรมที่เลือก
+      <select value={selectedEventId} onChange={e=>setSelectedEvent(e.target.value)} disabled={!store.events.length}
+        className="min-h-11 min-w-0 flex-1 rounded-xl border border-slate-300 bg-slate-50 px-3 font-semibold">
+        {!store.events.length && <option value="">ยังไม่มีกิจกรรม</option>}
+        {store.events.map(event=><option key={event.id} value={event.id}>{event.title}</option>)}
+      </select>
+    </label>
+  )}
+  {(adminTab==='dashboard' || adminTab==='all') && (
+<div className="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-4">
     <AdminMetric label="กิจกรรมทั้งหมด" value={store.events.length} note="รายการในระบบ" icon={<Activity size={18}/>} tone="rose"/>
-    <AdminMetric label="ผู้เข้าร่วมทั้งหมด" value={store.users.filter(u=>u.role==='STUDENT').length} note="บัญชีนักศึกษา" icon={<Users size={18}/>} tone="gold"/>
+    <AdminMetric label="นักศึกษาทั้งระบบ" value={store.users.filter(u=>u.role==='STUDENT').length} note="บัญชีนักศึกษา" icon={<Users size={18}/>} tone="gold"/>
     <AdminMetric label="ลงทะเบียนกิจกรรมนี้" value={regs.length} note={selectedEvent.title} icon={<QrCode size={18}/>} tone="blue"/>
     <AdminMetric label="เข้าร่วมครบแล้ว" value={completed} note="เช็กเอาต์สำเร็จ" icon={<CheckCircle2 size={18}/>} tone="green"/>
   </div>
-
-  {/* Admin Sub-Navigation Category Tabs */}
-  <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200/80 bg-white p-2 shadow-sm">
-    <div className="flex flex-wrap items-center gap-1.5">
-      <button
-        type="button"
-        onClick={() => setAdminTab('dashboard')}
-        className={cx(
-          'flex items-center gap-2 rounded-xl px-3.5 py-2 text-[11px] font-extrabold transition-all',
-          adminTab === 'dashboard'
-            ? 'bg-[#7c0a02] text-white shadow-md shadow-rose-950/25 ring-2 ring-rose-900/10'
-            : 'text-slate-600 hover:text-[#7c0a02] hover:bg-rose-50/60'
-        )}
-      >
-        <Activity size={14} />
-        <span>แดชบอร์ดภาพรวม</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => setAdminTab('events')}
-        className={cx(
-          'flex items-center gap-2 rounded-xl px-3.5 py-2 text-[11px] font-extrabold transition-all',
-          adminTab === 'events'
-            ? 'bg-sky-700 text-white shadow-md shadow-sky-950/25 ring-2 ring-sky-700/10'
-            : 'text-slate-600 hover:text-sky-700 hover:bg-sky-50/60'
-        )}
-      >
-        <BookOpen size={14} />
-        <span>จัดการกิจกรรม</span>
-        <span className={cx('rounded-full px-1.5 py-0.2 text-[9px] font-bold', adminTab==='events'?'bg-white/25 text-white':'bg-slate-100 text-slate-700')}>{store.events.length}</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => setAdminTab('report')}
-        className={cx(
-          'flex items-center gap-2 rounded-xl px-3.5 py-2 text-[11px] font-extrabold transition-all',
-          adminTab === 'report'
-            ? 'bg-emerald-700 text-white shadow-md shadow-emerald-950/25 ring-2 ring-emerald-700/10'
-            : 'text-slate-600 hover:text-emerald-700 hover:bg-emerald-50/60'
-        )}
-      >
-        <FileSpreadsheet size={14} />
-        <span>รายงานผู้เข้าร่วม</span>
-        <span className={cx('rounded-full px-1.5 py-0.2 text-[9px] font-bold', adminTab==='report'?'bg-white/25 text-white':'bg-slate-100 text-slate-700')}>{regs.length}</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => setAdminTab('users')}
-        className={cx(
-          'flex items-center gap-2 rounded-xl px-3.5 py-2 text-[11px] font-extrabold transition-all',
-          adminTab === 'users'
-            ? 'bg-amber-600 text-white shadow-md shadow-amber-950/25 ring-2 ring-amber-600/10'
-            : 'text-slate-600 hover:text-amber-800 hover:bg-amber-50/60'
-        )}
-      >
-        <Users size={14} />
-        <span>จัดการบัญชีผู้ใช้</span>
-        <span className={cx('rounded-full px-1.5 py-0.2 text-[9px] font-bold', adminTab==='users'?'bg-white/25 text-white':'bg-slate-100 text-slate-700')}>{store.users.length}</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => setAdminTab('catalog')}
-        className={cx(
-          'flex items-center gap-2 rounded-xl px-3.5 py-2 text-[11px] font-extrabold transition-all',
-          adminTab === 'catalog'
-            ? 'bg-purple-700 text-white shadow-md shadow-purple-950/25 ring-2 ring-purple-700/10'
-            : 'text-slate-600 hover:text-purple-800 hover:bg-purple-50/60'
-        )}
-      >
-        <Building2 size={14} />
-        <span>คณะ & สาขาวิชา</span>
-        <span className={cx('rounded-full px-1.5 py-0.2 text-[9px] font-bold', adminTab==='catalog'?'bg-white/25 text-white':'bg-slate-100 text-slate-700')}>{academicCatalog.length}</span>
-      </button>
-    </div>
-
-    <button
-      type="button"
-      onClick={() => setAdminTab(adminTab === 'all' ? 'dashboard' : 'all')}
-      className={cx(
-        'flex items-center gap-2 rounded-xl px-3.5 py-2 text-[11px] font-bold transition shadow-sm',
-        adminTab === 'all'
-          ? 'bg-slate-900 text-amber-300 ring-2 ring-slate-800'
-          : 'border border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-      )}
-    >
-      <Layers size={14} />
-      <span>{adminTab === 'all' ? 'แสดงแบบแท็บ' : 'แสดงทั้งหมด (All)'}</span>
-    </button>
-  </div>
-
+  )}
   {/* TAB 1: Dashboard Section */}
   {(adminTab === 'all' || adminTab === 'dashboard') && (
     <section className="bento p-5 sm:p-6 shadow-sm">
@@ -1303,9 +1285,7 @@ function AdminView({sessionToken,store,academicCatalog,manageAcademicCatalog,sel
             <h2 className="text-base font-extrabold text-slate-900">การจัดการกิจกรรม</h2>
             <p className="mt-0.5 text-[10px] text-slate-500">เลือกและตั้งค่าการลงทะเบียนของแต่ละกิจกรรม</p>
           </div>
-          <select value={selectedEventId} onChange={e=>setSelectedEvent(e.target.value)} className="max-w-[240px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold shadow-sm">
-            {store.events.map(e=><option value={e.id} key={e.id}>{e.title}</option>)}
-          </select>
+
         </div>
         <div className="mt-4 rounded-2xl border border-slate-200/80 bg-cover bg-center p-4 shadow-sm" style={selectedEvent.banner_url?{backgroundImage:`linear-gradient(90deg,rgba(255,255,255,.94) 0%,rgba(255,255,255,.84) 62%,rgba(255,255,255,.68) 100%),url("${selectedEvent.banner_url}")`}:undefined}>
           <div className="flex items-start justify-between gap-3">
