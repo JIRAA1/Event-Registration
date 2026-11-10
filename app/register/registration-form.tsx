@@ -2,6 +2,8 @@
 
 import {useEffect,useRef,useState} from 'react';
 import {QRCodeCanvas} from 'qrcode.react';
+import {RegistrationFrame} from './registration-frame';
+import styles from './registration.module.css';
 import {errorText,newReceipt,normalizeDigits,signupRpc,type ApplicationProfile,type Receipt,type SignupInfo} from '@/lib/event-registration';
 
 const input='mt-1 block min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-base';
@@ -157,11 +159,9 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
     sessionStorage.setItem(storageKey,key);sessionStorage.removeItem(storageKey+':draft');
     setEdit(false);setReceipt(undefined);setSecret(key);
   }
-  return <main className="canvas-grid min-h-screen px-3 py-5 sm:py-10"><section className="bento mx-auto max-w-xl space-y-4 p-5 sm:p-8">
-    <header><p className="text-sm font-bold text-[#7c0a02]">{station?'จุดลงทะเบียนหน้างาน':'ลงทะเบียนเข้าร่วมกิจกรรม'}</p>
-      <h1 className="mt-1 text-2xl font-bold">{info?.event?.title || 'ARU Event Pass'}</h1><p className="text-sm text-slate-600">{info?.event?.location}</p></header>
+  return <RegistrationFrame kiosk={!!station} title={info?.event?.title || 'ลงทะเบียนเข้าร่วมกิจกรรม'} location={info?.event?.location}>
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
-    {!info ? <button className="action-secondary" onClick={()=>window.location.reload()}>{error?'ลองโหลดอีกครั้ง':'กำลังโหลดกิจกรรม…'}</button>
+    {!info ? (error ? <button className="action-secondary" onClick={()=>window.location.reload()}>ลองโหลดอีกครั้ง</button> : <p role="status">กำลังโหลดกิจกรรม…</p>)
       : !info.event ? <p>ไม่พบกิจกรรมนี้</p>
       : secret && !edit ? <div className="space-y-4">
         {!receipt ? <p role="status">กำลังตรวจสอบคำขอ…</p> : <>
@@ -170,7 +170,7 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
           {status==='CORRECT' && <><p>กรุณาแก้ไข: {receipt.note}</p><button className="action-primary" onClick={()=>{setInitial(receipt.profile||undefined);setStudentNumber(receipt.student_id);setFaculty(receipt.profile?.faculty||'');setEdit(true);}}>แก้ไขใบสมัคร</button></>}
           {status==='CANCELLED' && <p>คำขอนี้ถูกยกเลิกแล้ว</p>}
           {status==='APPROVED' && <>
-            <div className="space-y-2 rounded-2xl bg-emerald-50 p-4"><h2 className="text-lg font-bold">ลงทะเบียนสำเร็จ</h2>
+            <div className="space-y-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950"><h2 className="text-lg font-bold">ลงทะเบียนสำเร็จ</h2>
               <p className="font-semibold">{info.event.title}</p><p>ชื่อผู้ใช้ <b className="font-mono text-lg">{receipt.student_id}</b></p>
               {password?<><p>รหัสผ่านเริ่มต้น <b className="break-all font-mono text-lg">{password}</b></p><p className="text-sm">แคปหน้าจอนี้เพื่อเก็บข้อมูลเข้าสู่ระบบ</p><button className="action-secondary" onClick={()=>void run(async()=>{await navigator.clipboard.writeText(receipt.student_id+'\n'+password);setCopied(true);})}>{copied?'คัดลอกแล้ว':'คัดลอกข้อมูลเข้าสู่ระบบ'}</button></>:
               receipt.issued && !receipt.claimed?(error?<button className="action-secondary" onClick={()=>setRetry(n=>n+1)}>ลองโหลดรหัสผ่านอีกครั้ง</button>:<p role="status">กำลังโหลดรหัสผ่าน…</p>):<p>{receipt.issued?'แสดงรหัสผ่านไปแล้ว หากไม่ได้บันทึกกรุณาติดต่อแอดมิน':'ใช้รหัสผ่าน Event Pass เดิม'}</p>}
@@ -178,7 +178,7 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
             {station?<div className="qr-ticket grid justify-items-center gap-2 p-2"><QRCodeCanvas value={loginUrl} size={180} marginSize={4}/><p>ใช้มือถือสแกนเพื่อเปิด Event Pass</p><small>หน้าจอจะล้างข้อมูลใน 90 วินาที</small></div>:<a className="action-primary w-full" href={loginUrl}>เข้าสู่ Event Pass</a>}
           </>}
         </>}
-        {(station || status==='CANCELLED' || status==='APPROVED') && <button className="action-secondary w-full" onClick={()=>{
+        {(station || status==='CANCELLED' || status==='APPROVED') && <button className={station && status==='APPROVED'?'action-primary w-full':'action-secondary w-full'} onClick={()=>{
           if((status==='PENDING'||status==='CORRECT') && !confirm('ยกเลิกคำขอของคนนี้และเริ่มคนถัดไป?'))return;
           void run(nextVisitor);
         }}>{station?'เสร็จแล้ว · คนถัดไป':'ปิดข้อมูลใบสมัคร'}</button>}
@@ -186,6 +186,7 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
       : info.event.closed || (!station && !info.event.open) ? <p className="rounded-xl bg-amber-50 p-4">ปิดรับสมัครออนไลน์แล้ว กรุณาติดต่อจุดลงทะเบียนหน้างาน</p>
       : <>
         <form key={formKey} className="space-y-3" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;void run(()=>submit(form));}}>
+          <h2 className="text-xl font-bold">{edit?'แก้ไขใบสมัคร':station?'กรอกข้อมูลผู้เข้าร่วม':'สมัครเข้าร่วมกิจกรรม'}</h2>
           <label className="block text-sm">รหัสนักศึกษา<input name="student_id" required className={input} autoComplete={station?'off':'username'}
             inputMode="numeric" pattern="[0-9๐-๙]{7,8}" maxLength={8} placeholder="รหัสนักศึกษา 7–8 หลัก" value={studentNumber}
             readOnly={edit || busy} onChange={e=>{const next=normalizeDigits(e.target.value);if(next!==studentNumber){setStudentNumber(next);setLookup(undefined);setError('');if(!station)setFaculty('');}}}/></label>
@@ -194,21 +195,22 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
           : method==='pending' ? <p role="status">มีใบสมัครรอยืนยันสำหรับกิจกรรมนี้แล้ว กรุณากลับไปยังหน้าที่ส่งใบสมัครหรือติดต่อแอดมิน</p>
           : method==='existing' ? <>
             <label className="block text-sm">รหัสผ่าน<input type="password" name="password" required className={input} autoComplete="current-password"/></label><p className="text-sm text-slate-600">รหัสผ่านเริ่มต้นของนักศึกษาคือวันเดือนปีเกิด พ.ศ. 8 หลัก เช่น 22062549 หากเปลี่ยนแล้วให้ใช้รหัสผ่านปัจจุบัน</p>
-          </>:<>
+          </>:<div className={styles.profile}>
             <label className="block text-sm">คำนำหน้า<select name="prefix" required defaultValue={initial?.prefix||''} className={input}>
               <option value="">เลือกคำนำหน้า</option><option>นาย</option><option>นางสาว</option></select></label>
-            <label className="block text-sm">หมู่เรียน<select name="class_group" required defaultValue={initial?.class_group||''} className={input}>
-              <option value="">เลือกหมู่เรียน</option>{[1,2,3,4].map(n=><option key={n}>{n}</option>)}</select></label>
             {fields.map(([name,label])=><label key={name} className="block text-sm">{label}<input required name={name} defaultValue={initial?.[name]}
               inputMode={['birth_date','phone'].includes(name)?'numeric':'text'} maxLength={name==='full_name'?255:name==='phone'?10:8} autoComplete="off" className={input}/>{name==='birth_date' && <small>เช่น 22 มิถุนายน 2549 กรอก 22062549</small>}</label>)}
             <label className="block text-sm">คณะ<select required value={faculty} onChange={e=>setFaculty(e.target.value)} className={input}><option value="">เลือกคณะ</option>{Object.keys(info.catalog||{}).map(f=><option key={f}>{f}</option>)}</select></label>
             <label className="block text-sm">สาขา<select key={faculty} name="major" required defaultValue={initial?.faculty===faculty?initial.major:''} className={input}><option value="">เลือกสาขา</option>{info.catalog?.[faculty]?.map(m=><option key={m}>{m}</option>)}</select></label>
             <label className="block text-sm">ชั้นปี<select name="study_year" defaultValue={initial?.study_year||''} required className={input}><option value="">เลือกชั้นปี</option>{[1,2,3,4,5,6,7,8].map(y=><option key={y}>{y}</option>)}</select></label>
-          </>}
+            <label className="block text-sm">หมู่เรียน<select name="class_group" required defaultValue={initial?.class_group||''} className={input}>
+              <option value="">เลือกหมู่เรียน</option>{[1,2,3,4].map(n=><option key={n}>{n}</option>)}</select></label>
+          </div>}
           {method!=='lookup' && <button disabled={busy} className="action-primary w-full">{busy?'กำลังส่ง…':method==='error'||method==='pending'?'ตรวจสอบอีกครั้ง':method==='existing'?'ยืนยันบัญชีและเข้ากิจกรรม':'ส่งใบสมัครให้แอดมินยืนยัน'}</button>}
         </form>
       </>}
-    {info?.contact && <a href={info.contact} target="_blank" rel="noreferrer" className="action-secondary">ติดต่อแอดมิน</a>}
+    <footer>{info?.contact && <a href={info.contact} target="_blank" rel="noreferrer" className="action-secondary">ติดต่อแอดมิน</a>}
     {station?<button className="block text-sm underline" onClick={onExit}>ออกจากบัญชีเครื่อง</button>:<a className="block text-sm underline" href={loginUrl}>กลับหน้า Event Pass</a>}
-  </section></main>;
+    </footer>
+  </RegistrationFrame>;
 }

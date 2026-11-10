@@ -1,0 +1,59 @@
+.page {
+  min-height: 100svh;
+  padding: clamp(12px, 4vw, 52px);
+  background: radial-gradient(ellipse at top left, #f2e5dc, transparent 65%), #f6f4f0;
+  color: #352c2d;
+}
+.sheet {
+  max-width: 960px;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid #dfd5cf;
+  border-radius: 24px;
+  background: white;
+  box-shadow: 0 18px 65px #47271912;
+}
+.cover {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(20px, 4vw, 42px);
+  background: linear-gradient(115deg, #4a1325, #791c32 70%, #8e3841);
+  color: white;
+}
+.cover::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  width: 360px;
+  height: 360px;
+  right: -200px;
+  bottom: -230px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #e1bd793d, 0 0 0 22px #ffffff06, 0 0 0 23px #e1bd7940, 0 0 0 64px #ffffff06, 0 0 0 65px #e1bd7933;
+}
+.brand, .event p { display: flex; align-items: center; gap: 12px; }
+.brand img { width: 52px; height: 52px; flex: none; border-radius: 14px; background: white; border: 2px solid #ebd3a4; }
+.brand strong, .brand span { display: block; }
+.brand strong { font-size: 20px; }
+.brand span { font-size: 13px; color: #fae9e4; }
+.event { margin-top: clamp(22px, 4vw, 45px); }
+.event p { gap: 8px; color: #ffe3ad; font-size: 14px; font-weight: 600; }
+.event h1 { margin-top: 7px; font-size: clamp(26px, 4vw, 40px); line-height: 1.3; font-weight: 750; overflow-wrap: anywhere; }
+.event .location { margin-top: 10px; color: #f5e5e3; }
+.content { padding: clamp(20px, 4vw, 42px); min-width: 0; overflow-wrap: anywhere; }
+.content > * + * { margin-top: 18px; }
+.content form label { min-width: 0; font-weight: 600; }
+.content input, .content select { min-height: 50px; color: #342f30; font-weight: 400; }
+.content label small { display: block; margin-top: 4px; color: #62595a; font-weight: 400; }
+.content button, .content a { min-height: 44px; }
+.content footer { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; border-top: 1px dashed #dbcec7; padding-top: 12px; }
+.content footer > * { display: inline-flex; align-items: center; }
+.profile { display: grid; gap: 14px; }
+@media (min-width: 600px) {
+  .profile { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 900px) {
+  .sheet { display: grid; grid-template-columns: minmax(290px, 0.8fr) minmax(0, 1.3fr); }
+  .cover { min-height: 400px; }
+}
