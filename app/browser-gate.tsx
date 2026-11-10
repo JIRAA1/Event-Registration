@@ -25,7 +25,10 @@ export default function BrowserGate({children}: {children: ReactNode}) {
   const [feedback,setFeedback] = useState('');
   const linkInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    setAddress(window.location.origin + window.location.pathname);
+    const address=new URL(window.location.pathname,window.location.origin);
+    const eventId=new URLSearchParams(window.location.search).get('event');
+    if(address.pathname==='/' && eventId && /^[a-f0-9-]{36}$/i.test(eventId))address.searchParams.set('event',eventId);
+    setAddress(address.href);
     setAllowed(acceptsBrowser(navigator));
   }, []);
 

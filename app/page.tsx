@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { StudentQr } from './student-qr';
+import { RegistrationAdmin, LoginHelp } from './register/registration-admin';
 import BrowserGate from './browser-gate';
 import { Camera, CameraOff, Save, Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Clipboard, Clock3, Download, ExternalLink, Eye, FileSpreadsheet, FileUp, Filter, Gauge, GraduationCap, Layers, LayoutDashboard, Loader2, Lock, LogOut, MapPin, Menu, Phone, Plus, QrCode, RefreshCw, ScanLine, Search, Settings2, ShieldCheck, Sparkles, Ticket, Trash2, Unlock, UserCheck, Users, UserX, X, Zap } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
@@ -96,6 +97,8 @@ function EventPass() {
   const [editingFaculty,setEditingFaculty]=useState('');
   const [editingMajor,setEditingMajor]=useState('');
   const [toast,setToast]=useState('');
+  const [loginError,setLoginError]=useState('');
+  const [workspaceReady,setWorkspaceReady]=useState(false);
   const [scanInput,setScanInput]=useState('');
   const [copied,setCopied]=useState(false);
   const [csvFile,setCsvFile]=useState<File|null>(null);
@@ -125,6 +128,17 @@ function EventPass() {
     finally{loadingRef.current=false;setLoadingMessage('');}
   }
 
+  useEffect(()=>{
+    if(!workspaceReady || user?.role!=='STUDENT')return;
+    const url=new URL(window.location.href);
+    const id=url.searchParams.get('event');
+    if(id && store.regs.some(r=>r.event_id===id && r.user_id===user.id)){
+      const feedback=sessionStorage.getItem('aru-join-feedback');
+      if(feedback){setToast(feedback);sessionStorage.removeItem('aru-join-feedback');}
+      setActiveEvent(id);setView('event');url.searchParams.delete('event');window.history.replaceState(null,'',url);
+    }
+  },[user,store.regs,workspaceReady]);
+
   const refreshWorkspace=useCallback(async()=>{
     if(!sessionToken||!supabase)return;
     const {data,error}=await supabase.rpc('load_workspace',{p_session_token:sessionToken});
@@ -137,7 +151,7 @@ function EventPass() {
     return !error&&data?.success&&Array.isArray(data.events)?data.events as EventDashboardRow[]:[];
   },[sessionToken]);
 
-  useEffect(()=>{setStore(readStore());localStorage.removeItem('aru-user-v1');const session=sessionStorage.getItem('aru-user-v1');if(session){try{setUser(JSON.parse(session) as User)}catch{sessionStorage.removeItem('aru-user-v1')}}const token=sessionStorage.getItem('aru-session-token')||'';setSessionToken(token);if(token&&supabase){void supabase.rpc('load_workspace',{p_session_token:token}).then(({data,error})=>{if(!error&&data?.success){setStore(workspaceStore(data));setAcademicCatalog(workspaceCatalog(data));if(data.user){setUser(data.user as User);sessionStorage.setItem('aru-user-v1',JSON.stringify(data.user));}if(data.events?.[0]){setSelectedEvent(data.events[0].id);setActiveEvent(data.events[0].id);}}});}},[]);
+  useEffect(()=>{setStore(readStore());localStorage.removeItem('aru-user-v1');const session=sessionStorage.getItem('aru-user-v1');if(session){try{setUser(JSON.parse(session) as User)}catch{sessionStorage.removeItem('aru-user-v1')}}const token=sessionStorage.getItem('aru-session-token')||'';setSessionToken(token);if(token&&supabase){void supabase.rpc('load_workspace',{p_session_token:token}).then(({data,error})=>{if(!error&&data?.success){setWorkspaceReady(true);setStore(workspaceStore(data));setAcademicCatalog(workspaceCatalog(data));if(data.user){setUser(data.user as User);sessionStorage.setItem('aru-user-v1',JSON.stringify(data.user));}if(data.events?.[0]){setSelectedEvent(data.events[0].id);setActiveEvent(data.events[0].id);}}});}},[]);
   useEffect(()=>{try{localStorage.setItem(storeKey,JSON.stringify(store));}catch{}},[store]);
   useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(''),2800);return()=>clearTimeout(t)},[toast]);
   useEffect(()=>{
@@ -226,15 +240,16 @@ function EventPass() {
   },[user?.id,user?.role,user?.study_year,sessionToken]);
 
   async function enterAs() {
+    setLoginError('');
     if(isSupabaseConfigured&&supabase) {
       const studentId=(document.getElementById('login-id') as HTMLInputElement|null)?.value;
       const password=(document.getElementById('login-password') as HTMLInputElement|null)?.value;
       if(!studentId||!password){setToast('กรุณากรอกรหัสผู้ใช้และรหัสผ่าน');return;}
       setSaving(true); const {data,error}=await supabase.rpc('login_student',{p_student_id:studentId,p_password:password}); setSaving(false);
-      if(error||!data?.success){setToast(data?.message||'เข้าสู่ระบบไม่สำเร็จ');return;}
+      if(error||!data?.success){setLoginError(data?.message||'เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบเครือข่ายแล้วลองอีกครั้ง');return;}
        const cloudUser=data.user as User;
       const actualRole=cloudUser.role;
-       const token=String(data.session_token||'');const {data:workspace,error:workspaceError}=await supabase.rpc('load_workspace',{p_session_token:token});if(workspaceError||!workspace?.success){setToast(workspace?.message||'โหลดข้อมูลบัญชีไม่สำเร็จ');return;}setStore(workspaceStore(workspace));setAcademicCatalog(workspaceCatalog(workspace));if(workspace.events?.[0]){setSelectedEvent(workspace.events[0].id);setActiveEvent(workspace.events[0].id);}const loadedUser={...cloudUser,...workspace.user} as User;setUser(loadedUser);sessionStorage.setItem('aru-user-v1',JSON.stringify(loadedUser));sessionStorage.setItem('aru-session-token',token);setSessionToken(token);setView(actualRole==='STAFF'?'scanner':actualRole==='ADMIN'?'admin':'home');return;
+       const token=String(data.session_token||'');const {data:workspace,error:workspaceError}=await supabase.rpc('load_workspace',{p_session_token:token});if(workspaceError||!workspace?.success){setToast(workspace?.message||'โหลดข้อมูลบัญชีไม่สำเร็จ');return;}setWorkspaceReady(true);setStore(workspaceStore(workspace));setAcademicCatalog(workspaceCatalog(workspace));if(workspace.events?.[0]){setSelectedEvent(workspace.events[0].id);setActiveEvent(workspace.events[0].id);}const loadedUser={...cloudUser,...workspace.user} as User;setUser(loadedUser);sessionStorage.setItem('aru-user-v1',JSON.stringify(loadedUser));sessionStorage.setItem('aru-session-token',token);setSessionToken(token);setView(actualRole==='STAFF'?'scanner':actualRole==='ADMIN'?'admin':'home');return;
     }
     const picked=demoUser;sessionStorage.removeItem('aru-session-token');setSessionToken('');
     setUser(picked);sessionStorage.setItem('aru-user-v1',JSON.stringify(picked));setView('home');setToast('เข้าสู่โหมดนักศึกษาตัวอย่างแล้ว');
@@ -246,7 +261,7 @@ function EventPass() {
     } else if (!isSupabaseConfigured && user?.role==='STUDENT' && studentRegs.some(reg=>reg.status==='ATTENDING')) {
       setToast('ต้องรอเจ้าหน้าที่เช็กเอาต์ก่อนจึงจะออกจากระบบได้');return;
     }
-    setUser(null);sessionStorage.removeItem('aru-user-v1');sessionStorage.removeItem('aru-session-token');localStorage.removeItem('aru-user-v1');setSessionToken('');setView('home');setScannerOn(false);void stopScanner();
+    setWorkspaceReady(false);setUser(null);sessionStorage.removeItem('aru-user-v1');sessionStorage.removeItem('aru-session-token');localStorage.removeItem('aru-user-v1');setSessionToken('');setView('home');setScannerOn(false);void stopScanner();
   }
   function save(next:Store){setStore(next)}
   async function scanPayload(raw:string) {
@@ -663,7 +678,7 @@ function EventPass() {
     )}
 
     <div key={view} className="page-transition mx-auto mt-6 max-w-[1440px]">
-      {!user?<Landing enterAs={()=>void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…',enterAs)} saving={saving||Boolean(loadingMessage)}/>:view==='scanner'&&user.role!=='STUDENT'?<ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={()=>setScannerLocked(value=>!value)} startScanner={()=>void withLoading('กำลังเปิดกล้อง…',startScanner)} stopScanner={()=>void withLoading('กำลังปิดกล้อง…',stopScanner)} scanMode={()=>void withLoading('กำลังเปลี่ยนโหมดสแกน…',setScanMode)} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async(raw:string)=>{await withLoading('กำลังตรวจสอบ QR…',()=>scanPayload(raw));}} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={()=>setModal('walkin')}/>:view==='admin'&&user.role==='ADMIN'?<AdminView deleteBatch={(kind,values)=>withLoading('กำลังลบรายการ…',()=>deleteBatch(kind,values))} sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args)=>withLoading('กำลังบันทึกคณะและสาขา…',()=>manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={()=>setModal('event')} openCodes={()=>setModal('codes')} openStaff={()=>setModal('staff')} editUser={(target:User)=>{setEditingUser(target);setEditingFaculty(target.faculty);setEditingMajor(target.major);setModal('editUser')}} deleteUser={(target:User)=>void withLoading('กำลังลบบัญชีผู้ใช้…',()=>deleteManagedUser(target))} deleteActivity={()=>void withLoading('กำลังลบกิจกรรม…',deleteActivity)} deleteRegistration={(id:string)=>void withLoading('กำลังนำรายชื่อออก…',()=>deleteRegistration(id))} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={()=>void withLoading('กำลังนำเข้ารายชื่อ…',importCsv)} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch:Partial<Event>)=>withLoading('กำลังบันทึกการเปลี่ยนแปลง…',()=>updateSelectedEvent(patch))} />:view==='studentStats'&&user.role==='STUDENT'?<StudentStatsView user={user} events={store.events.filter(e=>studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs}/>:view==='event'&&user.role==='STUDENT'?<EventDetail session={sessionToken} event={store.events.find(e=>e.id===activeEvent)||currentEvent} user={user} registration={studentRegs.find(r=>r.event_id===activeEvent)} back={()=>setView('home')}/>:<StudentHome user={user} events={store.events.filter(e=>e.status==='ACTIVE'&&studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs} select={(id:string)=>{setActiveEvent(id);setView('event')}} store={store}/>}
+      {!user?<Landing loginError={loginError} enterAs={()=>void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…',enterAs)} saving={saving||Boolean(loadingMessage)}/>:view==='scanner'&&user.role!=='STUDENT'?<ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={()=>setScannerLocked(value=>!value)} startScanner={()=>void withLoading('กำลังเปิดกล้อง…',startScanner)} stopScanner={()=>void withLoading('กำลังปิดกล้อง…',stopScanner)} scanMode={()=>void withLoading('กำลังเปลี่ยนโหมดสแกน…',setScanMode)} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async(raw:string)=>{await withLoading('กำลังตรวจสอบ QR…',()=>scanPayload(raw));}} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={()=>setModal('walkin')}/>:view==='admin'&&user.role==='ADMIN'?<AdminView deleteBatch={(kind,values)=>withLoading('กำลังลบรายการ…',()=>deleteBatch(kind,values))} sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args)=>withLoading('กำลังบันทึกคณะและสาขา…',()=>manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={()=>setModal('event')} openCodes={()=>setModal('codes')} openStaff={()=>setModal('staff')} editUser={(target:User)=>{setEditingUser(target);setEditingFaculty(target.faculty);setEditingMajor(target.major);setModal('editUser')}} deleteUser={(target:User)=>void withLoading('กำลังลบบัญชีผู้ใช้…',()=>deleteManagedUser(target))} deleteActivity={()=>void withLoading('กำลังลบกิจกรรม…',deleteActivity)} deleteRegistration={(id:string)=>void withLoading('กำลังนำรายชื่อออก…',()=>deleteRegistration(id))} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={()=>void withLoading('กำลังนำเข้ารายชื่อ…',importCsv)} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch:Partial<Event>)=>withLoading('กำลังบันทึกการเปลี่ยนแปลง…',()=>updateSelectedEvent(patch))} />:view==='studentStats'&&user.role==='STUDENT'?<StudentStatsView user={user} events={store.events.filter(e=>studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs}/>:view==='event'&&user.role==='STUDENT'?<EventDetail session={sessionToken} event={store.events.find(e=>e.id===activeEvent)||currentEvent} user={user} registration={studentRegs.find(r=>r.event_id===activeEvent)} back={()=>setView('home')}/>:<StudentHome user={user} events={store.events.filter(e=>e.status==='ACTIVE'&&studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs} select={(id:string)=>{setActiveEvent(id);setView('event')}} store={store}/>}
     </div>
     {user&&<div className="mx-auto mt-10 flex max-w-[1440px] items-center justify-between border-t border-slate-200/70 px-2 py-4 text-[10px] text-slate-500"><span>© 2026 ARU Student Organization · ระบบลงทะเบียนกิจกรรม</span><span className="hidden items-center gap-1 sm:flex"><ShieldCheck size={12}/>ข้อมูลกิจกรรมอัปเดตแบบเรียลไทม์</span></div>}
     {modal==='walkin'&&<Modal submitLabel="บันทึกรายชื่อหน้างาน" submitDisabled={walkinStudyYear>1&&reserveLeft===0} title="ลงทะเบียนหน้างาน" subtitle="เพิ่มนักศึกษาและผูกสิทธิ์กิจกรรม" close={()=>setModal(null)}><form id="staff-admin-form" onSubmit={e=>void withLoading('กำลังบันทึกรายชื่อ…',()=>addWalkin(e))} className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><Field label="รหัสนักศึกษา" name="student_id" required placeholder="เช่น 69123456"/><Field label="ชื่อ–นามสกุล" name="full_name" required placeholder="ชื่อ นามสกุล"/><label className="block text-[11px] font-semibold text-slate-600">คณะ<select name="faculty" value={walkinFaculty} required onChange={e=>{setWalkinFaculty(e.target.value);setWalkinMajor('')}} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800"><option value="">เลือกคณะ</option>{academicCatalog.map(faculty=><option key={faculty.id} value={faculty.name}>{faculty.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">สาขาวิชา<select name="major" value={walkinMajor} required disabled={!walkinFaculty} onChange={e=>setWalkinMajor(e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 disabled:opacity-50"><option value="">เลือกสาขา</option>{(academicCatalog.find(faculty=>faculty.name===walkinFaculty)?.majors||[]).map(major=><option key={major.id} value={major.name}>{major.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">ชั้นปีที่กำลังศึกษา<select name="study_year" value={walkinStudyYear} onChange={e=>setWalkinStudyYear(Number(e.target.value))} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{Array.from({length:8},(_,i)=>i+1).map(year=><option key={year} value={year}>ปี {year}</option>)}</select></label><Field label="หมู่เรียน" name="class_group" placeholder="เช่น 6901.1"/><Field label="วันเกิด (DDMMYYYY)" name="birth_date" required placeholder="22062549"/><Field label="เบอร์โทรศัพท์" name="phone" placeholder="08X-XXX-XXXX"/></div><div className={cx('flex items-center justify-between rounded-2xl px-4 py-3 text-xs',reserveLeft?'bg-amber-50 text-amber-900':'bg-rose-50 text-rose-700')}><span className="flex items-center gap-2"><Ticket size={15}/>Passcode สำรองคงเหลือ</span><b>{reserveLeft} รหัส</b></div><p className="text-center text-[10px] leading-5 text-slate-400">นักศึกษาชั้นปี 2 ขึ้นไปจะได้รับ Passcode หลังเช็กเอาต์ · ปี 1 ใช้ QR Check-in/Check-out</p></form></Modal>}
@@ -807,7 +822,7 @@ function NeuralNetworkCanvas(){
  return <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full opacity-80"/>;
 }
 
-function Landing({enterAs,saving}:{enterAs:()=>void;saving:boolean}){return <div className="space-y-5">
+function Landing({enterAs,saving,loginError}:{enterAs:()=>void;saving:boolean;loginError:string}){return <div className="space-y-5">
   {/* — Login card first — */}
   <section id="login-card" className="bento mx-auto max-w-md p-6 sm:p-8">
     <div className="flex flex-col items-center text-center">
@@ -827,6 +842,8 @@ function Landing({enterAs,saving}:{enterAs:()=>void;saving:boolean}){return <div
         <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-amber-300 text-[#57100b] transition duration-300 group-hover:translate-x-1 group-hover:rotate-[-35deg]">{saving?<Loader2 size={16} className="animate-spin"/>:<ArrowRight size={17}/>}</span>
       </button>
     </form>
+    {loginError && <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{loginError}</p>}
+    <LoginHelp loginFailed={Boolean(loginError)}/>
   </section>
 
 
@@ -1347,6 +1364,8 @@ function AdminView({deleteBatch,sessionToken,store,academicCatalog,manageAcademi
     <AdminMetric label="เข้าร่วมครบแล้ว" value={completed} note="เช็กเอาต์สำเร็จ" icon={<CheckCircle2 size={18}/>} tone="green"/>
   </div>
   )}
+  {store.events.length>0 && ['dashboard','events','all'].includes(adminTab) &&
+    <RegistrationAdmin key={selectedEvent.id} token={sessionToken} eventId={selectedEvent.id} refresh={refreshWorkspace}/>}
   {/* TAB 1: Dashboard Section */}
   {(adminTab === 'all' || adminTab === 'dashboard') && (
     <section className="bento p-5 sm:p-6 shadow-sm">
@@ -1763,43 +1782,57 @@ function PasscodeList({eventId,store,openCodes,remove}:{
   const [filter,setFilter]=useState('');
   const [query,setQuery]=useState('');
   const [selection,setSelection]=useState<string[]>([]);
-  const people=new Map(store.users.map(u=>[u.id,u]));
-  const matches=new Map(store.regs.filter(r=>r.event_id===eventId && r.passcode).map(r=>[r.passcode,r]));
-  const eventCodes=new Map(store.codes.filter(c=>c.event_id===eventId).map(c=>[c.code,c]));
-  // Older demo registrations can carry a passcode without an entry in the reserve pool.
-  for (const [code,reg] of matches) {
-    if (code && !eventCodes.has(code)) eventCodes.set(code,{event_id:eventId,code,is_reserve:false,assigned_to:reg.user_id});
-  }
-  const rows=[...eventCodes.values()].map(c=>{
-    const reg=matches.get(c.code);
-    const owner=c.assigned_to || reg?.user_id;
-    const person=owner?people.get(owner):undefined;
-    const status=reg?.status==='COMPLETED'?'ปลดล็อกแล้ว':owner?'จับคู่แล้ว':'ว่าง';
-    return {code:c.code,person,status};
-  });
+  const [pageIndex,setPageIndex]=useState(0);
+  const listRef=useRef<HTMLUListElement>(null);
+  const rows=useMemo(()=>{
+    const people=new Map(store.users.map(u=>[u.id,u]));
+    const matches=new Map(store.regs.filter(r=>r.event_id===eventId && r.passcode).map(r=>[r.passcode,r]));
+    const eventCodes=new Map(store.codes.filter(c=>c.event_id===eventId).map(c=>[c.code,c]));
+    // Older demo registrations can carry a passcode without an entry in the reserve pool.
+    for (const [code,reg] of matches) {
+      if (code && !eventCodes.has(code)) eventCodes.set(code,{event_id:eventId,code,is_reserve:false,assigned_to:reg.user_id});
+    }
+    return [...eventCodes.values()].map(c=>{
+      const reg=matches.get(c.code);
+      const owner=c.assigned_to || reg?.user_id;
+      const person=owner?people.get(owner):undefined;
+      const status=reg?.status==='COMPLETED'?'ปลดล็อกแล้ว':owner?'จับคู่แล้ว':'ว่าง';
+      return {code:c.code,person,status};
+    });
+  },[store.users,store.regs,store.codes,eventId]);
+  const availableCount=useMemo(()=>rows.filter(row=>row.status==='ว่าง').length,[rows]);
   const term=query.trim().toLocaleLowerCase('th');
-  const visible=rows.filter(r=>(!filter || r.status===filter) &&
-    [r.code,r.person?.full_name,r.person?.student_id].some(s=>s?.toLocaleLowerCase('th').includes(term)));
-  const eligible=visible.filter(r=>r.status==='ว่าง').map(r=>r.code);
-  const checked=new Set(selection);
-  const selected=eligible.filter(code=>checked.has(code));
+  const visible=useMemo(()=>rows.filter(row=>(!filter || row.status===filter) &&
+    (!term || [row.code,row.person?.full_name,row.person?.student_id].some(value=>value?.toLocaleLowerCase('th').includes(term)))),
+    [rows,filter,term]);
+  const eligible=useMemo(()=>visible.filter(row=>row.status==='ว่าง').map(row=>row.code),[visible]);
+  const checked=useMemo(()=>new Set(selection),[selection]);
+  const selected=useMemo(()=>eligible.filter(code=>checked.has(code)),[eligible,checked]);
+  const pageSize=50;
+  const pageCount=Math.ceil(visible.length/pageSize);
+  const page=Math.min(pageIndex,Math.max(0,pageCount-1));
+  const start=page*pageSize;
+  useEffect(()=>{
+    if (listRef.current) listRef.current.scrollTop=0;
+  },[page,query,filter]);
+  useEffect(()=>{if(pageIndex!==page)setPageIndex(page);},[pageIndex,page]);
   return <section className="bento space-y-3 p-4 sm:p-5">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h2 className="font-bold text-slate-900">Passcode ของกิจกรรม</h2>
       <button type="button" onClick={openCodes} className="action-primary"><Plus size={16}/>เพิ่มหลายรหัส</button>
     </div>
-    <p className="text-sm text-slate-600">ทั้งหมด {rows.length} รหัส · ว่าง {rows.filter(r=>r.status==='ว่าง').length} รหัส</p>
+    <p className="text-sm text-slate-600">ทั้งหมด {rows.length} รหัส · ว่าง {availableCount} รหัส</p>
     <input aria-label="ค้นหา Passcode หรือผู้รับ" placeholder="ค้นหารหัส ชื่อ หรือรหัสนักศึกษา" value={query}
-      onChange={e=>{setQuery(e.target.value);setSelection([]);}} className="h-11 w-full rounded-xl border border-slate-300 px-3"/>
+      onChange={e=>{setQuery(e.target.value);setPageIndex(0);setSelection([]);}} className="h-11 w-full rounded-xl border border-slate-300 px-3"/>
     <label className="flex items-center gap-2 text-sm">สถานะ
-      <select value={filter} onChange={e=>{setFilter(e.target.value);setSelection([]);}} className="h-11 min-w-0 flex-1 rounded-xl border border-slate-300 px-3">
+      <select value={filter} onChange={e=>{setFilter(e.target.value);setPageIndex(0);setSelection([]);}} className="h-11 min-w-0 flex-1 rounded-xl border border-slate-300 px-3">
         <option value="">ทั้งหมด</option>{['ว่าง','จับคู่แล้ว','ปลดล็อกแล้ว'].map(s=><option key={s}>{s}</option>)}
       </select>
     </label>
     <BulkActions eligible={eligible} selected={selected} setSelection={setSelection} label="ลบรหัส"
       remove={async()=>{if(await remove(selected))setSelection([]);}}/>
-    <ul className="max-h-96 divide-y overflow-y-auto">
-      {visible.map(r=><li key={r.code}><label className="flex min-h-12 items-center gap-3 py-2">
+    <ul ref={listRef} aria-label="รายการ Passcode" className="max-h-96 divide-y overflow-y-auto">
+      {visible.slice(start,start+pageSize).map(r=><li key={r.code}><label className="flex min-h-12 items-center gap-3 py-2">
         <input type="checkbox" aria-label={'เลือก Passcode '+r.code} disabled={r.status!=='ว่าง'} checked={r.status==='ว่าง' && checked.has(r.code)}
           onChange={e=>setSelection(e.target.checked?[...selected,r.code]:selected.filter(c=>c!==r.code))} className="h-5 w-5 shrink-0 accent-[#7c0a02]"/>
         <span className="min-w-0 flex-1"><b className="break-all font-mono text-sm">{r.code}</b>
@@ -1808,6 +1841,11 @@ function PasscodeList({eventId,store,openCodes,remove}:{
           r.status==='ว่าง'?'bg-slate-100 text-slate-700':r.status==='จับคู่แล้ว'?'bg-amber-50 text-amber-900':'bg-emerald-50 text-emerald-800')}>{r.status}</span>
       </label></li>)}
     </ul>
+    {pageCount>1 && <nav aria-label="หน้ารายการ Passcode" className="flex flex-wrap items-center justify-between gap-2">
+      <button type="button" className="action-secondary disabled:opacity-40" disabled={page===0} onClick={()=>setPageIndex(page-1)}>ก่อนหน้า</button>
+      <span aria-live="polite" className="text-sm text-slate-600">หน้า {page+1} / {pageCount}</span>
+      <button type="button" className="action-secondary disabled:opacity-40" disabled={page+1>=pageCount} onClick={()=>setPageIndex(page+1)}>ถัดไป</button>
+    </nav>}
     {!visible.length && <Empty message={rows.length?'ไม่พบรหัสตามตัวกรอง':'ยังไม่มี Passcode ในกิจกรรมนี้'}/>}
   </section>;
 }
