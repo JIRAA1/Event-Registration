@@ -17,7 +17,7 @@ type Event = { id: string; title: string; location: string; activity_hours: numb
 type Registration = { event_id: string; user_id: string; status: Status; passcode?: string; checkin_at?: string; checkout_at?: string; checked_in_by?: string; checked_out_by?: string; checkin_staff_name?: string; checkout_staff_name?: string; is_walkin?: boolean };
 type EventDashboardRow = { event_id:string;title:string;status:Event['status'];registered_count:number;checked_in_count:number;checked_out_count:number;online_students:number;online_staff:number };
 type Passcode = { event_id: string; code: string; is_reserve: boolean; assigned_to?: string };
-type Store = { users: User[]; events: Event[]; regs: Registration[]; codes: Passcode[]; applications?: {id:string;event_id:string;title:string;status:string;note:string}[] };
+type Store = { users: User[]; events: Event[]; regs: Registration[]; codes: Passcode[]; applications?: {id:string;event_id:string;title:string;online:boolean;status:string;note:string}[] };
 type AcademicMajor = { id:string; name:string };
 type AcademicFaculty = { id:string; name:string; majors:AcademicMajor[] };
 type CatalogAction = 'ADD_FACULTY'|'UPDATE_FACULTY'|'DELETE_FACULTY'|'ADD_MAJOR'|'UPDATE_MAJOR'|'DELETE_MAJOR';
@@ -229,6 +229,9 @@ function EventPass() {
     };
     document.addEventListener('visibilitychange',refresh);
     window.addEventListener('pageshow',refresh);
+    const applicationTimer=window.setInterval(()=>{
+      if(!pollTimer && storeRef.current.applications?.length)void refresh();
+    },15000);
     startFallback();
     void hashSessionToken(sessionToken).then(tokenHash=>{
       if(disposed)return;
@@ -239,7 +242,7 @@ function EventPass() {
           else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED')startFallback();
         });
     }).catch(()=>startFallback());
-    return()=>{disposed=true;document.removeEventListener('visibilitychange',refresh);window.removeEventListener('pageshow',refresh);stopFallback();if(channel)void client.removeChannel(channel);};
+    return()=>{disposed=true;window.clearInterval(applicationTimer);document.removeEventListener('visibilitychange',refresh);window.removeEventListener('pageshow',refresh);stopFallback();if(channel)void client.removeChannel(channel);};
   },[user?.id,user?.role,user?.study_year,sessionToken]);
 
   async function enterAs() {
@@ -887,7 +890,8 @@ function StudentHome({user,events,regs,select,store}:{user:User;events:Event[];r
       </div>
       <div className="mt-4 space-y-3">
         {store.applications?.map(a=><article key={a.id} className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <b>{a.title}</b><p className="mt-1 text-sm">{a.status==='CORRECT'?'กรุณากลับไปแก้ไขใบสมัคร · '+a.note:'รอยืนยันเข้าร่วมกิจกรรม'}</p>
+          <b>{a.title}</b><p className="mt-1 text-sm">{a.status==='CORRECT'?(a.online?'แอดมินขอให้แก้ไขใบสมัคร':'กรุณาแก้ไขที่จุดลงทะเบียนหน้างาน')+' · '+a.note:'รอยืนยันเข้าร่วมกิจกรรม'}</p>
+          {a.status==='CORRECT' && a.online && <a className="action-primary mt-3" href={'/register/'+a.event_id+'?correct='+a.id}>เปิดใบสมัครเพื่อแก้ไข</a>}
         </article>)}
         {events.map(event=>{
           const registration=regs.find(reg=>reg.event_id===event.id);

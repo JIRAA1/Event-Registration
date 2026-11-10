@@ -28,12 +28,16 @@ export function RegistrationAdmin({eventId,token,refresh}:{eventId:string;token:
   const [selected,setSelected]=useState<string[]>([]);
   const eligible=data?.queue.filter(row=>row.status==='PENDING').map(row=>row.id) || [];
   const chosen=eligible.filter(id=>selected.includes(id));
+  const exportIds=chosen.length?chosen:(data?.queue.map(row=>row.id)??[]);
   async function approveSelected(){
     await signupRpc('registration_approve_many',{p_token:token,p_event:eventId,p_ids:chosen});
     setSelected([]);setNotice(`อนุมัติแล้ว ${chosen.length} รายการ`);await refresh();
   }
   async function exportApplicants(){
-    const rows=await signupRpc<(string|null)[][]>('registration_export',{p_token:token,p_event:eventId});
+    const rows=await signupRpc<(string|null)[][]>('registration_export',{p_token:token,p_event:eventId,p_ids:exportIds});
+    if(rows.length!==exportIds.length){
+      setNotice('คิวมีการเปลี่ยนแปลง กรุณาตรวจรายชื่อแล้วกดส่งออกอีกครั้ง');return;
+    }
     const header=['รหัสนักศึกษา','ชื่อและนามสกุล','คณะ','สาขา','ชั้นปี','หมู่เรียน','ช่องทางสมัคร','สถานะ','เวลาสมัคร'];
     const csv=[header,...rows].map(row=>row.map(value=>{
       let cell=String(value??'');
@@ -85,7 +89,9 @@ export function RegistrationAdmin({eventId,token,refresh}:{eventId:string;token:
         <button className="action-secondary" onClick={()=>void run(async()=>{await navigator.clipboard.writeText(url);setNotice('คัดลอกลิงก์แล้ว');})}>คัดลอกลิงก์สมัคร</button></div>
       <h3 className="font-bold">คิวของกิจกรรมนี้ ({data.queue.length})</h3>
       <div className="flex flex-wrap items-center gap-3">
-        <button disabled={busy} className="action-secondary" onClick={()=>void run(exportApplicants)}>ส่งออกรายชื่อผู้สมัครทั้งหมด (CSV)</button>
+        <button disabled={busy||!exportIds.length} className="action-secondary" onClick={()=>void run(exportApplicants)}>
+          ส่งออก{chosen.length?'ที่เลือก':'รายชื่อในคิว'} {exportIds.length} รายการ (CSV)
+        </button>
         {eligible.length>0 && <><label className="flex min-h-11 items-center gap-2"><input type="checkbox" disabled={busy} checked={chosen.length===eligible.length}
           onChange={e=>setSelected(e.target.checked?eligible:[])}/>เลือกทั้งหมดที่รอยืนยัน</label>
           <button className="action-primary" disabled={busy||!chosen.length} onClick={()=>void run(approveSelected)}>อนุมัติที่เลือก ({chosen.length})</button></>}

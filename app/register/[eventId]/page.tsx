@@ -1,7 +1,8 @@
 import BrowserGate from '../../browser-gate';
 import {RegistrationForm} from '../registration-form';
 
-export default async function RegisterPage({params}:{params:Promise<{eventId:string}>}) {
+export default async function RegisterPage({params,searchParams}:{params:Promise<{eventId:string}>;searchParams:Promise<{correct?:string}>}) {
   const {eventId}=await params;
-  return <BrowserGate><RegistrationForm eventId={eventId}/></BrowserGate>;
+  const {correct}=await searchParams;
+  return <BrowserGate><RegistrationForm key={eventId+':'+(correct||'')} eventId={eventId} correctionId={correct}/></BrowserGate>;
 }

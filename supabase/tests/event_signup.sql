@@ -1,4 +1,4 @@
--- Run against an isolated database after migrations 001-024.
+-- Run against an isolated database after migrations 001-026.
 begin;
 set local search_path=public,extensions,pg_temp;
 do $test$
@@ -54,6 +54,19 @@ begin
   exception when raise_exception then assert sqlerrm like '%บัญชีเดิม%'; end;
   perform registration_review(admin_token,application_id,'CORRECT','ตรวจสอบชื่อ');
   assert registration_receipt(event_a,proof)->>'status'='CORRECT';
+  result:=login_student('06912345',password);
+  assert load_workspace(result->>'session_token')->'applications'->0->>'online'='true';
+  assert registration_correction(result->>'session_token',event_a,application_id)->>'note'='ตรวจสอบชื่อ';
+  begin
+    perform registration_correction(admin_token,event_a,application_id);
+    raise exception 'wrong session accepted' using errcode='23505';
+  exception when raise_exception then assert sqlerrm like '%เจ้าของ%'; end;
+  perform registration_admin(admin_token,event_a,'CLOSE');
+  perform registration_correction(result->>'session_token',event_a,application_id,profile||'{"phone":"0812345678"}');
+  assert registration_receipt(event_a,proof)->>'status'='PENDING';
+  assert (select a.profile->>'phone' from event_pass_private.applications a where id=application_id)='0812345678';
+  perform registration_admin(admin_token,event_a,'OPEN');
+  perform registration_review(admin_token,application_id,'CORRECT','ตรวจสอบอีกครั้ง');
   perform registration_apply(event_a,profile,proof);
   insert into event_passcodes(event_id,code,is_reserve) values(event_a,'QA-ONLINE',true);
   perform registration_review(admin_token,application_id,'APPROVE');
@@ -102,16 +115,21 @@ begin
   assert not exists(select 1 from event_registrations where event_id=event_a);
   assert not exists(select 1 from event_passcodes where event_id=event_a and assigned_to is not null);
   insert into event_passcodes(event_id,code,is_reserve) values(event_a,'QA-BULK-2',true);
+  assert jsonb_array_length(registration_export(admin_token,event_a))=2;
+  result:=registration_export(admin_token,event_a,array[application_id]);
+  assert jsonb_array_length(result)=1 and result->0->>0='06912345' and result->0->>7='รอยืนยัน';
+  assert registration_export(admin_token,event_b,array[application_id])='[]'::jsonb;
+  assert registration_export(admin_token,event_a,array[]::uuid[])='[]'::jsonb;
   perform registration_approve_many(admin_token,event_a,array[application_id,kiosk_id]);
   assert (select count(distinct passcode_id)=2 from event_registrations where event_id=event_a);
   result:=registration_export(admin_token,event_a);
-  assert jsonb_array_length(result)=2 and result->0->>7='อนุมัติแล้ว';
+  assert result='[]'::jsonb;
   insert into events(title,online_registration) values('Year one QA',true) returning id into event_a;
   update users set study_year=1 where student_id='06912345';
   result:=registration_login_join(event_a,'06912345',password);
   assert (result->>'success')::boolean and not (result ? 'pending');
   assert (select count(*)=1 from event_registrations where event_id=event_a and passcode_id is null);
-  assert registration_export(admin_token,event_a)->0->>7='อนุมัติแล้ว';
+  assert registration_export(admin_token,event_a)='[]'::jsonb;
   perform registration_station_logout(station_token);
 end;
 $test$;

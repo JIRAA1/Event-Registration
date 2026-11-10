@@ -12,7 +12,7 @@ const fields=[
   ['birth_date','วันเกิด 8 หลัก (ววดดปปปป พ.ศ.)'],['phone','เบอร์โทรศัพท์'],
 ] as const;
 
-export function RegistrationForm({eventId,station,onExit}:{eventId:string;station?:string;onExit?:()=>void}) {
+export function RegistrationForm({eventId,station,onExit,correctionId}:{eventId:string;station?:string;onExit?:()=>void;correctionId?:string}) {
   const storageKey='aru-signup:'+eventId+(station?':station:'+station.slice(-12):':online');
   const [info,setInfo]=useState<SignupInfo>();
   const [error,setError]=useState('');
@@ -25,6 +25,8 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
   const [faculty,setFaculty]=useState('');
   const [busy,setBusy]=useState(false);
   const [edit,setEdit]=useState(false);
+  const [correctionNote,setCorrectionNote]=useState('');
+  const [resubmitted,setResubmitted]=useState(false);
   const [password,setPassword]=useState('');
   const [copied,setCopied]=useState(false);
   const [origin,setOrigin]=useState('');
@@ -35,7 +37,15 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
     let active=true;
     setOrigin(window.location.origin);
     const saved=sessionStorage.getItem(storageKey);
-    if(saved)setSecret(saved);
+    if(correctionId){
+      signupRpc<{profile:ApplicationProfile;note:string}>('registration_correction',{
+        p_token:sessionStorage.getItem('aru-session-token'),p_event:eventId,p_id:correctionId
+      }).then(({profile,note})=>{
+        if(!active)return;
+        setInitial(profile);setStudentNumber(profile.student_id);setFaculty(profile.faculty);
+        setCorrectionNote(note);setEdit(true);
+      }).catch(e=>{if(active)setError(errorText(e));});
+    }else if(saved)setSecret(saved);
     else {
       const raw=sessionStorage.getItem(storageKey+':draft');
       if(raw){
@@ -51,7 +61,7 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
     }
     signupRpc<SignupInfo>('registration_info',{p_event:eventId}).then(data=>{if(active)setInfo(data);}).catch(e=>{if(active)setError(errorText(e));});
     return ()=>{active=false};
-  },[eventId,storageKey,station]);
+  },[eventId,storageKey,station,correctionId]);
   const number=normalizeDigits(studentNumber);
   const method=station || edit?'new':lookup?.id===number?lookup.step:'lookup';
   useEffect(()=>{
@@ -151,6 +161,10 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
     }
     const profile:ApplicationProfile={student_id:studentId,prefix:get('prefix'),full_name:get('full_name'),class_group:get('class_group'),faculty,major:get('major'),
       study_year:get('study_year'),birth_date:normalizeDigits(get('birth_date')),phone:normalizeDigits(get('phone'))};
+    if(correctionId){
+      await signupRpc('registration_correction',{p_token:sessionStorage.getItem('aru-session-token'),p_event:eventId,p_id:correctionId,p_profile:profile});
+      setResubmitted(true);return;
+    }
     // Keep a retry key before sending, so a lost response can be retried with the same request.
     const draft=JSON.parse(sessionStorage.getItem(storageKey+':draft')||'null') as {id:string;key:string}|null;
     const key=secret || (draft?.id===studentId?draft.key:newReceipt());
@@ -167,6 +181,8 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
     {!info ? (error ? <button className="action-secondary" onClick={()=>window.location.reload()}>ลองโหลดอีกครั้ง</button> : <p role="status">กำลังโหลดกิจกรรม…</p>)
       : !info.event ? <p>ไม่พบกิจกรรมนี้</p>
+      : resubmitted ? <p role="status" className="rounded-xl bg-emerald-50 p-4">ส่งใบสมัครที่แก้ไขแล้ว รอแอดมินยืนยันอีกครั้ง</p>
+      : correctionId && !edit ? (!error && <p role="status">กำลังเปิดใบสมัครที่ต้องแก้ไข…</p>)
       : secret && !edit ? <div className="space-y-4">
         {!receipt ? <p role="status">กำลังตรวจสอบคำขอ…</p> : <>
           <p className="text-sm text-slate-600">คำขอ {receipt.id.slice(0,8).toUpperCase()}</p>
@@ -189,10 +205,11 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
           void run(nextVisitor);
         }}>{station?'เสร็จแล้ว · คนถัดไป':'ปิดข้อมูลใบสมัคร'}</button>}
       </div>
-      : info.event.closed || (!station && !info.event.open) ? <p className="rounded-xl bg-amber-50 p-4">ปิดรับสมัครออนไลน์แล้ว กรุณาติดต่อจุดลงทะเบียนหน้างาน</p>
+      : info.event.closed || (!correctionId && !station && !info.event.open) ? <p className="rounded-xl bg-amber-50 p-4">ปิดรับสมัครออนไลน์แล้ว กรุณาติดต่อจุดลงทะเบียนหน้างาน</p>
       : <>
         <form key={formKey} className="space-y-3" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;void run(()=>submit(form));}}>
           <h2 className="text-xl font-bold">{edit?'แก้ไขใบสมัคร':station?'กรอกข้อมูลผู้เข้าร่วม':'สมัครเข้าร่วมกิจกรรม'}</h2>
+          {edit && <p className="rounded-xl bg-amber-50 p-3">ข้อความจากแอดมิน · {correctionNote || receipt?.note}</p>}
           <label className="block text-sm">รหัสนักศึกษา<input name="student_id" required className={input} autoComplete={station?'off':'username'}
             inputMode="numeric" pattern="[0-9๐-๙]{7,8}" maxLength={8} placeholder="รหัสนักศึกษา 7–8 หลัก" value={studentNumber}
             readOnly={edit || busy} onChange={e=>{const next=normalizeDigits(e.target.value);if(next!==studentNumber){setStudentNumber(next);setLookup(undefined);setError('');if(!station)setFaculty('');}}}/></label>
