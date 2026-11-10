@@ -6,7 +6,7 @@ import {errorText,newReceipt,normalizeDigits,signupRpc,type ApplicationProfile,t
 
 const input='mt-1 block min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-base';
 const fields=[
-  ['student_id','รหัสนักศึกษา'],['full_name','ชื่อและนามสกุล'],['class_group','หมู่เรียน'],
+  ['full_name','ชื่อและนามสกุล'],
   ['birth_date','วันเกิด 8 หลัก (ววดดปปปป พ.ศ.)'],['phone','เบอร์โทรศัพท์'],
 ] as const;
 
@@ -14,7 +14,9 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
   const storageKey='aru-signup:'+eventId+(station?':station:'+station.slice(-12):':online');
   const [info,setInfo]=useState<SignupInfo>();
   const [error,setError]=useState('');
-  const [method,setMethod]=useState<'new'|'existing'>(station?'new':'existing');
+  const [studentNumber,setStudentNumber]=useState('');
+  const [lookup,setLookup]=useState<{id:string;step:'existing'|'new'|'pending'|'error';message?:string}>();
+  const [lookupRetry,setLookupRetry]=useState(0);
   const [secret,setSecret]=useState('');
   const [receipt,setReceipt]=useState<Receipt>();
   const [initial,setInitial]=useState<ApplicationProfile>();
@@ -48,7 +50,33 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
     signupRpc<SignupInfo>('registration_info',{p_event:eventId}).then(data=>{if(active)setInfo(data);}).catch(e=>{if(active)setError(errorText(e));});
     return ()=>{active=false};
   },[eventId,storageKey,station]);
+  const number=normalizeDigits(studentNumber);
+  const method=station || edit?'new':lookup?.id===number?lookup.step:'lookup';
+  useEffect(()=>{
+    if(station || secret || edit || !info?.event?.open || !/^[0-9]{7,8}$/.test(number))return;
+    let active=true;
+    const timer=setTimeout(async()=>{
+      try{
+        const step=await signupRpc<'existing'|'new'|'pending'>('registration_account_step',{p_event:eventId,p_student_id:number});
+        if(active)setLookup({id:number,step});
+      }catch(e){if(active)setLookup({id:number,step:'error',message:errorText(e)});}
+    },450);
+    return ()=>{active=false;clearTimeout(timer);};
+  },[station,secret,edit,info,eventId,number,lookupRetry]);
   const status=receipt?.status;
+  const claim=useRef<{key:string;result:Promise<Receipt>}|null>(null);
+  const [retry,setRetry]=useState(0);
+  useEffect(()=>{
+    if(!secret || status!=='APPROVED' || !receipt?.issued || receipt.claimed)return;
+    let active=true;
+    if(claim.current?.key!==secret){
+      claim.current={key:secret,result:signupRpc<Receipt>('registration_receipt',{p_event:eventId,p_receipt:secret,p_station:station||null,p_claim:true})};
+    }
+    claim.current.result.then(data=>{
+      if(active){setPassword(data.password||'');setReceipt({...data,claimed:true});setError('');}
+    }).catch(e=>{if(active){claim.current=null;setError(errorText(e));}});
+    return ()=>{active=false;};
+  },[secret,status,receipt?.issued,receipt?.claimed,eventId,station,retry]);
   useEffect(()=>{
     if(!secret || edit || status==='APPROVED' || status==='CANCELLED')return;
     let active=true;
@@ -66,7 +94,7 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
   },[secret,eventId,station,edit,status]);
   function clear() {
     sessionStorage.removeItem(storageKey);sessionStorage.removeItem(storageKey+':draft');
-    setSecret('');setReceipt(undefined);setPassword('');setInitial(undefined);setFaculty('');
+    setLookup(undefined);setStudentNumber('');claim.current=null;setSecret('');setReceipt(undefined);setPassword('');setInitial(undefined);setFaculty('');
     setCopied(false);setEdit(false);setError('');setFormKey(k=>k+1);
   }
   useEffect(()=>{
@@ -107,6 +135,9 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
     const values=new FormData(form);
     const get=(k:string)=>String(values.get(k)||'').trim();
     const studentId=normalizeDigits(get('student_id'));
+    if(method==='lookup' || method==='error' || method==='pending'){
+      setLookup(undefined);setLookupRetry(n=>n+1);return;
+    }
     if(method==='existing' && !station && !edit){
       const data=await signupRpc<{success:boolean;already:boolean;message?:string;user:{role:string};session_token:string}>('registration_login_join',{
         p_event:eventId,p_student_id:studentId,p_password:String(values.get('password')||''),
@@ -116,7 +147,7 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
       sessionStorage.setItem('aru-user-v1',JSON.stringify(data.user));sessionStorage.setItem('aru-session-token',data.session_token);
       window.location.assign(loginUrl);return;
     }
-    const profile:ApplicationProfile={student_id:studentId,full_name:get('full_name'),class_group:get('class_group'),faculty,major:get('major'),
+    const profile:ApplicationProfile={student_id:studentId,prefix:get('prefix'),full_name:get('full_name'),class_group:get('class_group'),faculty,major:get('major'),
       study_year:get('study_year'),birth_date:normalizeDigits(get('birth_date')),phone:normalizeDigits(get('phone'))};
     // Keep a retry key before sending, so a lost response can be retried with the same request.
     const draft=JSON.parse(sessionStorage.getItem(storageKey+':draft')||'null') as {id:string;key:string}|null;
@@ -136,16 +167,13 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
         {!receipt ? <p role="status">กำลังตรวจสอบคำขอ…</p> : <>
           <p className="text-sm text-slate-600">คำขอ {receipt.id.slice(0,8).toUpperCase()}</p>
           {status==='PENDING' && <h2 className="text-lg font-bold">ได้รับใบสมัครแล้ว · รอแอดมินยืนยัน</h2>}
-          {status==='CORRECT' && <><p>กรุณาแก้ไข: {receipt.note}</p><button className="action-primary" onClick={()=>{setInitial(receipt.profile||undefined);setFaculty(receipt.profile?.faculty||'');setEdit(true);}}>แก้ไขใบสมัคร</button></>}
+          {status==='CORRECT' && <><p>กรุณาแก้ไข: {receipt.note}</p><button className="action-primary" onClick={()=>{setInitial(receipt.profile||undefined);setStudentNumber(receipt.student_id);setFaculty(receipt.profile?.faculty||'');setEdit(true);}}>แก้ไขใบสมัคร</button></>}
           {status==='CANCELLED' && <p>คำขอนี้ถูกยกเลิกแล้ว</p>}
           {status==='APPROVED' && <>
             <div className="space-y-2 rounded-2xl bg-emerald-50 p-4"><h2 className="text-lg font-bold">ลงทะเบียนสำเร็จ</h2>
-              <p>ชื่อผู้ใช้ <b>{receipt.student_id}</b></p>
-              {password?<><p>รหัสผ่านเริ่มต้น <b className="break-all font-mono">{password}</b></p><button className="action-secondary" onClick={()=>void run(async()=>{await navigator.clipboard.writeText(receipt.student_id+'\n'+password);setCopied(true);})}>{copied?'คัดลอกแล้ว':'คัดลอกข้อมูลเข้าสู่ระบบ'}</button></>:
-              receipt.issued && !receipt.claimed?<button className="action-primary" disabled={busy} onClick={()=>void run(async()=>{
-                const data=await signupRpc<Receipt>('registration_receipt',{p_event:eventId,p_receipt:secret,p_station:station||null,p_claim:true});
-                setReceipt(data);setPassword(data.password||'');
-              })}>แสดงรหัสผ่านเริ่มต้นครั้งเดียว</button>:<p>{receipt.issued?'แสดงรหัสผ่านไปแล้ว หากไม่ได้บันทึกกรุณาติดต่อแอดมิน':'ใช้รหัสผ่าน Event Pass เดิม'}</p>}
+              <p className="font-semibold">{info.event.title}</p><p>ชื่อผู้ใช้ <b className="font-mono text-lg">{receipt.student_id}</b></p>
+              {password?<><p>รหัสผ่านเริ่มต้น <b className="break-all font-mono text-lg">{password}</b></p><p className="text-sm">แคปหน้าจอนี้เพื่อเก็บข้อมูลเข้าสู่ระบบ</p><button className="action-secondary" onClick={()=>void run(async()=>{await navigator.clipboard.writeText(receipt.student_id+'\n'+password);setCopied(true);})}>{copied?'คัดลอกแล้ว':'คัดลอกข้อมูลเข้าสู่ระบบ'}</button></>:
+              receipt.issued && !receipt.claimed?(error?<button className="action-secondary" onClick={()=>setRetry(n=>n+1)}>ลองโหลดรหัสผ่านอีกครั้ง</button>:<p role="status">กำลังโหลดรหัสผ่าน…</p>):<p>{receipt.issued?'แสดงรหัสผ่านไปแล้ว หากไม่ได้บันทึกกรุณาติดต่อแอดมิน':'ใช้รหัสผ่าน Event Pass เดิม'}</p>}
             </div>
             {station?<div className="qr-ticket grid justify-items-center gap-2 p-2"><QRCodeCanvas value={loginUrl} size={180} marginSize={4}/><p>ใช้มือถือสแกนเพื่อเปิด Event Pass</p><small>หน้าจอจะล้างข้อมูลใน 90 วินาที</small></div>:<a className="action-primary w-full" href={loginUrl}>เข้าสู่ Event Pass</a>}
           </>}
@@ -157,19 +185,27 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
       </div>
       : info.event.closed || (!station && !info.event.open) ? <p className="rounded-xl bg-amber-50 p-4">ปิดรับสมัครออนไลน์แล้ว กรุณาติดต่อจุดลงทะเบียนหน้างาน</p>
       : <>
-        {!station && !edit && <div className="grid grid-cols-2 gap-2">{(['existing','new'] as const).map(m=><button key={m} type="button" aria-pressed={method===m} className={method===m?'action-primary':'action-secondary'} onClick={()=>{setMethod(m);setError('');}}>{m==='existing'?'มีบัญชี Event Pass':'สมัครบัญชีใหม่'}</button>)}</div>}
-        <form key={method+formKey} className="space-y-3" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;void run(()=>submit(form));}}>
-          {method==='existing' && !station && !edit ? <>
-            <label className="block text-sm">รหัสนักศึกษา<input name="student_id" required className={input} autoComplete="username"/></label>
-            <label className="block text-sm">รหัสผ่าน<input type="password" name="password" required className={input} autoComplete="current-password"/></label>
+        <form key={formKey} className="space-y-3" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;void run(()=>submit(form));}}>
+          <label className="block text-sm">รหัสนักศึกษา<input name="student_id" required className={input} autoComplete={station?'off':'username'}
+            inputMode="numeric" pattern="[0-9๐-๙]{7,8}" maxLength={8} placeholder="รหัสนักศึกษา 7–8 หลัก" value={studentNumber}
+            readOnly={edit || busy} onChange={e=>{const next=normalizeDigits(e.target.value);if(next!==studentNumber){setStudentNumber(next);setLookup(undefined);setError('');if(!station)setFaculty('');}}}/></label>
+          {method==='lookup' ? <p role="status" className="text-sm text-slate-600">{number.length>=7?'กำลังตรวจสอบรหัสนักศึกษา…':'กรอกรหัสนักศึกษาเพื่อเริ่มสมัคร'}</p>
+          : method==='error' ? <p role="alert">{lookup?.message}</p>
+          : method==='pending' ? <p role="status">มีใบสมัครรอยืนยันสำหรับกิจกรรมนี้แล้ว กรุณากลับไปยังหน้าที่ส่งใบสมัครหรือติดต่อแอดมิน</p>
+          : method==='existing' ? <>
+            <label className="block text-sm">รหัสผ่าน<input type="password" name="password" required className={input} autoComplete="current-password"/></label><p className="text-sm text-slate-600">รหัสผ่านเริ่มต้นของนักศึกษาคือวันเดือนปีเกิด พ.ศ. 8 หลัก เช่น 22062549 หากเปลี่ยนแล้วให้ใช้รหัสผ่านปัจจุบัน</p>
           </>:<>
-            {fields.map(([name,label])=><label key={name} className="block text-sm">{label}<input required name={name} defaultValue={initial?.[name]} readOnly={edit && name==='student_id'}
-              inputMode={['birth_date','student_id','phone'].includes(name)?'numeric':'text'} maxLength={name==='full_name'?255:name==='class_group'?50:name==='phone'?10:8} autoComplete="off" className={input}/></label>)}
+            <label className="block text-sm">คำนำหน้า<select name="prefix" required defaultValue={initial?.prefix||''} className={input}>
+              <option value="">เลือกคำนำหน้า</option><option>นาย</option><option>นางสาว</option></select></label>
+            <label className="block text-sm">หมู่เรียน<select name="class_group" required defaultValue={initial?.class_group||''} className={input}>
+              <option value="">เลือกหมู่เรียน</option>{[1,2,3,4].map(n=><option key={n}>{n}</option>)}</select></label>
+            {fields.map(([name,label])=><label key={name} className="block text-sm">{label}<input required name={name} defaultValue={initial?.[name]}
+              inputMode={['birth_date','phone'].includes(name)?'numeric':'text'} maxLength={name==='full_name'?255:name==='phone'?10:8} autoComplete="off" className={input}/>{name==='birth_date' && <small>เช่น 22 มิถุนายน 2549 กรอก 22062549</small>}</label>)}
             <label className="block text-sm">คณะ<select required value={faculty} onChange={e=>setFaculty(e.target.value)} className={input}><option value="">เลือกคณะ</option>{Object.keys(info.catalog||{}).map(f=><option key={f}>{f}</option>)}</select></label>
             <label className="block text-sm">สาขา<select key={faculty} name="major" required defaultValue={initial?.faculty===faculty?initial.major:''} className={input}><option value="">เลือกสาขา</option>{info.catalog?.[faculty]?.map(m=><option key={m}>{m}</option>)}</select></label>
             <label className="block text-sm">ชั้นปี<select name="study_year" defaultValue={initial?.study_year||''} required className={input}><option value="">เลือกชั้นปี</option>{[1,2,3,4,5,6,7,8].map(y=><option key={y}>{y}</option>)}</select></label>
           </>}
-          <button disabled={busy} className="action-primary w-full">{busy?'กำลังส่ง…':method==='existing' && !station && !edit?'ยืนยันบัญชีและเข้ากิจกรรม':'ส่งใบสมัครให้แอดมินยืนยัน'}</button>
+          {method!=='lookup' && <button disabled={busy} className="action-primary w-full">{busy?'กำลังส่ง…':method==='error'||method==='pending'?'ตรวจสอบอีกครั้ง':method==='existing'?'ยืนยันบัญชีและเข้ากิจกรรม':'ส่งใบสมัครให้แอดมินยืนยัน'}</button>}
         </form>
       </>}
     {info?.contact && <a href={info.contact} target="_blank" rel="noreferrer" className="action-secondary">ติดต่อแอดมิน</a>}

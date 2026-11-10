@@ -1,4 +1,4 @@
--- Run against an isolated database after migrations 001-021.
+-- Run against an isolated database after migrations 001-023.
 begin;
 set local search_path=public,extensions,pg_temp;
 do $test$
@@ -23,10 +23,24 @@ begin
   insert into events(title) values('Registration QA A') returning id into event_a;
   insert into events(title) values('Registration QA B') returning id into event_b;
   profile:=jsonb_build_object('student_id','๐๖๙๑๒๓๔๕','full_name','QA Student','faculty','คณะครุศาสตร์','major','คณิตศาสตร์',
-    'birth_date','01012549','phone','0800000000','study_year','2','class_group','01.1');
+    'birth_date','01012549','phone','0800000000','study_year','2','class_group','1','prefix','นาย');
 
+  begin
+    perform registration_account_step(event_a,'06912345');
+    raise exception 'closed lookup accepted' using errcode='23505';
+  exception when raise_exception then assert sqlerrm like '%ปิดรับ%'; end;
   perform registration_admin(admin_token,event_a,'OPEN');
+  assert registration_account_step(event_a,'๐๖๙๑๒๓๔๕')='new';
+  begin
+    perform registration_apply(event_a,profile || '{"class_group":"5"}'::jsonb,proof);
+    raise exception 'invalid group accepted' using errcode='23505';
+  exception when raise_exception then assert sqlerrm like '%หมู่เรียน%'; end;
+  begin
+    perform registration_apply(event_a,profile - 'prefix',proof);
+    raise exception 'missing title accepted' using errcode='23505';
+  exception when raise_exception then assert sqlerrm like '%กรุณาตรวจ%'; end;
   application_id:=(registration_apply(event_a,profile,proof)->>'id')::uuid;
+  assert registration_account_step(event_a,'06912345')='pending';
   assert registration_apply(event_a,profile,proof)->>'id'=application_id::text;
   begin
     perform registration_apply(event_a,profile || '{"student_id":"06912345"}'::jsonb,kiosk_proof);
@@ -37,8 +51,10 @@ begin
   perform registration_apply(event_a,profile,proof);
   perform registration_review(admin_token,application_id,'APPROVE');
   perform registration_review(admin_token,application_id,'APPROVE');
+  assert registration_account_step(event_a,'06912345')='existing';
   password:=registration_receipt(event_a,proof,null,true)->>'password';
-  assert password is not null;
+  assert password is not distinct from '01012549';
+  assert (select full_name='นายQA Student' and class_group='1' from users where student_id='06912345');
   assert registration_receipt(event_a,proof,null,true)->>'password' is null;
   assert (registration_login_join(event_a,'06912345',password)->>'already')::boolean;
   assert not (registration_login_join(event_a,'06912345','incorrect')->>'success')::boolean;
@@ -47,6 +63,8 @@ begin
     raise exception 'closed event accepted' using errcode='23505';
   exception when raise_exception then assert sqlerrm like '%ปิดรับ%'; end;
 
+  update users set password_hash=crypt('previous-personal-password',gen_salt('bf')) where student_id='06912345';
+  password:='previous-personal-password';
   device:=registration_admin(admin_token,event_b,'STATION');
   station_token:=registration_station_login(device->>'username',device->>'password')->>'token';
   kiosk_id:=(registration_apply(event_b,profile,kiosk_proof,station_token)->>'id')::uuid;

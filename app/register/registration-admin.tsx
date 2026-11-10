@@ -13,7 +13,7 @@ export function LoginHelp({loginFailed}:{loginFailed:boolean}){
   return <div className="mt-4 flex flex-wrap justify-between gap-3 text-sm">
     {link && <a className="font-bold text-[#7c0a02] underline" href={link} target="_blank" rel="noreferrer">เข้าใช้บัญชีไม่ได้? ติดต่อแอดมิน</a>}
     {!link && loginFailed && <p>ติดต่อแอดมินที่จุดลงทะเบียนหน้างาน พร้อมแจ้งรหัสนักศึกษา</p>}
-    <a className="text-slate-600 underline" href="/kiosk">เข้าสู่ระบบเครื่องหน้างาน</a>
+
   </div>;
 }
 export function RegistrationAdmin({eventId,token,refresh}:{eventId:string;token:string;refresh:()=>Promise<void>}) {
@@ -65,7 +65,7 @@ export function RegistrationAdmin({eventId,token,refresh}:{eventId:string;token:
       <h3 className="font-bold">คิวของกิจกรรมนี้ ({data.queue.length})</h3>
       {!data.queue.length && <p className="text-sm text-slate-600">ไม่มีใบสมัครรอตรวจ</p>}
       {data.queue.map(r=><article key={r.id} className="space-y-2 rounded-xl border p-3">
-        <b>{r.profile.full_name} · {r.student_id}</b><p className="text-sm">{r.kiosk?'หน้างาน':'ออนไลน์'} · {r.id.slice(0,8).toUpperCase()} · {r.status==='CORRECT'?'รอผู้สมัครแก้ไข':'รอยืนยัน'}</p>
+        <b>{r.profile.prefix}{r.profile.full_name} · {r.student_id}</b><p className="text-sm">{r.kiosk?'หน้างาน':'ออนไลน์'} · {r.id.slice(0,8).toUpperCase()} · {r.status==='CORRECT'?'รอผู้สมัครแก้ไข':'รอยืนยัน'}</p>
         <p className="text-sm">{r.profile.faculty} · {r.profile.major} · ปี {r.profile.study_year} · หมู่ {r.profile.class_group} · โทร {r.profile.phone}</p>
         <input className="h-11 w-full rounded-xl border px-3" aria-label="ข้อความให้แก้ไข" placeholder="ระบุข้อมูลที่ต้องแก้ไข" value={notes[r.id]||''} maxLength={300} onChange={e=>setNotes({...notes,[r.id]:e.target.value})}/>
         <div className="flex flex-wrap gap-2"><button className="action-primary" disabled={busy||r.status!=='PENDING'} onClick={()=>void run(()=>review(r.id,'APPROVE'))}>ยืนยันตัวตนและอนุมัติ</button>
