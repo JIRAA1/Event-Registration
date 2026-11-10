@@ -69,7 +69,7 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
   const claim=useRef<{key:string;result:Promise<Receipt>}|null>(null);
   const [retry,setRetry]=useState(0);
   useEffect(()=>{
-    if(!secret || status!=='APPROVED' || !receipt?.issued || receipt.claimed)return;
+    if(!secret || !(status==='APPROVED' || (!station && status==='PENDING')) || !receipt?.issued || receipt.claimed)return;
     let active=true;
     if(claim.current?.key!==secret){
       claim.current={key:secret,result:signupRpc<Receipt>('registration_receipt',{p_event:eventId,p_receipt:secret,p_station:station||null,p_claim:true})};
@@ -141,11 +141,11 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
       setLookup(undefined);setLookupRetry(n=>n+1);return;
     }
     if(method==='existing' && !station && !edit){
-      const data=await signupRpc<{success:boolean;already:boolean;message?:string;user:{role:string};session_token:string}>('registration_login_join',{
+      const data=await signupRpc<{success:boolean;already:boolean;pending?:boolean;message?:string;user:{role:string};session_token:string}>('registration_login_join',{
         p_event:eventId,p_student_id:studentId,p_password:String(values.get('password')||''),
       });
       if(!data.success)throw new Error(data.message||'กรุณาใช้บัญชีนักศึกษา');
-      sessionStorage.setItem('aru-join-feedback',data.already?'คุณลงทะเบียนกิจกรรมนี้แล้ว':'ลงทะเบียนเข้าร่วมกิจกรรมแล้ว');
+      sessionStorage.setItem('aru-join-feedback',data.pending?'รอยืนยันเข้าร่วมกิจกรรม':data.already?'คุณลงทะเบียนกิจกรรมนี้แล้ว':'ลงทะเบียนเข้าร่วมกิจกรรมแล้ว');
       sessionStorage.setItem('aru-user-v1',JSON.stringify(data.user));sessionStorage.setItem('aru-session-token',data.session_token);
       window.location.assign(loginUrl);return;
     }
@@ -155,9 +155,13 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
     const draft=JSON.parse(sessionStorage.getItem(storageKey+':draft')||'null') as {id:string;key:string}|null;
     const key=secret || (draft?.id===studentId?draft.key:newReceipt());
     sessionStorage.setItem(storageKey+':draft',JSON.stringify({id:studentId,key}));
-    await signupRpc('registration_apply',{p_event:eventId,p_profile:profile,p_receipt:key,p_station:station||null});
+    const applied=await signupRpc<{id:string;account_created?:boolean}>('registration_apply',{p_event:eventId,p_profile:profile,p_receipt:key,p_station:station||null});
     sessionStorage.setItem(storageKey,key);sessionStorage.removeItem(storageKey+':draft');
-    setEdit(false);setReceipt(undefined);setSecret(key);
+    if(applied.account_created){
+      setPassword(profile.birth_date);
+      setReceipt({id:applied.id,status:'PENDING',student_id:studentId,note:'',issued:true,claimed:false,password:null,profile:null});
+    }else setReceipt(undefined);
+    setEdit(false);setSecret(key);
   }
   return <RegistrationFrame kiosk={!!station} title={info?.event?.title || 'ลงทะเบียนเข้าร่วมกิจกรรม'} location={info?.event?.location}>
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
@@ -166,12 +170,14 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
       : secret && !edit ? <div className="space-y-4">
         {!receipt ? <p role="status">กำลังตรวจสอบคำขอ…</p> : <>
           <p className="text-sm text-slate-600">คำขอ {receipt.id.slice(0,8).toUpperCase()}</p>
-          {status==='PENDING' && <h2 className="text-lg font-bold">ได้รับใบสมัครแล้ว · รอแอดมินยืนยัน</h2>}
+          {status==='PENDING' && !receipt.issued && <h2 className="text-lg font-bold">ได้รับใบสมัครแล้ว · รอแอดมินยืนยัน</h2>}
           {status==='CORRECT' && <><p>กรุณาแก้ไข: {receipt.note}</p><button className="action-primary" onClick={()=>{setInitial(receipt.profile||undefined);setStudentNumber(receipt.student_id);setFaculty(receipt.profile?.faculty||'');setEdit(true);}}>แก้ไขใบสมัคร</button></>}
           {status==='CANCELLED' && <p>คำขอนี้ถูกยกเลิกแล้ว</p>}
-          {status==='APPROVED' && <>
+          {(status==='APPROVED' || (!station && receipt.issued && status==='PENDING')) && <>
             <div className="space-y-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950"><h2 className="text-lg font-bold">ลงทะเบียนสำเร็จ</h2>
-              <p className="font-semibold">{info.event.title}</p><p>ชื่อผู้ใช้ <b className="font-mono text-lg">{receipt.student_id}</b></p>
+              <p className="font-semibold">{info.event.title}</p>
+              {status==='PENDING' && <p>รอยืนยันเข้าร่วมกิจกรรมจากแอดมิน คุณเข้าสู่ระบบเพื่อตรวจสถานะได้เลย</p>}
+              <p>ชื่อผู้ใช้ <b className="font-mono text-lg">{receipt.student_id}</b></p>
               {password?<><p>รหัสผ่านเริ่มต้น <b className="break-all font-mono text-lg">{password}</b></p><p className="text-sm">แคปหน้าจอนี้เพื่อเก็บข้อมูลเข้าสู่ระบบ</p><button className="action-secondary" onClick={()=>void run(async()=>{await navigator.clipboard.writeText(receipt.student_id+'\n'+password);setCopied(true);})}>{copied?'คัดลอกแล้ว':'คัดลอกข้อมูลเข้าสู่ระบบ'}</button></>:
               receipt.issued && !receipt.claimed?(error?<button className="action-secondary" onClick={()=>setRetry(n=>n+1)}>ลองโหลดรหัสผ่านอีกครั้ง</button>:<p role="status">กำลังโหลดรหัสผ่าน…</p>):<p>{receipt.issued?'แสดงรหัสผ่านไปแล้ว หากไม่ได้บันทึกกรุณาติดต่อแอดมิน':'ใช้รหัสผ่าน Event Pass เดิม'}</p>}
             </div>
@@ -206,7 +212,7 @@ export function RegistrationForm({eventId,station,onExit}:{eventId:string;statio
             <label className="block text-sm">หมู่เรียน<select name="class_group" required defaultValue={initial?.class_group||''} className={input}>
               <option value="">เลือกหมู่เรียน</option>{[1,2,3,4].map(n=><option key={n}>{n}</option>)}</select></label>
           </div>}
-          {method!=='lookup' && <button disabled={busy} className="action-primary w-full">{busy?'กำลังส่ง…':method==='error'||method==='pending'?'ตรวจสอบอีกครั้ง':method==='existing'?'ยืนยันบัญชีและเข้ากิจกรรม':'ส่งใบสมัครให้แอดมินยืนยัน'}</button>}
+          {method!=='lookup' && <button disabled={busy} className="action-primary w-full">{busy?'กำลังส่ง…':method==='error'||method==='pending'?'ตรวจสอบอีกครั้ง':method==='existing'?'ยืนยันบัญชีและสมัครเข้าร่วม':station||edit?'ส่งใบสมัครให้แอดมินยืนยัน':'ลงทะเบียนและรับบัญชี'}</button>}
         </form>
       </>}
     <footer>{info?.contact && <a href={info.contact} target="_blank" rel="noreferrer" className="action-secondary">ติดต่อแอดมิน</a>}

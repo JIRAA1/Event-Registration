@@ -55,7 +55,7 @@ begin
     if not found then raise exception 'กรุณาใช้บัญชีเดิมยืนยันการสมัคร'; end if;
     update event_pass_private.applications set created_user=person.id,issued=true where id=new_id;
   end if;
-  return jsonb_build_object('id',new_id);
+  return jsonb_build_object('id',new_id,'account_created',not kiosk_mode);
 end; $$;
 
 create or replace function public.registration_review(p_token text,p_id uuid,p_decision text,p_note text default '') returns void
@@ -155,13 +155,16 @@ begin
     return jsonb_build_object('pending',true);
   end if;
   if e.id is null or not e.online_registration or e.status='CLOSED' then raise exception 'ปิดรับสมัครออนไลน์แล้ว กรุณาติดต่อจุดหน้างาน'; end if;
-  if u.study_year>1 then
+  if u.study_year>1 or exists(select 1 from event_pass_private.applications where event_id=p_event and created_user=u.id) then
     insert into event_pass_private.applications(event_id,student_id,kiosk,receipt_hash,profile)
     values(p_event,u.student_id,false,encode(gen_random_bytes(32),'hex'),jsonb_build_object('full_name',u.full_name,'faculty',u.faculty,
       'major',u.major,'class_group',u.class_group,'phone',u.phone,'study_year',u.study_year));
     return jsonb_build_object('pending',true);
   end if;
   insert into public.event_registrations(event_id,user_id) values(p_event,u.id) on conflict(event_id,user_id) do nothing;
+  insert into event_pass_private.applications(event_id,student_id,kiosk,receipt_hash,status,profile)
+    values(p_event,u.student_id,false,encode(gen_random_bytes(32),'hex'),'APPROVED',jsonb_build_object('full_name',u.full_name,
+      'faculty',u.faculty,'major',u.major,'class_group',u.class_group,'study_year',u.study_year));
 
   return jsonb_build_object('already',false);
 end; $$;
@@ -176,7 +179,7 @@ begin
   return jsonb_build_object(
     'success',true,
     'user',jsonb_build_object('id',v_user.id,'student_id',v_user.student_id,'full_name',v_user.full_name,'faculty',v_user.faculty,'major',v_user.major,'class_group',v_user.class_group,'enrollment_year',v_user.enrollment_year,'study_year',v_user.study_year,'phone',v_user.phone,'role',v_user.role),
-    'applications',coalesce((select jsonb_agg(jsonb_build_object('id',a.id,'title',e.title,'status',a.status,'note',a.note) order by a.created_at)
+    'applications',coalesce((select jsonb_agg(jsonb_build_object('id',a.id,'event_id',e.id,'title',e.title,'status',a.status,'note',a.note) order by a.created_at)
       from event_pass_private.applications a join public.events e on e.id=a.event_id where v_user.role='STUDENT' and a.student_id=v_user.student_id
       and a.status in ('PENDING','CORRECT') and not exists(select 1 from public.event_registrations r where r.user_id=v_user.id and r.event_id=e.id)),'[]'::jsonb),
     'events',coalesce((select jsonb_agg(jsonb_build_object('id',e.id,'title',e.title,'location',e.location,'activity_hours',e.activity_hours,'status',e.status,'redirect_url_year1',e.redirect_url_year1,'scan_mode',e.scan_mode,'banner_url',e.banner_url) order by e.created_at desc) from public.events e where v_user.role in ('STAFF','ADMIN') or exists(select 1 from public.event_registrations r where r.event_id=e.id and r.user_id=v_user.id)),'[]'::jsonb),

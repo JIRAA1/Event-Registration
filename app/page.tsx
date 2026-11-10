@@ -17,7 +17,7 @@ type Event = { id: string; title: string; location: string; activity_hours: numb
 type Registration = { event_id: string; user_id: string; status: Status; passcode?: string; checkin_at?: string; checkout_at?: string; checked_in_by?: string; checked_out_by?: string; checkin_staff_name?: string; checkout_staff_name?: string; is_walkin?: boolean };
 type EventDashboardRow = { event_id:string;title:string;status:Event['status'];registered_count:number;checked_in_count:number;checked_out_count:number;online_students:number;online_staff:number };
 type Passcode = { event_id: string; code: string; is_reserve: boolean; assigned_to?: string };
-type Store = { users: User[]; events: Event[]; regs: Registration[]; codes: Passcode[] };
+type Store = { users: User[]; events: Event[]; regs: Registration[]; codes: Passcode[]; applications?: {id:string;event_id:string;title:string;status:string;note:string}[] };
 type AcademicMajor = { id:string; name:string };
 type AcademicFaculty = { id:string; name:string; majors:AcademicMajor[] };
 type CatalogAction = 'ADD_FACULTY'|'UPDATE_FACULTY'|'DELETE_FACULTY'|'ADD_MAJOR'|'UPDATE_MAJOR'|'DELETE_MAJOR';
@@ -71,8 +71,8 @@ function csvHeaderKey(value:string){return value.replace(/^\uFEFF/,'').trim().to
 function cx(...parts:(string|false|undefined|null)[]) { return parts.filter(Boolean).join(' '); }
 function initials(name:string) { return name.split(' ').map(w=>w[0]).slice(0,2).join(''); }
 function formatThaiDate(date=new Date()) { return new Intl.DateTimeFormat('th-TH',{day:'numeric',month:'short',year:'numeric'}).format(date); }
-function workspaceStore(data:{users?:unknown;events?:unknown;registrations?:unknown;passcodes?:unknown}):Store {
-  return {users:(Array.isArray(data.users)?data.users:[]) as User[],events:(Array.isArray(data.events)?data.events:[]) as Event[],regs:(Array.isArray(data.registrations)?data.registrations:[]) as Registration[],codes:(Array.isArray(data.passcodes)?data.passcodes:[]) as Passcode[]};
+function workspaceStore(data:{users?:unknown;events?:unknown;registrations?:unknown;passcodes?:unknown;applications?:unknown}):Store {
+  return {applications:Array.isArray(data.applications)?data.applications:[],users:(Array.isArray(data.users)?data.users:[]) as User[],events:(Array.isArray(data.events)?data.events:[]) as Event[],regs:(Array.isArray(data.registrations)?data.registrations:[]) as Registration[],codes:(Array.isArray(data.passcodes)?data.passcodes:[]) as Passcode[]};
 }
 function defaultAcademicCatalog():AcademicFaculty[]{return Object.entries(ARU_CATALOG).map(([name,majors],index)=>({id:`demo-faculty-${index}`,name,majors:majors.map((major,majorIndex)=>({id:`demo-major-${index}-${majorIndex}`,name:major}))}));}
 function workspaceCatalog(data:{academic_catalog?:unknown}):AcademicFaculty[]{return Array.isArray(data.academic_catalog)?data.academic_catalog as AcademicFaculty[]:defaultAcademicCatalog();}
@@ -132,12 +132,15 @@ function EventPass() {
     if(!workspaceReady || user?.role!=='STUDENT')return;
     const url=new URL(window.location.href);
     const id=url.searchParams.get('event');
-    if(id && store.regs.some(r=>r.event_id===id && r.user_id===user.id)){
+    if(id && store.applications?.some(a=>a.event_id===id)){
+      setView('home');sessionStorage.removeItem('aru-join-feedback');
+      url.searchParams.delete('event');window.history.replaceState(null,'',url);
+    }else if(id && store.regs.some(r=>r.event_id===id && r.user_id===user.id)){
       const feedback=sessionStorage.getItem('aru-join-feedback');
       if(feedback){setToast(feedback);sessionStorage.removeItem('aru-join-feedback');}
       setActiveEvent(id);setView('event');url.searchParams.delete('event');window.history.replaceState(null,'',url);
     }
-  },[user,store.regs,workspaceReady]);
+  },[user,store.regs,store.applications,workspaceReady]);
 
   const refreshWorkspace=useCallback(async()=>{
     if(!sessionToken||!supabase)return;
@@ -880,9 +883,12 @@ function StudentHome({user,events,regs,select,store}:{user:User;events:Event[];r
     <section className="bento p-4 sm:p-6">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-base font-extrabold text-slate-900">กิจกรรมที่ฉันลงทะเบียน</h2>
-        <span className="shrink-0 text-xs text-slate-600">{events.length} กิจกรรม</span>
+        <span className="shrink-0 text-xs text-slate-600">{events.length+(store.applications?.length||0)} กิจกรรม</span>
       </div>
       <div className="mt-4 space-y-3">
+        {store.applications?.map(a=><article key={a.id} className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <b>{a.title}</b><p className="mt-1 text-sm">{a.status==='CORRECT'?'กรุณากลับไปแก้ไขใบสมัคร · '+a.note:'รอยืนยันเข้าร่วมกิจกรรม'}</p>
+        </article>)}
         {events.map(event=>{
           const registration=regs.find(reg=>reg.event_id===event.id);
           if (!registration) return null;
@@ -905,7 +911,7 @@ function StudentHome({user,events,regs,select,store}:{user:User;events:Event[];r
             </span>
           </button>;
         })}
-        {events.length===0&&<Empty message="ยังไม่มีกิจกรรมที่เปิดและลงทะเบียนไว้"/>}
+        {events.length===0&&!store.applications?.length&&<Empty message="ยังไม่มีกิจกรรมที่เปิดและลงทะเบียนไว้"/>}
       </div>
     </section>
     <UserProfileSummary user={user}/>

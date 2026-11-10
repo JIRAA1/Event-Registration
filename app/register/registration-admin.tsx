@@ -25,6 +25,27 @@ export function RegistrationAdmin({eventId,token,refresh}:{eventId:string;token:
   const [revision,reload]=useState(0);
   const [url,setUrl]=useState('');
   const [notes,setNotes]=useState<Record<string,string>>({});
+  const [selected,setSelected]=useState<string[]>([]);
+  const eligible=data?.queue.filter(row=>row.status==='PENDING').map(row=>row.id) || [];
+  const chosen=eligible.filter(id=>selected.includes(id));
+  async function approveSelected(){
+    await signupRpc('registration_approve_many',{p_token:token,p_event:eventId,p_ids:chosen});
+    setSelected([]);setNotice(`อนุมัติแล้ว ${chosen.length} รายการ`);await refresh();
+  }
+  async function exportApplicants(){
+    const rows=await signupRpc<(string|null)[][]>('registration_export',{p_token:token,p_event:eventId});
+    const header=['รหัสนักศึกษา','ชื่อและนามสกุล','คณะ','สาขา','ชั้นปี','หมู่เรียน','ช่องทางสมัคร','สถานะ','เวลาสมัคร'];
+    const csv=[header,...rows].map(row=>row.map(value=>{
+      let cell=String(value??'');
+      if(/^\s*[=+@-]|^[\t\r\n]/.test(cell))cell="'"+cell;
+      return '"'+cell.replace(/"/g,'""')+'"';
+    }).join(',')).join('\r\n');
+    const link=document.createElement('a');
+    link.href=URL.createObjectURL(new Blob(['\ufeff',csv],{type:'text/csv;charset=utf-8'}));
+    link.download='รายชื่อผู้สมัคร-'+eventId+'.csv';link.click();
+    setTimeout(()=>URL.revokeObjectURL(link.href),1000);
+    setNotice(`ส่งออกรายชื่อ ${rows.length} รายการแล้ว`);
+  }
   useEffect(()=>setUrl(window.location.origin+'/register/'+eventId),[eventId]);
   useEffect(()=>{
     if(!token || !isSupabaseConfigured)return;
@@ -63,13 +84,20 @@ export function RegistrationAdmin({eventId,token,refresh}:{eventId:string;token:
         <a className="action-secondary" href={url} target="_blank" rel="noreferrer">ดูหน้าสมัคร</a>
         <button className="action-secondary" onClick={()=>void run(async()=>{await navigator.clipboard.writeText(url);setNotice('คัดลอกลิงก์แล้ว');})}>คัดลอกลิงก์สมัคร</button></div>
       <h3 className="font-bold">คิวของกิจกรรมนี้ ({data.queue.length})</h3>
+      <div className="flex flex-wrap items-center gap-3">
+        <button disabled={busy} className="action-secondary" onClick={()=>void run(exportApplicants)}>ส่งออกรายชื่อผู้สมัครทั้งหมด (CSV)</button>
+        {eligible.length>0 && <><label className="flex min-h-11 items-center gap-2"><input type="checkbox" disabled={busy} checked={chosen.length===eligible.length}
+          onChange={e=>setSelected(e.target.checked?eligible:[])}/>เลือกทั้งหมดที่รอยืนยัน</label>
+          <button className="action-primary" disabled={busy||!chosen.length} onClick={()=>void run(approveSelected)}>อนุมัติที่เลือก ({chosen.length})</button></>}
+      </div>
       {!data.queue.length && <p className="text-sm text-slate-600">ไม่มีใบสมัครรอตรวจ</p>}
       {data.queue.map(r=><article key={r.id} className="space-y-2 rounded-xl border p-3">
-        <b>{r.profile.prefix}{r.profile.full_name} · {r.student_id}</b><p className="text-sm">{r.kiosk?'หน้างาน':'ออนไลน์'} · {r.id.slice(0,8).toUpperCase()} · {r.status==='CORRECT'?'รอผู้สมัครแก้ไข':'รอยืนยัน'}</p>
+        <label className="flex min-h-11 items-center gap-3"><input type="checkbox" disabled={busy||r.status!=='PENDING'} checked={chosen.includes(r.id)}
+          onChange={e=>setSelected(ids=>e.target.checked?[...ids,r.id]:ids.filter(id=>id!==r.id))}/><b>{r.profile.prefix}{r.profile.full_name} · {r.student_id}</b></label><p className="text-sm">{r.kiosk?'หน้างาน':'ออนไลน์'} · {r.id.slice(0,8).toUpperCase()} · {r.status==='CORRECT'?'รอผู้สมัครแก้ไข':'รอยืนยัน'}</p>
         <p className="text-sm">{r.profile.faculty} · {r.profile.major} · ปี {r.profile.study_year} · หมู่ {r.profile.class_group} · โทร {r.profile.phone}</p>
-        <input className="h-11 w-full rounded-xl border px-3" aria-label="ข้อความให้แก้ไข" placeholder="ระบุข้อมูลที่ต้องแก้ไข" value={notes[r.id]||''} maxLength={300} onChange={e=>setNotes({...notes,[r.id]:e.target.value})}/>
+        {r.profile.birth_date && <input className="h-11 w-full rounded-xl border px-3" aria-label="ข้อความให้แก้ไข" placeholder="ระบุข้อมูลที่ต้องแก้ไข" value={notes[r.id]||''} maxLength={300} onChange={e=>setNotes({...notes,[r.id]:e.target.value})}/>}
         <div className="flex flex-wrap gap-2"><button className="action-primary" disabled={busy||r.status!=='PENDING'} onClick={()=>void run(()=>review(r.id,'APPROVE'))}>ยืนยันตัวตนและอนุมัติ</button>
-        <button className="action-secondary" disabled={busy||!notes[r.id]?.trim()} onClick={()=>void run(()=>review(r.id,'CORRECT'))}>ส่งกลับให้แก้ไข</button>
+        {r.profile.birth_date && <button className="action-secondary" disabled={busy||!notes[r.id]?.trim()} onClick={()=>void run(()=>review(r.id,'CORRECT'))}>ส่งกลับให้แก้ไข</button>}
         <button className="action-danger" disabled={busy} onClick={()=>void run(()=>review(r.id,'CANCEL'))}>ยกเลิกใบสมัคร</button></div>
       </article>)}
       <details className="rounded-xl border p-3"><summary className="cursor-pointer font-bold">ตั้งค่าเครื่อง iPad และช่องทางติดต่อ</summary>

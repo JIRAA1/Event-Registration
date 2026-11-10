@@ -16,7 +16,7 @@ export type QueueState = {open:boolean;contact:string;station:string|null;queue:
 export async function signupRpc<T>(name:string,params:Record<string,unknown>):Promise<T> {
   if (!supabase) throw new Error('หน้านี้ต้องเชื่อมต่อฐานข้อมูล Event Pass');
   const {data,error}=await supabase.rpc(name,params);
-  if (error) throw new Error(error.code==='PGRST202'?'ฐานข้อมูลยังไม่พร้อม กรุณาติดตั้ง migration ให้ครบถึง 023':error.message);
+  if (error) throw new Error(error.code==='PGRST202'?'ฐานข้อมูลยังไม่พร้อม กรุณาติดตั้ง migration ให้ครบถึง 024':error.message);
   return data as T;
 }
 export function errorText(e:unknown) {return e instanceof Error?e.message:'เชื่อมต่อไม่สำเร็จ กรุณาลองอีกครั้ง';}
