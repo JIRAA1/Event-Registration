@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { StudentQr } from './student-qr';
 import BrowserGate from './browser-gate';
-import { Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Clipboard, Clock3, Download, ExternalLink, Eye, FileSpreadsheet, FileUp, Filter, Gauge, GraduationCap, Layers, LayoutDashboard, Loader2, Lock, LogOut, MapPin, Menu, Phone, Plus, QrCode, RefreshCw, ScanLine, Search, Settings2, ShieldCheck, Sparkles, Ticket, Trash2, Unlock, UserCheck, Users, UserX, X, Zap } from 'lucide-react';
+import { Camera, CameraOff, Save, Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Clipboard, Clock3, Download, ExternalLink, Eye, FileSpreadsheet, FileUp, Filter, Gauge, GraduationCap, Layers, LayoutDashboard, Loader2, Lock, LogOut, MapPin, Menu, Phone, Plus, QrCode, RefreshCw, ScanLine, Search, Settings2, ShieldCheck, Sparkles, Ticket, Trash2, Unlock, UserCheck, Users, UserX, X, Zap } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { soundEngine } from '@/lib/sound';
 import { ARU_CATALOG } from '@/lib/aru-catalog';
@@ -631,11 +631,11 @@ function EventPass() {
       {!user?<Landing enterAs={()=>void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…',enterAs)} saving={saving||Boolean(loadingMessage)}/>:view==='scanner'&&user.role!=='STUDENT'?<ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={()=>setScannerLocked(value=>!value)} startScanner={()=>void withLoading('กำลังเปิดกล้อง…',startScanner)} stopScanner={()=>void withLoading('กำลังปิดกล้อง…',stopScanner)} scanMode={()=>void withLoading('กำลังเปลี่ยนโหมดสแกน…',setScanMode)} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async(raw:string)=>{await withLoading('กำลังตรวจสอบ QR…',()=>scanPayload(raw));}} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={()=>setModal('walkin')}/>:view==='admin'&&user.role==='ADMIN'?<AdminView sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args)=>withLoading('กำลังบันทึกคณะและสาขา…',()=>manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={()=>setModal('event')} openCodes={()=>setModal('codes')} openStaff={()=>setModal('staff')} editUser={(target:User)=>{setEditingUser(target);setEditingFaculty(target.faculty);setEditingMajor(target.major);setModal('editUser')}} deleteUser={(target:User)=>void withLoading('กำลังลบบัญชีผู้ใช้…',()=>deleteManagedUser(target))} deleteActivity={()=>void withLoading('กำลังลบกิจกรรม…',deleteActivity)} deleteRegistration={(id:string)=>void withLoading('กำลังนำรายชื่อออก…',()=>deleteRegistration(id))} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={()=>void withLoading('กำลังนำเข้ารายชื่อ…',importCsv)} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch:Partial<Event>)=>withLoading('กำลังบันทึกการเปลี่ยนแปลง…',()=>updateSelectedEvent(patch))} />:view==='studentStats'&&user.role==='STUDENT'?<StudentStatsView user={user} events={store.events.filter(e=>studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs}/>:view==='event'&&user.role==='STUDENT'?<EventDetail session={sessionToken} event={store.events.find(e=>e.id===activeEvent)||currentEvent} user={user} registration={studentRegs.find(r=>r.event_id===activeEvent)} back={()=>setView('home')}/>:<StudentHome user={user} events={store.events.filter(e=>e.status==='ACTIVE'&&studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs} select={(id:string)=>{setActiveEvent(id);setView('event')}} store={store}/>}
     </div>
     {user&&<div className="mx-auto mt-10 flex max-w-[1440px] items-center justify-between border-t border-slate-200/70 px-2 py-4 text-[10px] text-slate-500"><span>© 2026 ARU Student Organization · ระบบลงทะเบียนกิจกรรม</span><span className="hidden items-center gap-1 sm:flex"><ShieldCheck size={12}/>ข้อมูลกิจกรรมอัปเดตแบบเรียลไทม์</span></div>}
-    {modal==='walkin'&&<Modal title="ลงทะเบียนหน้างาน" subtitle="เพิ่มนักศึกษาและผูกสิทธิ์กิจกรรม" close={()=>setModal(null)}><form onSubmit={e=>void withLoading('กำลังบันทึกรายชื่อ…',()=>addWalkin(e))} className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><Field label="รหัสนักศึกษา" name="student_id" required placeholder="เช่น 69123456"/><Field label="ชื่อ–นามสกุล" name="full_name" required placeholder="ชื่อ นามสกุล"/><label className="block text-[11px] font-semibold text-slate-600">คณะ<select name="faculty" value={walkinFaculty} required onChange={e=>{setWalkinFaculty(e.target.value);setWalkinMajor('')}} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800"><option value="">เลือกคณะ</option>{academicCatalog.map(faculty=><option key={faculty.id} value={faculty.name}>{faculty.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">สาขาวิชา<select name="major" value={walkinMajor} required disabled={!walkinFaculty} onChange={e=>setWalkinMajor(e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 disabled:opacity-50"><option value="">เลือกสาขา</option>{(academicCatalog.find(faculty=>faculty.name===walkinFaculty)?.majors||[]).map(major=><option key={major.id} value={major.name}>{major.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">ชั้นปีที่กำลังศึกษา<select name="study_year" value={walkinStudyYear} onChange={e=>setWalkinStudyYear(Number(e.target.value))} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{Array.from({length:8},(_,i)=>i+1).map(year=><option key={year} value={year}>ปี {year}</option>)}</select></label><Field label="หมู่เรียน" name="class_group" placeholder="เช่น 6901.1"/><Field label="วันเกิด (DDMMYYYY)" name="birth_date" required placeholder="22062549"/><Field label="เบอร์โทรศัพท์" name="phone" placeholder="08X-XXX-XXXX"/></div><div className={cx('flex items-center justify-between rounded-2xl px-4 py-3 text-xs',reserveLeft?'bg-amber-50 text-amber-900':'bg-rose-50 text-rose-700')}><span className="flex items-center gap-2"><Ticket size={15}/>Passcode สำรองคงเหลือ</span><b>{reserveLeft} รหัส</b></div><button className="w-full rounded-xl bg-[#7c0a02] py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300" disabled={walkinStudyYear>1&&reserveLeft===0} type="submit">บันทึกรายชื่อ</button><p className="text-center text-[10px] leading-5 text-slate-400">นักศึกษาชั้นปี 2 ขึ้นไปจะได้รับ Passcode หลังเช็กเอาต์ · ปี 1 ใช้ QR Check-in/Check-out</p></form></Modal>}
-    {modal==='event'&&<Modal title="สร้างกิจกรรมใหม่" subtitle="ตั้งค่ากิจกรรมสำหรับการลงทะเบียน" close={()=>setModal(null)}><form onSubmit={e=>void withLoading('กำลังสร้างกิจกรรม…',()=>createEvent(e))} className="space-y-3"><Field label="ชื่อกิจกรรม" name="title" required placeholder="เช่น ปฐมนิเทศนักศึกษาใหม่"/><Field label="สถานที่จัดกิจกรรม" name="location" required placeholder="หอประชุมมหาวิทยาลัย"/><Field label="URL สำหรับนักศึกษาปี 1 หลังเช็กอิน" name="redirect" type="url" placeholder="https://..."/><Field label="URL ภาพแบนเนอร์กิจกรรม" name="banner_url" type="url" placeholder="https://..."/><p className="-mt-1 text-[9px] leading-4 text-slate-400">วางลิงก์รูปภาพโดยตรง ระบบจะแสดงภาพจาง ๆ เป็นพื้นหลังของกิจกรรม</p><Field label="ชั่วโมงกิจกรรม" name="hours" type="number" min="1" defaultValue="4"/><button className="mt-2 w-full rounded-xl bg-[#7c0a02] py-3 text-sm font-bold text-white">สร้างกิจกรรม</button></form></Modal>}
-    {modal==='codes'&&<Modal title="เติม Passcode สำรอง" subtitle={`เพิ่มรหัสสำรองสำหรับ ${selected.title}`} close={()=>setModal(null)}><form onSubmit={e=>void withLoading('กำลังเพิ่ม Passcode…',()=>addCodes(e))} className="space-y-3"><label className="block text-xs font-semibold text-slate-700">รายการ Passcode <textarea name="codes" required rows={6} placeholder={'ARU-R-3001\nARU-R-3002\nARU-R-3003'} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-amber-400"/></label><p className="text-[10px] text-slate-500">ใส่หนึ่งรหัสต่อบรรทัด ระบบจะข้ามรหัสที่ซ้ำโดยอัตโนมัติ</p><button className="w-full rounded-xl bg-[#7c0a02] py-3 text-sm font-bold text-white">เพิ่มรหัสสำรอง</button></form></Modal>}
-    {modal==='staff'&&<Modal title="เพิ่มบัญชีเจ้าหน้าที่" subtitle="สร้างบัญชีสตาฟหรือแอดมินสำหรับเข้าระบบ" close={()=>setModal(null)}><form onSubmit={e=>void withLoading('กำลังสร้างบัญชี…',()=>createStaffAccount(e))} className="space-y-3"><Field label="ชื่อผู้ใช้ / รหัสเจ้าหน้าที่" name="username" required placeholder="เช่น staff-aru-01"/><Field label="ชื่อ–นามสกุล" name="full_name" required placeholder="ชื่อผู้ใช้งาน"/><label className="block text-[11px] font-semibold text-slate-600">ประเภทบัญชี<select name="role" className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800"><option value="STAFF">สตาฟ</option><option value="ADMIN">แอดมิน</option></select></label><Field label="รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)" name="password" type="password" minLength={8} required placeholder="ตั้งรหัสผ่านเริ่มต้น"/><div className="grid gap-3 sm:grid-cols-2"><Field label="หน่วยงาน / คณะ" name="faculty" placeholder="องค์การนักศึกษา"/><Field label="ฝ่าย / ตำแหน่ง" name="major" placeholder="ฝ่ายกิจกรรม"/></div><p className="rounded-xl bg-amber-50 px-3 py-2 text-[10px] leading-5 text-amber-900">ตั้งรหัสผ่านเริ่มต้นให้เจ้าหน้าที่ และแจ้งให้เปลี่ยนรหัสผ่านหลังเข้าสู่ระบบครั้งแรก</p><button className="w-full rounded-xl bg-[#7c0a02] py-3 text-sm font-bold text-white">สร้างบัญชี</button></form></Modal>}
-    {modal==='editUser'&&editingUser&&<Modal title="แก้ไขข้อมูลผู้ใช้" subtitle={editingUser.role==='STUDENT'?'แก้ไขข้อมูลนักศึกษา':'แก้ไขข้อมูลสตาฟ'} close={()=>{setModal(null);setEditingUser(null)}}><form onSubmit={e=>void withLoading('กำลังบันทึกข้อมูลผู้ใช้…',()=>updateManagedUser(e,editingUser))} className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><Field label="ชื่อผู้ใช้ / รหัสนักศึกษา" name="student_id" required defaultValue={editingUser.student_id}/><Field label="ชื่อ-นามสกุล" name="full_name" required defaultValue={editingUser.full_name}/>{editingUser.role==='STUDENT'?<label className="block text-[11px] font-semibold text-slate-600">คณะ<select name="faculty" value={editingFaculty} onChange={e=>{setEditingFaculty(e.target.value);setEditingMajor(academicCatalog.find(faculty=>faculty.name===e.target.value)?.majors[0]?.name||'');}} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{editingFaculty && !academicCatalog.some(f=>f.name===editingFaculty) && <option value={editingFaculty}>{editingFaculty}</option>}{academicCatalog.map(faculty=><option key={faculty.id} value={faculty.name}>{faculty.name}</option>)}</select></label>:<Field label="คณะ / หน่วยงาน" name="faculty" defaultValue={editingUser.faculty}/>} {editingUser.role==='STUDENT'?<label className="block text-[11px] font-semibold text-slate-600">สาขาวิชา<select name="major" value={editingMajor} onChange={e=>setEditingMajor(e.target.value)} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{editingMajor && !academicCatalog.find(f=>f.name===editingFaculty)?.majors.some(m=>m.name===editingMajor) && <option value={editingMajor}>{editingMajor}</option>}{(academicCatalog.find(faculty=>faculty.name===editingFaculty)?.majors||[]).map(major=><option key={major.id} value={major.name}>{major.name}</option>)}</select></label>:<Field label="สาขา / ฝ่าย" name="major" defaultValue={editingUser.major}/>}<Field label="หมู่เรียน / กลุ่ม" name="class_group" defaultValue={editingUser.class_group}/><Field label="วันเกิด (DDMMYYYY)" name="birth_date" defaultValue={editingUser.birth_date||''} placeholder="เว้นว่างหากไม่แก้ไข"/><Field label="เบอร์โทรศัพท์" name="phone" type="tel" defaultValue={editingUser.phone||''}/>{editingUser.role==='STUDENT'&&<label className="block text-[11px] font-semibold text-slate-600">ชั้นปีที่กำลังศึกษา<select name="study_year" defaultValue={editingUser.study_year} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{Array.from({length:8},(_,index)=>index+1).map(year=><option key={year} value={year}>ปี {year}</option>)}</select></label>}<Field label="รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)" name="new_password" type="password" minLength={8} placeholder="อย่างน้อย 8 ตัวอักษร"/></div><p className="rounded-xl bg-amber-50 px-3 py-2 text-[10px] leading-5 text-amber-900">เมื่อกำหนดรหัสผ่านใหม่ ระบบจะออกจากระบบในอุปกรณ์อื่นของบัญชีนี้</p><button className="w-full rounded-xl bg-[#7c0a02] py-3 text-sm font-bold text-white">บันทึกข้อมูล</button></form></Modal>}
+    {modal==='walkin'&&<Modal submitLabel="บันทึกรายชื่อหน้างาน" submitDisabled={walkinStudyYear>1&&reserveLeft===0} title="ลงทะเบียนหน้างาน" subtitle="เพิ่มนักศึกษาและผูกสิทธิ์กิจกรรม" close={()=>setModal(null)}><form id="staff-admin-form" onSubmit={e=>void withLoading('กำลังบันทึกรายชื่อ…',()=>addWalkin(e))} className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><Field label="รหัสนักศึกษา" name="student_id" required placeholder="เช่น 69123456"/><Field label="ชื่อ–นามสกุล" name="full_name" required placeholder="ชื่อ นามสกุล"/><label className="block text-[11px] font-semibold text-slate-600">คณะ<select name="faculty" value={walkinFaculty} required onChange={e=>{setWalkinFaculty(e.target.value);setWalkinMajor('')}} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800"><option value="">เลือกคณะ</option>{academicCatalog.map(faculty=><option key={faculty.id} value={faculty.name}>{faculty.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">สาขาวิชา<select name="major" value={walkinMajor} required disabled={!walkinFaculty} onChange={e=>setWalkinMajor(e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 disabled:opacity-50"><option value="">เลือกสาขา</option>{(academicCatalog.find(faculty=>faculty.name===walkinFaculty)?.majors||[]).map(major=><option key={major.id} value={major.name}>{major.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">ชั้นปีที่กำลังศึกษา<select name="study_year" value={walkinStudyYear} onChange={e=>setWalkinStudyYear(Number(e.target.value))} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{Array.from({length:8},(_,i)=>i+1).map(year=><option key={year} value={year}>ปี {year}</option>)}</select></label><Field label="หมู่เรียน" name="class_group" placeholder="เช่น 6901.1"/><Field label="วันเกิด (DDMMYYYY)" name="birth_date" required placeholder="22062549"/><Field label="เบอร์โทรศัพท์" name="phone" placeholder="08X-XXX-XXXX"/></div><div className={cx('flex items-center justify-between rounded-2xl px-4 py-3 text-xs',reserveLeft?'bg-amber-50 text-amber-900':'bg-rose-50 text-rose-700')}><span className="flex items-center gap-2"><Ticket size={15}/>Passcode สำรองคงเหลือ</span><b>{reserveLeft} รหัส</b></div><p className="text-center text-[10px] leading-5 text-slate-400">นักศึกษาชั้นปี 2 ขึ้นไปจะได้รับ Passcode หลังเช็กเอาต์ · ปี 1 ใช้ QR Check-in/Check-out</p></form></Modal>}
+    {modal==='event'&&<Modal submitLabel="สร้างกิจกรรม" title="สร้างกิจกรรมใหม่" subtitle="ตั้งค่ากิจกรรมสำหรับการลงทะเบียน" close={()=>setModal(null)}><form id="staff-admin-form" onSubmit={e=>void withLoading('กำลังสร้างกิจกรรม…',()=>createEvent(e))} className="space-y-3"><Field label="ชื่อกิจกรรม" name="title" required placeholder="เช่น ปฐมนิเทศนักศึกษาใหม่"/><Field label="สถานที่จัดกิจกรรม" name="location" required placeholder="หอประชุมมหาวิทยาลัย"/><Field label="URL สำหรับนักศึกษาปี 1 หลังเช็กอิน" name="redirect" type="url" placeholder="https://..."/><Field label="URL ภาพแบนเนอร์กิจกรรม" name="banner_url" type="url" placeholder="https://..."/><p className="-mt-1 text-[9px] leading-4 text-slate-400">วางลิงก์รูปภาพโดยตรง ระบบจะแสดงภาพจาง ๆ เป็นพื้นหลังของกิจกรรม</p><Field label="ชั่วโมงกิจกรรม" name="hours" type="number" min="1" defaultValue="4"/></form></Modal>}
+    {modal==='codes'&&<Modal submitLabel="เพิ่มรหัสสำรอง" title="เติม Passcode สำรอง" subtitle={`เพิ่มรหัสสำรองสำหรับ ${selected.title}`} close={()=>setModal(null)}><form id="staff-admin-form" onSubmit={e=>void withLoading('กำลังเพิ่ม Passcode…',()=>addCodes(e))} className="space-y-3"><label className="block text-xs font-semibold text-slate-700">รายการ Passcode <textarea name="codes" required rows={6} placeholder={'ARU-R-3001\nARU-R-3002\nARU-R-3003'} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-amber-400"/></label><p className="text-[10px] text-slate-500">ใส่หนึ่งรหัสต่อบรรทัด ระบบจะข้ามรหัสที่ซ้ำโดยอัตโนมัติ</p></form></Modal>}
+    {modal==='staff'&&<Modal submitLabel="สร้างบัญชีเจ้าหน้าที่" title="เพิ่มบัญชีเจ้าหน้าที่" subtitle="สร้างบัญชีสตาฟหรือแอดมินสำหรับเข้าระบบ" close={()=>setModal(null)}><form id="staff-admin-form" onSubmit={e=>void withLoading('กำลังสร้างบัญชี…',()=>createStaffAccount(e))} className="space-y-3"><Field label="ชื่อผู้ใช้ / รหัสเจ้าหน้าที่" name="username" required placeholder="เช่น staff-aru-01"/><Field label="ชื่อ–นามสกุล" name="full_name" required placeholder="ชื่อผู้ใช้งาน"/><label className="block text-[11px] font-semibold text-slate-600">ประเภทบัญชี<select name="role" className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800"><option value="STAFF">สตาฟ</option><option value="ADMIN">แอดมิน</option></select></label><Field label="รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)" name="password" type="password" minLength={8} required placeholder="ตั้งรหัสผ่านเริ่มต้น"/><div className="grid gap-3 sm:grid-cols-2"><Field label="หน่วยงาน / คณะ" name="faculty" placeholder="องค์การนักศึกษา"/><Field label="ฝ่าย / ตำแหน่ง" name="major" placeholder="ฝ่ายกิจกรรม"/></div><p className="rounded-xl bg-amber-50 px-3 py-2 text-[10px] leading-5 text-amber-900">ตั้งรหัสผ่านเริ่มต้นให้เจ้าหน้าที่ และแจ้งให้เปลี่ยนรหัสผ่านหลังเข้าสู่ระบบครั้งแรก</p></form></Modal>}
+    {modal==='editUser'&&editingUser&&<Modal submitLabel="บันทึกข้อมูลผู้ใช้" title="แก้ไขข้อมูลผู้ใช้" subtitle={editingUser.role==='STUDENT'?'แก้ไขข้อมูลนักศึกษา':'แก้ไขข้อมูลสตาฟ'} close={()=>{setModal(null);setEditingUser(null)}}><form id="staff-admin-form" onSubmit={e=>void withLoading('กำลังบันทึกข้อมูลผู้ใช้…',()=>updateManagedUser(e,editingUser))} className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><Field label="ชื่อผู้ใช้ / รหัสนักศึกษา" name="student_id" required defaultValue={editingUser.student_id}/><Field label="ชื่อ-นามสกุล" name="full_name" required defaultValue={editingUser.full_name}/>{editingUser.role==='STUDENT'?<label className="block text-[11px] font-semibold text-slate-600">คณะ<select name="faculty" value={editingFaculty} onChange={e=>{setEditingFaculty(e.target.value);setEditingMajor(academicCatalog.find(faculty=>faculty.name===e.target.value)?.majors[0]?.name||'');}} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{editingFaculty && !academicCatalog.some(f=>f.name===editingFaculty) && <option value={editingFaculty}>{editingFaculty}</option>}{academicCatalog.map(faculty=><option key={faculty.id} value={faculty.name}>{faculty.name}</option>)}</select></label>:<Field label="คณะ / หน่วยงาน" name="faculty" defaultValue={editingUser.faculty}/>} {editingUser.role==='STUDENT'?<label className="block text-[11px] font-semibold text-slate-600">สาขาวิชา<select name="major" value={editingMajor} onChange={e=>setEditingMajor(e.target.value)} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{editingMajor && !academicCatalog.find(f=>f.name===editingFaculty)?.majors.some(m=>m.name===editingMajor) && <option value={editingMajor}>{editingMajor}</option>}{(academicCatalog.find(faculty=>faculty.name===editingFaculty)?.majors||[]).map(major=><option key={major.id} value={major.name}>{major.name}</option>)}</select></label>:<Field label="สาขา / ฝ่าย" name="major" defaultValue={editingUser.major}/>}<Field label="หมู่เรียน / กลุ่ม" name="class_group" defaultValue={editingUser.class_group}/><Field label="วันเกิด (DDMMYYYY)" name="birth_date" defaultValue={editingUser.birth_date||''} placeholder="เว้นว่างหากไม่แก้ไข"/><Field label="เบอร์โทรศัพท์" name="phone" type="tel" defaultValue={editingUser.phone||''}/>{editingUser.role==='STUDENT'&&<label className="block text-[11px] font-semibold text-slate-600">ชั้นปีที่กำลังศึกษา<select name="study_year" defaultValue={editingUser.study_year} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{Array.from({length:8},(_,index)=>index+1).map(year=><option key={year} value={year}>ปี {year}</option>)}</select></label>}<Field label="รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)" name="new_password" type="password" minLength={8} placeholder="อย่างน้อย 8 ตัวอักษร"/></div><p className="rounded-xl bg-amber-50 px-3 py-2 text-[10px] leading-5 text-amber-900">เมื่อกำหนดรหัสผ่านใหม่ ระบบจะออกจากระบบในอุปกรณ์อื่นของบัญชีนี้</p></form></Modal>}
     {(loadingMessage||saving)&&<div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/25 p-4 backdrop-blur-[2px]" role="status" aria-live="polite" aria-busy="true"><div className="flex min-w-[230px] items-center gap-3 rounded-2xl border border-white/80 bg-white/95 px-5 py-4 shadow-2xl"><Loader2 size={22} className="animate-spin text-[#7c0a02]"/><div><b className="block text-xs text-slate-900">{loadingMessage||"กำลังดำเนินการ…"}</b><span className="mt-1 block text-[10px] text-slate-500">กรุณารอสักครู่</span><span className="loading-progress mt-3 block h-1 overflow-hidden rounded-full bg-rose-100"><i className="block h-full w-2/5 rounded-full bg-[#7c0a02]"/></span></div></div></div>}
     {toast&&<div className="fixed bottom-5 left-1/2 z-[70] -translate-x-1/2 rounded-full bg-slate-950 px-5 py-3 text-xs font-medium text-white shadow-2xl">{toast}</div>}
   </main>;
@@ -717,8 +717,23 @@ function NavButton({
     </button>
   );
 }
-function Field({label,...props}:{label:string;name:string;id?:string;type?:string;required?:boolean;placeholder?:string;defaultValue?:string|number;min?:string|number;max?:string|number;minLength?:number}){return <label className="block text-[11px] font-semibold text-slate-600">{label}<input {...props} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 placeholder:text-slate-300"/></label>}
-function Modal({title,subtitle,close,children}:{title:string;subtitle:string;close:()=>void;children:React.ReactNode}){return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-[28px] border border-white bg-white p-6 shadow-2xl"><div className="mb-5 flex items-start justify-between"><div><h2 className="text-lg font-bold text-slate-900">{title}</h2><p className="mt-1 text-xs text-slate-500">{subtitle}</p></div><button onClick={close} className="rounded-full bg-slate-100 p-2 text-slate-500"><X size={16}/></button></div>{children}</div></div>}
+function Field({label,...props}:{label:string;name:string;id?:string;type?:string;required?:boolean;placeholder?:string;defaultValue?:string|number;min?:string|number;max?:string|number;minLength?:number;autoComplete?:string;enterKeyHint?:"go"|"next"}){return <label className="block text-[11px] font-semibold text-slate-600">{label}<input {...props} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 placeholder:text-slate-300"/></label>}
+function Modal({title,subtitle,close,children,submitLabel,submitDisabled=false}:{
+  title:string;subtitle:string;close:()=>void;children:React.ReactNode;submitLabel:string;submitDisabled?:boolean;
+}){
+  return <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}>
+    <section role="dialog" aria-modal="true" aria-labelledby="staff-admin-title" className="flex max-h-[94dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
+      <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+        <div><h2 id="staff-admin-title" className="text-lg font-bold">{title}</h2><p className="mt-1 text-xs text-slate-600">{subtitle}</p></div>
+        <button type="button" aria-label="ปิดหน้าต่าง" onClick={close} className="action-secondary"><X size={18}/></button>
+      </header>
+      <div className="min-h-0 overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
+      <footer className="border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <button form="staff-admin-form" type="submit" disabled={submitDisabled} className="action-primary w-full"><Save size={18}/>{submitLabel}</button>
+      </footer>
+    </section>
+  </div>;
+}
 
 function NeuralNetworkCanvas(){
  const canvasRef=useRef<HTMLCanvasElement|null>(null);
@@ -765,15 +780,18 @@ function Landing({enterAs,saving}:{enterAs:()=>void;saving:boolean}){return <div
       <h2 className="mt-4 text-2xl font-extrabold text-slate-900">เข้าสู่ระบบ</h2>
       <p className="mt-1 text-xs text-slate-500">ระบบลงทะเบียนกิจกรรม · องค์การนักศึกษา ARU</p>
     </div>
-    <div className="mt-6 space-y-3">
-      <Field label="รหัสนักศึกษา / รหัสเจ้าหน้าที่" name="login-id" id="login-id" placeholder="กรอกรหัสผู้ใช้งาน"/>
-      <Field label="รหัสผ่าน" name="login-password" id="login-password" type="password" placeholder="••••••••"/>
-      <button onClick={enterAs} disabled={saving} className="login-action group relative mt-2 flex w-full items-center justify-between overflow-hidden rounded-2xl px-5 py-4 text-sm font-extrabold text-white transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(124,10,2,.28)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300/70 disabled:translate-y-0 disabled:cursor-wait disabled:opacity-75">
+    <form className="mt-6 space-y-3" onSubmit={event=>{
+      event.preventDefault();
+      if (!saving) enterAs();
+    }}>
+      <Field label="รหัสนักศึกษา / รหัสเจ้าหน้าที่" name="login-id" id="login-id" autoComplete="username" required={isSupabaseConfigured} placeholder="กรอกรหัสผู้ใช้งาน"/>
+      <Field label="รหัสผ่าน" name="login-password" id="login-password" autoComplete="current-password" enterKeyHint="go" required={isSupabaseConfigured} type="password" placeholder="••••••••"/>
+      <button type="submit" disabled={saving} className="login-action group relative mt-2 flex w-full items-center justify-between overflow-hidden rounded-2xl px-5 py-4 text-sm font-extrabold text-white transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(124,10,2,.28)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300/70 disabled:translate-y-0 disabled:cursor-wait disabled:opacity-75">
         <span className="pointer-events-none absolute inset-0 login-action-shine"/>
         <span className="relative flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-amber-200">{saving?<Loader2 size={19} className="animate-spin"/>:<ShieldCheck size={19}/>}</span><span className="text-left"><span className="block text-[15px]">{saving?"กำลังเข้าสู่ระบบ…":"เข้าสู่ระบบ"}</span><span className="mt-0.5 block text-[9px] font-medium tracking-wide text-white/65">ARU EVENT PASS</span></span></span>
         <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-amber-300 text-[#57100b] transition duration-300 group-hover:translate-x-1 group-hover:rotate-[-35deg]">{saving?<Loader2 size={16} className="animate-spin"/>:<ArrowRight size={17}/>}</span>
       </button>
-    </div>
+    </form>
   </section>
 
 
@@ -805,9 +823,39 @@ function StudentHome({user,events,regs,select,store}:{user:User;events:Event[];r
   const latestEvent=latestConfirmed?store.events.find(e=>e.id===latestConfirmed.event_id):undefined;
   return <div className="space-y-5">
     <header className="px-2"><div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.15em] text-slate-400"><span>{formatThaiDate()}</span><span className="h-1 w-1 rounded-full bg-[#d4af37]"/>Student Portal</div><h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">กิจกรรมที่กำลังเปิด</h1><p className="mt-1 text-xs text-slate-500">เลือกกิจกรรมเพื่อดูรายละเอียดและ QR Code ของคุณ</p></header>
-    <UserProfileSummary user={user}/>
     <AttendanceConfirmation status={latestConfirmed?.status} eventTitle={latestEvent?.title}/>
-    <section className="bento p-5 sm:p-6"><div className="flex items-center justify-between"><div><h2 className="text-base font-extrabold text-slate-900">กิจกรรมที่ฉันลงทะเบียน</h2><p className="mt-1 text-[10px] text-slate-500">แสดงเฉพาะกิจกรรมที่กำลังเปิดใช้งาน</p></div><span className="rounded-full bg-amber-50 px-3 py-1.5 text-[9px] font-bold text-amber-800">{events.length} กิจกรรม</span></div><div className="mt-4 space-y-3">{events.map(event=>{const reg=regs.find(r=>r.event_id===event.id)!;return <button key={event.id} onClick={()=>select(event.id)} style={event.banner_url?{backgroundImage:`linear-gradient(90deg,rgba(255,255,255,.97) 0%,rgba(255,255,255,.9) 54%,rgba(255,255,255,.66) 100%),url("${event.banner_url}")`,backgroundSize:'cover',backgroundPosition:'center'}:undefined} className="group flex w-full items-center gap-4 rounded-2xl border border-slate-100 p-3 text-left transition hover:border-amber-200 hover:bg-amber-50/50 sm:p-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#7c0a02] text-white"><BookOpen size={19}/></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><b className="truncate text-xs text-slate-900 sm:text-sm">{event.title}</b><StatusPill status={reg.status}/></div><div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[9px] text-slate-500"><span className="flex items-center gap-1"><MapPin size={11}/>{event.location}</span><span className="flex items-center gap-1"><Clock3 size={11}/>{event.activity_hours} ชั่วโมง</span></div></div><ArrowRight size={15} className="text-slate-300 transition group-hover:translate-x-1 group-hover:text-[#7c0a02]"/></button>})}{events.length===0&&<Empty message="ยังไม่มีกิจกรรมที่เปิดและลงทะเบียนไว้"/>}</div></section>
+    <section className="bento p-4 sm:p-6">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="text-base font-extrabold text-slate-900">กิจกรรมที่ฉันลงทะเบียน</h2>
+        <span className="shrink-0 text-xs text-slate-600">{events.length} กิจกรรม</span>
+      </div>
+      <div className="mt-4 space-y-3">
+        {events.map(event=>{
+          const registration=regs.find(reg=>reg.event_id===event.id);
+          if (!registration) return null;
+          const completed=registration.status==='COMPLETED';
+          const action=completed?'ดูผลการเข้าร่วม':registration.status==='ATTENDING'?'เปิด QR สแกนออก':'เปิด QR สแกนเข้า';
+          return <button key={event.id} type="button" onClick={()=>select(event.id)} aria-label={action+' · '+event.title}
+            style={event.banner_url?{backgroundImage:`linear-gradient(90deg,rgba(255,255,255,.97),rgba(255,255,255,.87)),url("${event.banner_url}")`,backgroundSize:'cover',backgroundPosition:'center'}:undefined}
+            className="group grid w-full gap-4 rounded-2xl border border-slate-300 bg-white p-4 text-left shadow-sm transition hover:border-[#7c0a02] hover:shadow-md active:bg-rose-50 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+            <span className="min-w-0">
+              <StatusPill status={registration.status}/>
+              <strong className="mt-2 block break-words text-base text-slate-900">{event.title}</strong>
+              <span className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+                <span className="flex items-center gap-1"><MapPin size={14}/>{event.location}</span>
+                <span className="flex items-center gap-1"><Clock3 size={14}/>{event.activity_hours} ชั่วโมง</span>
+              </span>
+            </span>
+            <span className={cx('inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold',
+              completed?'border border-slate-300 bg-white text-slate-700 group-hover:bg-slate-100':'bg-[#7c0a02] text-white group-hover:bg-[#620701]')}>
+              {completed?<CheckCircle2 size={16}/>:<QrCode size={16}/>}{action}<ArrowRight size={16}/>
+            </span>
+          </button>;
+        })}
+        {events.length===0&&<Empty message="ยังไม่มีกิจกรรมที่เปิดและลงทะเบียนไว้"/>}
+      </div>
+    </section>
+    <UserProfileSummary user={user}/>
   </div>;
 }
 
@@ -833,7 +881,7 @@ function EventDetail({event,user,registration,back,session}:{session:string;even
   const passcode=registration?.status==='COMPLETED'&&user.study_year>1?registration.passcode:undefined;
   const yearOneRedirect=user.study_year===1&&registration && registration.status!=='REGISTERED'&&event.redirect_url_year1;
   return <div className="mx-auto max-w-5xl">
-    <button onClick={back} className="mb-4 flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-[#7c0a02]">← กลับหน้ากิจกรรม</button>
+    <button onClick={back} className="mb-4 inline-flex min-h-11 items-center gap-1 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:border-[#7c0a02] hover:text-[#7c0a02]">← กลับหน้ากิจกรรม</button>
     <div className="grid gap-5 lg:grid-cols-[1.2fr_.8fr]">
       <section className="maroon-gradient relative min-h-[270px] overflow-hidden rounded-[32px] p-7 text-white sm:p-9" style={event.banner_url?{backgroundImage:`linear-gradient(105deg,rgba(91,8,4,.94) 0%,rgba(124,10,2,.86) 55%,rgba(91,8,4,.68) 100%),url("${event.banner_url}")`,backgroundSize:'cover',backgroundPosition:'center'}:undefined}><span className="rounded-full bg-white/15 px-3 py-1 text-[9px] font-bold">กิจกรรม ARU</span><h1 className="mt-8 max-w-xl text-3xl font-extrabold leading-tight">{event.title}</h1><p className="mt-3 flex items-center gap-1.5 text-xs text-rose-100"><MapPin size={14}/>{event.location} <span className="mx-1">·</span><Clock3 size={14}/>{event.activity_hours} ชั่วโมง</p><div className="absolute -bottom-12 -right-10 h-48 w-48 rounded-full border-[28px] border-white/5"/></section>
       <section className="bento p-6">
@@ -966,25 +1014,12 @@ function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,sta
          </div>
        </div>
 
-       {/* Camera Action Buttons */}
-       <div className="mb-4 grid grid-cols-2 gap-3">
-         <button
-           onClick={()=>scannerOn?stopScanner():startScanner()}
-           className={cx(
-             'flex items-center justify-center gap-2 rounded-xl py-3 text-xs font-bold text-white shadow-sm transition',
-             scannerOn ? 'bg-slate-700 hover:bg-slate-800' : 'bg-[#7c0a02] hover:bg-[#620701]'
-           )}
-         >
-           <Zap size={15}/>
-           {scannerOn ? 'ปิดกล้อง' : 'เปิดกล้อง'}
+       <div className="mb-4 grid gap-2 sm:grid-cols-2">
+         <button type="button" onClick={()=>scannerOn?stopScanner():startScanner()} className={scannerOn?'action-secondary':'action-primary'}>
+           {scannerOn?<CameraOff size={20}/>:<Camera size={20}/>}
+           {scannerOn?'ปิดกล้องสแกน':'เปิดกล้องสแกน QR'}
          </button>
-         <button
-           onClick={openWalkin}
-           className="flex items-center justify-center gap-2 rounded-xl border border-sky-300 bg-sky-50 py-3 text-xs font-bold text-sky-800 shadow-sm transition hover:bg-sky-100"
-         >
-           <Plus size={15}/>
-           เพิ่มรายชื่อหน้างาน
-         </button>
+         <button type="button" onClick={openWalkin} className="action-secondary"><UserCheck size={18}/>เพิ่มรายชื่อหน้างาน</button>
        </div>
        {/* Camera Viewport */}
        <div className="relative flex min-h-[240px] sm:min-h-[320px] items-center justify-center overflow-hidden rounded-[24px] bg-slate-950">
@@ -999,7 +1034,7 @@ function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,sta
              <ScanLine size={32}/>
            </div>
            <b className="text-sm text-white">พร้อมสแกน QR Code</b>
-           <span className="mt-1 max-w-xs text-[10px] leading-5 text-slate-400">แตะ “เปิดกล้อง” แล้วให้นักศึกษาแสดง QR</span>
+           <span className="mt-1 max-w-xs text-[10px] leading-5 text-slate-400">แตะ “เปิดกล้องสแกน QR” แล้วให้นักศึกษาแสดง QR</span>
            <div className="pointer-events-none absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-[28px] border-2 border-amber-300/70"/>
          </div>}
          {scannerOn&&<div className="pointer-events-none absolute left-1/2 top-1/2 z-[2] h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-[28px] border-2 border-amber-300/80"/>}
@@ -1226,11 +1261,11 @@ function AdminView({sessionToken,store,academicCatalog,manageAcademicCatalog,sel
       <h1 className="text-2xl font-extrabold text-slate-900 sm:text-3xl">พื้นที่ผู้ดูแลระบบ</h1>
     </div>
     <div className="flex gap-2">
-      <button onClick={openStaff} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-[10px] font-bold text-slate-700 shadow-sm transition hover:border-[#7c0a02] hover:text-[#7c0a02]">
+      <button onClick={openStaff} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white min-h-11 px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:border-[#7c0a02] hover:text-[#7c0a02]">
         <Users size={14}/>
         เพิ่มผู้ใช้
       </button>
-      <button onClick={openCreate} className="flex items-center gap-2 rounded-full bg-gradient-to-r from-[#7c0a02] to-[#a31508] px-4 py-2.5 text-[10px] font-bold text-white shadow-md shadow-rose-900/20 transition hover:shadow-lg">
+      <button onClick={openCreate} className="flex items-center gap-2 rounded-full bg-gradient-to-r from-[#7c0a02] to-[#a31508] min-h-11 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-rose-900/20 transition hover:shadow-lg">
         <Plus size={14}/>
         สร้างกิจกรรมใหม่
       </button>
@@ -1331,9 +1366,9 @@ function AdminView({sessionToken,store,academicCatalog,manageAcademicCatalog,sel
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div>
               <label className="text-[10px] font-semibold text-slate-500">URL Redirect · รุ่นปี 1</label>
-              <div className="mt-1 flex gap-2">
+              <div className="mt-1 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
                 <input type="url" value={redirectDraft} onChange={e=>setRedirectDraft(e.target.value)} placeholder="https://..." className="h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 text-[10px]"/>
-                <button type="button" onClick={()=>void updateEvent({redirect_url_year1:redirectDraft})} className="shrink-0 rounded-lg bg-[#7c0a02] px-3 text-[9px] font-bold text-white shadow-sm hover:bg-[#620701]">บันทึก URL</button>
+                <button type="button" onClick={()=>void updateEvent({redirect_url_year1:redirectDraft})} className="action-primary"><Save size={16}/>บันทึกลิงก์</button>
               </div>
             </div>
             <label className="text-[10px] font-semibold text-slate-500">สถานะกิจกรรม
@@ -1348,14 +1383,14 @@ function AdminView({sessionToken,store,academicCatalog,manageAcademicCatalog,sel
             <label className="text-[10px] font-semibold text-slate-500">ภาพแบนเนอร์กิจกรรม
               <input type="url" value={bannerDraft} onChange={e=>setBannerDraft(e.target.value)} placeholder="วาง URL รูปภาพโดยตรง เช่น https://..." className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-[10px]"/>
             </label>
-            <button type="button" onClick={()=>void updateEvent({banner_url:bannerDraft})} className="self-end rounded-lg bg-[#7c0a02] px-4 py-3 text-[9px] font-bold text-white shadow-sm hover:bg-[#620701]">บันทึกแบนเนอร์</button>
+            <button type="button" onClick={()=>void updateEvent({banner_url:bannerDraft})} className="action-primary self-end"><Save size={16}/>บันทึกแบนเนอร์</button>
           </div>
           <div className="mt-4 flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-            <button onClick={deleteActivity} className="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-2 text-[9px] font-bold text-rose-700 hover:bg-rose-50 shadow-sm">
+            <button onClick={deleteActivity} className="action-danger">
               <Trash2 size={13}/>
               ลบกิจกรรมนี้
             </button>
-            <button onClick={openCodes} className="flex items-center gap-1.5 rounded-lg bg-amber-100 px-3 py-2 text-[9px] font-bold text-amber-900 shadow-sm hover:bg-amber-200">
+            <button onClick={openCodes} className="action-secondary">
               <Ticket size={13}/>
               เติม Passcode สำรอง
             </button>
@@ -1373,12 +1408,12 @@ function AdminView({sessionToken,store,academicCatalog,manageAcademicCatalog,sel
             </div>
             <FileUp size={17} className="text-slate-400"/>
           </div>
-          <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-[10px] text-slate-500 hover:border-amber-400 hover:bg-amber-50/50 transition">
+          <label className="mt-3 flex cursor-pointer focus-within:outline focus-within:outline-2 focus-within:outline-sky-700 items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-[10px] text-slate-500 hover:border-amber-400 hover:bg-amber-50/50 transition">
             <Download size={15}/>
-            {csvFile?csvFile.name:'คลิกเพื่อเลือกไฟล์ .csv'}
-            <input type="file" accept=".csv,text/csv" className="hidden" onChange={e=>setCsvFile(e.target.files?.[0]||null)}/>
+            {csvFile?csvFile.name:'เลือกไฟล์ CSV'}
+            <input type="file" accept=".csv,text/csv" className="sr-only" onChange={e=>setCsvFile(e.target.files?.[0]||null)}/>
           </label>
-          <button disabled={!csvFile} onClick={importCsv} className="mt-2 w-full rounded-xl bg-slate-900 py-2.5 text-[10px] font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:bg-slate-300">
+          <button disabled={!csvFile} onClick={importCsv} className="action-primary mt-2 w-full">
             นำเข้ารายชื่อและจับคู่ Passcode อัตโนมัติ
           </button>
         </div>
@@ -1404,7 +1439,7 @@ function AdminView({sessionToken,store,academicCatalog,manageAcademicCatalog,sel
             <div>
               <b className="text-xs text-slate-900">{remaining===0?'ต้องเติม Passcode':'พร้อมสำหรับ Walk-in'}</b>
               <p className="mt-1 max-w-[180px] text-[9px] leading-5 text-slate-500">โค้ดจะถูกจับคู่ด้วย database transaction ป้องกันการแจกซ้ำ</p>
-              <button onClick={openCodes} className="mt-3 rounded-lg bg-[#7c0a02] px-3 py-2 text-[9px] font-bold text-white shadow-sm hover:bg-[#620701]">เติมรหัสสำรอง</button>
+              <button onClick={openCodes} className="action-secondary">เติมรหัสสำรอง</button>
             </div>
           </div>
         </div>
@@ -1460,7 +1495,7 @@ function AdminView({sessionToken,store,academicCatalog,manageAcademicCatalog,sel
               <option value="ALL">ทุกหมู่เรียน</option>
               {reportClassGroups.map(group=><option key={group}>{group}</option>)}
             </select>
-            <button onClick={exportAttendance} className="flex items-center gap-1.5 rounded-lg bg-[#7c0a02] px-3.5 py-2 text-[10px] font-bold text-white shadow-sm hover:bg-[#620701]">
+            <button onClick={exportAttendance} className="action-secondary">
               <Download size={13}/>
               ส่งออก CSV
             </button>
@@ -1512,7 +1547,7 @@ function AdminView({sessionToken,store,academicCatalog,manageAcademicCatalog,sel
                   <td className="px-4 py-3 text-slate-600">{checkinStaff||'—'}</td>
                   <td className="px-4 py-3 text-slate-600 font-mono">{reg.checkout_at?new Date(reg.checkout_at).toLocaleString('th-TH'):'—'}</td>
                   <td className="px-4 py-3 text-slate-600">{checkoutStaff||'—'}</td>
-                  <td className="px-4 py-3"><button onClick={()=>deleteRegistration(reg.user_id)} title="ลบการลงทะเบียนกิจกรรม" aria-label="ลบการลงทะเบียนกิจกรรม" className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-700 transition"><Trash2 size={14}/></button></td>
+                  <td className="px-4 py-3"><button onClick={()=>deleteRegistration(reg.user_id)} title="ลบการลงทะเบียนกิจกรรม" aria-label="ลบการลงทะเบียนกิจกรรม" className="action-danger" ><Trash2 size={14}/></button></td>
                 </tr>;
               })}
               {selectedReportRows.length===0&&<tr><td colSpan={12} className="p-8 text-center text-xs text-slate-400">ไม่มีรายชื่อในหมวดนี้</td></tr>}
@@ -1556,7 +1591,7 @@ function AdminView({sessionToken,store,academicCatalog,manageAcademicCatalog,sel
                   <td className="px-4 py-3 text-slate-600">{p.class_group||'—'}</td>
                   <td className="px-4 py-3"><StatusPill status={reg.status}/></td>
                   <td className="px-4 py-3 font-mono text-slate-600 font-bold">{p.study_year>1?(assignedPasscode||'รอจ่ายรหัส'):'ไม่ใช้'}</td>
-                  <td className="px-4 py-3"><button onClick={()=>deleteRegistration(reg.user_id)} title="ลบการลงทะเบียนกิจกรรม" aria-label="ลบการลงทะเบียนกิจกรรม" className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-700 transition"><Trash2 size={14}/></button></td>
+                  <td className="px-4 py-3"><button onClick={()=>deleteRegistration(reg.user_id)} title="ลบการลงทะเบียนกิจกรรม" aria-label="ลบการลงทะเบียนกิจกรรม" className="action-danger" ><Trash2 size={14}/></button></td>
                 </tr>;
               })}
               {regs.length===0&&<tr><td colSpan={8} className="p-8 text-center text-xs text-slate-400">ยังไม่มีผู้ลงทะเบียน</td></tr>}
@@ -1611,10 +1646,10 @@ function AdminView({sessionToken,store,academicCatalog,manageAcademicCatalog,sel
             </small>
           </div>
           <div className="flex shrink-0 flex-col gap-1.5">
-            <button type="button" onClick={()=>editUser(account)} className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[9px] font-bold text-slate-700 hover:border-[#7c0a02] hover:text-[#7c0a02] hover:bg-white shadow-xs transition">
+            <button type="button" onClick={()=>editUser(account)} className="action-secondary">
               แก้ไข
             </button>
-            <button type="button" onClick={()=>deleteUser(account)} className="rounded-lg border border-rose-200 bg-rose-50/50 px-2.5 py-1.5 text-[9px] font-bold text-rose-700 hover:bg-rose-100 shadow-xs transition">
+            <button type="button" onClick={()=>deleteUser(account)} className="action-danger">
               ลบ
             </button>
           </div>
@@ -1636,7 +1671,7 @@ function AdminView({sessionToken,store,academicCatalog,manageAcademicCatalog,sel
       </div>
       <form onSubmit={e=>{e.preventDefault();const name=newFaculty.trim();if(name){void manageAcademicCatalog('ADD_FACULTY','',name,'','');setNewFaculty('');}}} className="flex gap-2 p-5 pb-3 bg-slate-50/50">
         <input value={newFaculty} onChange={e=>setNewFaculty(e.target.value)} maxLength={150} placeholder="พิมพ์ชื่อคณะใหม่ที่ต้องการเพิ่ม..." aria-label="ชื่อคณะใหม่" className="h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-medium shadow-xs"/>
-        <button className="flex shrink-0 items-center gap-1.5 rounded-xl bg-[#7c0a02] px-4 text-xs font-bold text-white shadow-sm hover:bg-[#620701] transition">
+        <button disabled={!newFaculty.trim()} className="action-primary shrink-0">
           <Plus size={15}/>
           เพิ่มคณะใหม่
         </button>
@@ -1645,28 +1680,28 @@ function AdminView({sessionToken,store,academicCatalog,manageAcademicCatalog,sel
         {academicCatalog.map(faculty=><article key={faculty.id} className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
           <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-3">
             <Building2 size={16} className="text-[#7c0a02]"/>
-            <input value={facultyDrafts[faculty.id]??faculty.name} onChange={e=>setFacultyDrafts(old=>({...old,[faculty.id]:e.target.value}))} maxLength={150} aria-label={`ชื่อคณะ ${faculty.name}`} className="h-10 min-w-[200px] flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-800"/>
-            <button type="button" onClick={()=>{const name=(facultyDrafts[faculty.id]??faculty.name).trim();if(name){void manageAcademicCatalog('UPDATE_FACULTY',faculty.id,name,'','');setFacultyDrafts(old=>({...old,[faculty.id]:name}));}}} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-bold text-slate-700 hover:border-amber-400 hover:bg-white transition">
-              บันทึกคณะ
+            <input value={facultyDrafts[faculty.id]??faculty.name} onChange={e=>setFacultyDrafts(old=>({...old,[faculty.id]:e.target.value}))} maxLength={150} aria-label={`ชื่อคณะ ${faculty.name}`} className="h-10 min-w-0 basis-full sm:basis-48 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-800"/>
+            <button type="button" onClick={()=>{const name=(facultyDrafts[faculty.id]??faculty.name).trim();if(name){void manageAcademicCatalog('UPDATE_FACULTY',faculty.id,name,'','');setFacultyDrafts(old=>({...old,[faculty.id]:name}));}}} disabled={!(facultyDrafts[faculty.id]||'').trim() || facultyDrafts[faculty.id].trim()===faculty.name} className="action-primary">
+              <Save size={16}/>บันทึกคณะ
             </button>
-            <button type="button" onClick={()=>saveCatalogItem('DELETE_FACULTY',faculty)} className="rounded-lg border border-rose-200 bg-rose-50/50 px-3 py-2 text-[10px] font-bold text-rose-700 hover:bg-rose-100 transition">
+            <button type="button" onClick={()=>saveCatalogItem('DELETE_FACULTY',faculty)} className="action-danger">
               ลบคณะ
             </button>
           </div>
           <div className="mt-3 space-y-2">
             {faculty.majors.map(major=><div key={major.id} className="flex flex-wrap items-center gap-2 pl-2 sm:pl-6">
               <span className="text-slate-300">↳</span>
-              <input value={majorDrafts[major.id]??major.name} onChange={e=>setMajorDrafts(old=>({...old,[major.id]:e.target.value}))} maxLength={150} aria-label={`ชื่อสาขา ${major.name}`} className="h-9 min-w-[180px] flex-1 rounded-lg border border-slate-200 bg-white px-3 text-[11px]"/>
-              <button type="button" onClick={()=>{const name=(majorDrafts[major.id]??major.name).trim();if(name){void manageAcademicCatalog('UPDATE_MAJOR',faculty.id,faculty.name,major.id,name);setMajorDrafts(old=>({...old,[major.id]:name}));}}} className="rounded-lg border border-slate-200 px-3 py-1.5 text-[9px] font-bold text-slate-600 hover:bg-slate-50">
-                บันทึก
+              <input value={majorDrafts[major.id]??major.name} onChange={e=>setMajorDrafts(old=>({...old,[major.id]:e.target.value}))} maxLength={150} aria-label={`ชื่อสาขา ${major.name}`} className="h-9 min-w-0 basis-full sm:basis-44 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-[11px]"/>
+              <button type="button" onClick={()=>{const name=(majorDrafts[major.id]??major.name).trim();if(name){void manageAcademicCatalog('UPDATE_MAJOR',faculty.id,faculty.name,major.id,name);setMajorDrafts(old=>({...old,[major.id]:name}));}}} disabled={!(majorDrafts[major.id]||'').trim() || majorDrafts[major.id].trim()===major.name} className="action-primary">
+                <Save size={16}/>บันทึกสาขา
               </button>
-              <button type="button" onClick={()=>saveCatalogItem('DELETE_MAJOR',faculty,'',major)} className="rounded-lg px-2.5 py-1.5 text-[9px] font-bold text-rose-600 hover:bg-rose-50">
+              <button type="button" onClick={()=>saveCatalogItem('DELETE_MAJOR',faculty,'',major)} className="action-danger">
                 ลบสาขา
               </button>
             </div>)}
             <form onSubmit={e=>{e.preventDefault();const name=(newMajor[faculty.id]||'').trim();if(name){void manageAcademicCatalog('ADD_MAJOR',faculty.id,faculty.name,'',name);setNewMajor(old=>({...old,[faculty.id]:''}));}}} className="flex flex-wrap gap-2 pl-2 sm:pl-6 pt-1">
-              <input value={newMajor[faculty.id]||''} onChange={e=>setNewMajor(old=>({...old,[faculty.id]:e.target.value}))} maxLength={150} placeholder={`+ เพิ่มสาขาใหม่ใน ${faculty.name}...`} aria-label={`เพิ่มสาขาใน${faculty.name}`} className="h-9 min-w-[180px] flex-1 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 text-[11px]"/>
-              <button className="flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-slate-800 transition">
+              <input value={newMajor[faculty.id]||''} onChange={e=>setNewMajor(old=>({...old,[faculty.id]:e.target.value}))} maxLength={150} placeholder={`+ เพิ่มสาขาใหม่ใน ${faculty.name}...`} aria-label={`เพิ่มสาขาใน${faculty.name}`} className="h-9 min-w-0 basis-full sm:basis-44 flex-1 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 text-[11px]"/>
+              <button disabled={!newMajor[faculty.id]?.trim()} className="action-primary">
                 <Plus size={12}/>
                 เพิ่มสาขา
               </button>

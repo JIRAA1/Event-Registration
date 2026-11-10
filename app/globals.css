@@ -70,3 +70,21 @@ input:focus,select:focus { border-color:#bda150!important; box-shadow:0 0 0 3px 
 @media (max-width: 639px) {
   input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px; }
 }
+
+@layer components {
+  .action-primary, .action-secondary, .action-danger {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700;
+  }
+  .action-primary {
+    @apply border-[#7c0a02] bg-[#7c0a02] text-white shadow-sm hover:bg-[#620701] active:bg-[#520500];
+  }
+  .action-secondary {
+    @apply border-slate-300 bg-white text-slate-800 hover:border-[#7c0a02] hover:text-[#7c0a02];
+  }
+  .action-danger {
+    @apply border-transparent bg-white text-rose-700 hover:border-rose-200 hover:bg-rose-50;
+  }
+  .action-primary:disabled {
+    @apply cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500 shadow-none;
+  }
+}
