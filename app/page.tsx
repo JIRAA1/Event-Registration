@@ -5,6 +5,8 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { StudentQr } from './student-qr';
 import { RegistrationAdmin, LoginHelp } from './register/registration-admin';
 import BrowserGate from './browser-gate';
+import {RosterUpload} from './register/roster-upload';
+import {readStudentFile} from '@/lib/student-file';
 import {OpenEvents} from './register/open-events';
 import {birthDateToInput} from '@/lib/birth-date';
 import {PasswordInput} from './password-input';
@@ -57,18 +59,6 @@ function genId():string {
 async function hashSessionToken(token:string):Promise<string>{
   const bytes=await globalThis.crypto.subtle.digest('SHA-256',new TextEncoder().encode(token));
   return Array.from(new Uint8Array(bytes),byte=>byte.toString(16).padStart(2,'0')).join('');
-}
-function parseCsvLine(line:string,delimiter=','):string[]{
-  const fields:string[]=[];let value='';let quoted=false;
-  for(let i=0;i<line.length;i++){
-    const char=line[i];
-    if(char==='"'&&quoted&&line[i+1]==='"'){value+='"';i++;}
-    else if(char==='"')quoted=!quoted;
-    else if(char===delimiter&&!quoted){fields.push(value.trim());value='';}
-    else value+=char;
-  }
-  fields.push(value.trim());
-  return fields;
 }
 function westernDigits(value:string){return value.replace(/[๐-๙]/g,d=>String(d.charCodeAt(0)-0x0e50));}
 function csvHeaderKey(value:string){return value.replace(/^\uFEFF/,'').trim().toLocaleLowerCase('th').replace(/[\s_-]+/g,'');}
@@ -459,11 +449,10 @@ function EventPass() {
   async function importCsv(roster=false){
     if(!csvFile)return;
     if(roster && !isSupabaseConfigured){setToast('กรุณาเชื่อมต่อฐานข้อมูลก่อนสร้างบัญชีนักศึกษา');return;}
-    const csvText=(await csvFile.text()).replace(/^\uFEFF/,'');
-    const lines=csvText.split(/\r?\n/).filter(line=>line.trim());
-    if(lines.length<2){setToast('ไฟล์ CSV ต้องมีหัวตารางและข้อมูลนักศึกษาอย่างน้อย 1 แถว');return;}
-    const delimiter=(lines[0].split(';').length>lines[0].split(',').length)?';':',';
-    const headers=parseCsvLine(lines[0],delimiter).map(csvHeaderKey);
+    let fileRows:string[][];
+    try{fileRows=await readStudentFile(csvFile);}catch(error){setToast(error instanceof Error?error.message:'อ่านไฟล์ไม่สำเร็จ');return;}
+    if(fileRows.length<2){setToast('ไฟล์ต้องมีหัวตารางและข้อมูลนักศึกษาอย่างน้อย 1 แถว');return;}
+    const headers=fileRows[0].map(csvHeaderKey);
     const headerAliases:Record<string,string[]>={
       student_id:['student_id','รหัสนักศึกษา','รหัสประจำตัวนักศึกษา'],
       full_name:['full_name','ชื่อ-นามสกุล','ชื่อสกุล','ชื่อและนามสกุล'],
@@ -482,8 +471,7 @@ function EventPass() {
     if(missing.length){setToast(`ไม่พบหัวตาราง: ${missing.join(', ')} · รองรับชื่อคอลัมน์ภาษาไทยหรืออังกฤษ`);return;}
     const readField=(row:string[],key:string)=>indexes[key]>=0?(row[indexes[key]]||'').trim():'';
     const currentBuddhistYear=new Date().getFullYear()+543;
-    const students=lines.slice(1).map((line,index)=>{
-      const row=parseCsvLine(line,delimiter);
+    const students=fileRows.slice(1).map((row,index)=>{
       const student_id=westernDigits(readField(row,'student_id'));
       const full_name=readField(row,'full_name') || readField(row,'prefix')+readField(row,'first_name')+' '+readField(row,'last_name');
       const faculty=readField(row,'faculty');
@@ -502,7 +490,7 @@ function EventPass() {
       }
       return {student_id,full_name,faculty,major,class_group,enrollment_year,study_year,birth_date,phone};
     }).filter((student):student is NonNullable<typeof student>=>student!==null);
-    if(students.length!==lines.length-1)return;
+    if(students.length!==fileRows.length-1)return;
     if(isSupabaseConfigured&&supabase&&user?.role==='ADMIN'){
       if(!sessionToken){setToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบแอดมินใหม่');return;}
       const {data,error}=roster
@@ -1695,14 +1683,7 @@ function AdminView({deleteBatch,sessionToken,store,academicCatalog,manageAcademi
     </div>
   )}
 
-  {(adminTab==='all' || adminTab==='users') && <section className="bento space-y-3 p-5">
-    <h2 className="font-bold">นำเข้าทะเบียนนักศึกษาเพื่อสร้างบัญชี</h2>
-    <p className="text-sm text-slate-600">นำเข้า CSV UTF-8 จากทะเบียนนักศึกษา แล้วใช้รหัสนักศึกษาและวันเกิด พ.ศ. 8 หลักเข้าสู่ระบบเพื่อเลือกกิจกรรมได้</p>
-    <p className="text-sm text-slate-600">รองรับคำนำหน้าไทย ชื่อไทย นามสกุลไทย และวันเกิด เช่น 18/11/2550 · เบอร์โทรเว้นว่างได้ · รหัสนักศึกษาที่มีบัญชีแล้วจะถูกข้าม</p>
-    <input type="file" accept=".csv,text/csv" aria-label="ไฟล์ทะเบียนนักศึกษา CSV" onChange={event=>setCsvFile(event.target.files?.[0]||null)} className="block w-full text-sm"/>
-    {csvFile && <p className="break-all text-sm">ไฟล์ที่เลือก {csvFile.name}</p>}
-    <button className="action-primary" disabled={!csvFile} onClick={()=>importCsv(true)}><FileUp size={18}/>นำเข้าและสร้างบัญชีนักศึกษา</button>
-  </section>}
+  {(adminTab==='all' || adminTab==='users') && <RosterUpload file={csvFile} setFile={setCsvFile} submit={()=>importCsv(true)}/>}
   {/* TAB 4: User Accounts Management */}
   {(adminTab === 'all' || adminTab === 'users') && (
     <section className="bento overflow-hidden shadow-sm">
