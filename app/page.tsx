@@ -353,6 +353,12 @@ function EventPass() {
   async function createEvent(ev:React.FormEvent<HTMLFormElement>){ev.preventDefault();const f=new FormData(ev.currentTarget);let event:Event={id:genId(),title:String(f.get('title')).trim(),location:String(f.get('location')).trim(),activity_hours:Number(f.get('hours')),status:'ACTIVE',redirect_url_year1:String(f.get('redirect')||''),scan_mode:'CHECKIN',banner_url:String(f.get('banner_url')||'').trim()};if(isSupabaseConfigured&&supabase&&user?.role==='ADMIN'){if(!sessionToken){setToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบแอดมินใหม่');return;}const {data,error}=await supabase.rpc('admin_create_event',{p_admin_token:sessionToken,p_title:event.title,p_location:event.location,p_activity_hours:event.activity_hours,p_redirect_url_year1:event.redirect_url_year1||null});if(error||!data?.success){setToast(data?.message||error?.message||'สร้างกิจกรรมไม่สำเร็จ');return;}event={...data.event as Event,banner_url:event.banner_url};if(event.banner_url){const saved=await supabase.rpc('admin_update_event_banner',{p_admin_token:sessionToken,p_event_id:event.id,p_banner_url:event.banner_url});if(saved.error||!saved.data?.success)setToast(saved.data?.message||saved.error?.message||'สร้างกิจกรรมแล้ว แต่บันทึกภาพแบนเนอร์ไม่สำเร็จ');}}save({...store,events:[event,...store.events]});setSelectedEvent(event.id);setActiveEvent(event.id);setModal(null);if(!event.banner_url)setToast('สร้างกิจกรรมใหม่แล้ว');}
   async function updateSelectedEvent(patch:Partial<Event>){
     const updated={...selected,...patch};
+    const detailsChanged=patch.title!==undefined||patch.location!==undefined||patch.activity_hours!==undefined||patch.status!==undefined;
+    if(detailsChanged&&isSupabaseConfigured&&supabase&&/^[0-9a-f-]{36}$/i.test(selected.id)){
+      if(!sessionToken){setToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบแอดมินใหม่');return;}
+      const {data,error}=await supabase.rpc('admin_update_event_details',{p_admin_token:sessionToken,p_event_id:selected.id,p_title:patch.title??null,p_location:patch.location??null,p_activity_hours:patch.activity_hours??null,p_status:patch.status??null});
+      if(error||!data?.success){setToast(data?.message||error?.message||'บันทึกข้อมูลกิจกรรมไม่สำเร็จ');return;}
+    }
     if(patch.redirect_url_year1!==undefined&&isSupabaseConfigured&&supabase&&/^[0-9a-f-]{36}$/i.test(selected.id)){
       if(!sessionToken){setToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบแอดมินใหม่');return;}
       const {data,error}=await supabase.rpc('admin_update_event_redirect',{p_admin_token:sessionToken,p_event_id:selected.id,p_redirect_url_year1:updated.redirect_url_year1||null});
@@ -366,6 +372,7 @@ function EventPass() {
     save({...store,events:store.events.map(e=>e.id===selected.id?updated:e)});
     if(patch.redirect_url_year1!==undefined)setToast('บันทึก URL สำหรับนักศึกษาปี 1 แล้ว');
     if(patch.banner_url!==undefined)setToast('บันทึกภาพแบนเนอร์แล้ว');
+    if(detailsChanged)setToast('บันทึกข้อมูลกิจกรรมแล้ว');
   }
   async function deleteActivity(){if(!selected)return;if(store.events.length<=1){setToast('ต้องมีอย่างน้อยหนึ่งกิจกรรมในระบบ');return;}if(!window.confirm(`ยืนยันลบกิจกรรม “${selected.title}” และรายชื่อที่ผูกอยู่ทั้งหมดหรือไม่?`))return;if(isSupabaseConfigured&&supabase&&/^[0-9a-f-]{36}$/i.test(selectedEvent)){if(!sessionToken){setToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบแอดมินใหม่');return;}const {data,error}=await supabase.rpc('admin_delete_event',{p_admin_token:sessionToken,p_event_id:selectedEvent});if(error||!data?.success){setToast(data?.message||error?.message||'ลบกิจกรรมไม่สำเร็จ');return;}}const events=store.events.filter(e=>e.id!==selectedEvent),next=events[0];save({...store,events,regs:store.regs.filter(r=>r.event_id!==selectedEvent),codes:store.codes.filter(c=>c.event_id!==selectedEvent)});setSelectedEvent(next.id);setActiveEvent(next.id);setToast('ลบกิจกรรมแล้ว');}
   async function deleteRegistration(userId:string){
@@ -802,7 +809,7 @@ function NavButton({
     </button>
   );
 }
-function Field({label,...props}:{label:string;name:string;id?:string;type?:string;required?:boolean;placeholder?:string;defaultValue?:string|number;min?:string|number;max?:string|number;minLength?:number;autoComplete?:string;enterKeyHint?:"go"|"next"}){const Input=props.type==='password'?PasswordInput:'input';return <label className="block text-[11px] font-semibold text-slate-600">{label}<Input {...props} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 placeholder:text-slate-300"/></label>}
+function Field({label,...props}:{label:string;name:string;id?:string;type?:string;required?:boolean;placeholder?:string;defaultValue?:string|number;min?:string|number;max?:string|number;minLength?:number;maxLength?:number;step?:string|number;autoComplete?:string;enterKeyHint?:"go"|"next"}){const Input=props.type==='password'?PasswordInput:'input';return <label className="block text-[11px] font-semibold text-slate-600">{label}<Input {...props} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 placeholder:text-slate-300"/></label>}
 function Modal({title,subtitle,close,children,submitLabel,submitDisabled=false,wide=false}:{
   title:string;subtitle:string;close:()=>void;children:React.ReactNode;submitLabel?:string;submitDisabled?:boolean;wide?:boolean;
 }){
@@ -1541,6 +1548,18 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
             </div>
             <span className="rounded-xl bg-rose-50 p-2 text-[#7c0a02]"><BookOpen size={18}/></span>
           </div>
+          <form key={selectedEventId} className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4" onSubmit={e=>{
+            e.preventDefault();const form=new FormData(e.currentTarget);
+            const title=String(form.get('title')||'').trim(),location=String(form.get('location')||'').trim();
+            if(!title||!location)return;
+            void updateEvent({title,location,activity_hours:Number(form.get('hours'))});
+          }}>
+            <h4 className="text-sm font-bold text-slate-800">แก้ไขข้อมูลกิจกรรม</h4>
+            <Field label="ชื่อกิจกรรม" name="title" required maxLength={255} defaultValue={selectedEvent.title}/>
+            <Field label="สถานที่จัดกิจกรรม" name="location" required maxLength={255} defaultValue={selectedEvent.location||''} placeholder="เช่น หอประชุมมหาวิทยาลัย"/>
+            <Field label="ชั่วโมงกิจกรรม" name="hours" type="number" required min="1" max="2147483647" step="1" defaultValue={String(selectedEvent.activity_hours)}/>
+            <button type="submit" className="action-primary w-full"><Save size={16}/>บันทึกข้อมูลกิจกรรม</button>
+          </form>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div>
               <label className="text-[10px] font-semibold text-slate-500">URL Redirect · รุ่นปี 1</label>
