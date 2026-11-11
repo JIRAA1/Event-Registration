@@ -6,7 +6,7 @@ import {readStudentFile} from '@/lib/student-file';
 const columns=['ชั้นปี','คณะ','สาขาวิชา','รุ่น','หมู่','รหัสนักศึกษา','คำนำหน้าไทย','ชื่อไทย','นามสกุลไทย','วันเกิด'];
 const example=['1','คณะครุศาสตร์','คอมพิวเตอร์ศึกษา','2569','1','16915039','นาย','ตัวอย่าง','นักศึกษา','18/11/2550'];
 
-export function RosterUpload({file,setFile,submit}:{file:File|null;setFile:(file:File|null)=>void;submit:()=>void}){
+export function RosterUpload({file,setFile,submit,importError}:{importError?:string;file:File|null;setFile:(file:File|null)=>void;submit:()=>void}){
   const input=useRef<HTMLInputElement>(null);
   const request=useRef(0);
   const [preview,setPreview]=useState<{file:File;rows:string[][]}|null>(null);
@@ -50,6 +50,7 @@ export function RosterUpload({file,setFile,submit}:{file:File|null;setFile:(file
           onChange={event=>{void choose(event.target.files?.[0]||null);event.target.value='';}}/>
         <button type="button" className="action-primary" onClick={()=>input.current?.click()}>เลือกไฟล์จากเครื่อง</button>
       </div>
+      {importError && <p role="alert" className="break-words rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">นำเข้าไม่สำเร็จ · {importError}</p>}
       {loading && <p role="status">กำลังอ่านไฟล์และเตรียมตัวอย่าง…</p>}
       {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
       {ready && <div className="space-y-3">
