@@ -31,7 +31,7 @@ begin
   roster:=jsonb_build_array(roster->0 || '{"student_id":"16815039","study_year":2}');
   perform admin_import_student_roster(token,roster);
   result:=login_student('16815039','18112550');
-  assert registration_join(qa_event,result->>'session_token')->>'pending'='true';
+  assert registration_join(qa_event,result->>'session_token')->>'already'='false';
   begin
     perform admin_import_student_roster(student_token,roster);
     raise exception 'student imported accounts' using errcode='23505';

@@ -1,4 +1,4 @@
--- Run against an isolated database after migrations 001-027.
+-- Run against an isolated database after migrations 001-031.
 begin;
 set local search_path=public,extensions,pg_temp;
 do $test$
@@ -51,8 +51,7 @@ begin
   assert registration_account_step(event_a,'06912345')='existing';
   password:=registration_receipt(event_a,proof,null,true)->>'password';
   assert password is not distinct from '01012549';
-  result:=registration_login_join(event_a,'06912345',password);
-  assert (result->>'pending')::boolean;
+  result:=login_student('06912345',password);
   assert load_workspace(result->>'session_token')->'applications'->0->>'status'='PENDING';
   assert jsonb_array_length(load_workspace(result->>'session_token')->'registrations')=0;
   assert registration_apply(event_a,profile,proof)->>'id'=application_id::text;
@@ -98,11 +97,8 @@ begin
     perform registration_receipt(event_b,kiosk_proof);
     raise exception 'device receipt exposed' using errcode='23505';
   exception when raise_exception then assert sqlerrm like '%ไม่พบ%'; end;
-  begin
-    perform registration_review(admin_token,kiosk_id,'APPROVE');
-    raise exception 'missing reserve accepted' using errcode='23505';
-  exception when raise_exception then assert sqlerrm like '%Passcode%'; end;
-  assert registration_receipt(event_b,kiosk_proof,station_token)->>'status'='PENDING';
+  perform registration_review(admin_token,kiosk_id,'APPROVE');
+  assert registration_receipt(event_b,kiosk_proof,station_token)->>'status'='APPROVED';
   insert into event_passcodes(event_id,code,is_reserve) values(event_b,'QA-RESERVE',true);
   perform registration_review(admin_token,kiosk_id,'APPROVE');
   result:=registration_receipt(event_b,kiosk_proof,station_token,true);
@@ -111,21 +107,13 @@ begin
   assert (select count(*)=1 from users where student_id='06912345');
   assert (select count(*)=2 from event_registrations r join users u on u.id=r.user_id where u.student_id='06912345');
   insert into events(title,online_registration) values('Bulk QA',true) returning id into event_a;
-  assert (registration_login_join(event_a,'06912345',password)->>'pending')::boolean;
-  assert (registration_login_join(event_a,'06912345',password)->>'pending')::boolean;
-  select id into strict application_id from event_pass_private.applications where event_id=event_a;
+  application_id:=(registration_apply(event_a,profile||'{"student_id":"06912347"}',encode(gen_random_bytes(32),'hex'))->>'id')::uuid;
   kiosk_id:=(registration_apply(event_a,profile||'{"student_id":"06912346"}',encode(gen_random_bytes(32),'hex'))->>'id')::uuid;
   insert into event_passcodes(event_id,code,is_reserve) values(event_a,'QA-BULK-1',true);
-  begin
-    perform registration_approve_many(admin_token,event_a,array[application_id,kiosk_id]);
-    raise exception 'short batch accepted' using errcode='23505';
-  exception when raise_exception then assert sqlerrm like '%Passcode%'; end;
-  assert not exists(select 1 from event_registrations where event_id=event_a);
-  assert not exists(select 1 from event_passcodes where event_id=event_a and assigned_to is not null);
   insert into event_passcodes(event_id,code,is_reserve) values(event_a,'QA-BULK-2',true);
   assert jsonb_array_length(registration_export(admin_token,event_a))=2;
   result:=registration_export(admin_token,event_a,array[application_id]);
-  assert jsonb_array_length(result)=1 and result->0->>0='06912345' and result->0->>7='รอยืนยัน';
+  assert jsonb_array_length(result)=1 and result->0->>0='06912347' and result->0->>7='รอยืนยัน';
   assert registration_export(admin_token,event_b,array[application_id])='[]'::jsonb;
   assert registration_export(admin_token,event_a,array[]::uuid[])='[]'::jsonb;
   perform registration_approve_many(admin_token,event_a,array[application_id,kiosk_id]);

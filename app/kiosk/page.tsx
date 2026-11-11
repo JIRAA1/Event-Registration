@@ -3,7 +3,7 @@ import {useEffect,useState} from 'react';
 import {PasswordInput} from '../password-input';
 import {LoginHelp} from '../register/registration-admin';
 import BrowserGate from '../browser-gate';
-import {RegistrationForm} from '../register/registration-form';
+import {KioskCheckin} from './checkin';
 import {RegistrationFrame} from '../register/registration-frame';
 import {signupRpc,errorText,type Station} from '@/lib/event-registration';
 
@@ -39,7 +39,7 @@ function StationLogin(){
     for(const key of Object.keys(sessionStorage))if(key.startsWith('aru-signup:')&&key.includes(':station:'))sessionStorage.removeItem(key);
     sessionStorage.removeItem('aru-station');setStation(undefined);
   }
-  if(station)return <RegistrationForm station={station.token} eventId={station.event} onExit={()=>void exit()}/>;
+  if(station)return <KioskCheckin key={station.token} station={station} onExit={()=>void exit()}/>;
   return <RegistrationFrame kiosk title="เปิดเครื่องลงทะเบียน"><form className="space-y-4"
     onSubmit={e=>{e.preventDefault();if(!busy)void login(e.currentTarget);}}>
     <h2 className="text-xl font-bold">เข้าสู่ระบบด้วยบัญชีเครื่อง</h2>
