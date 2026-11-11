@@ -5,6 +5,8 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { StudentQr } from './student-qr';
 import { RegistrationAdmin, LoginHelp } from './register/registration-admin';
 import BrowserGate from './browser-gate';
+import {OpenEvents} from './register/open-events';
+import {birthDateToInput} from '@/lib/birth-date';
 import {PasswordInput} from './password-input';
 import {BirthDateField} from './birth-date-field';
 import { Camera, CameraOff, Save, Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Clipboard, Clock3, Download, ExternalLink, Eye, FileSpreadsheet, FileUp, Filter, Gauge, GraduationCap, Layers, LayoutDashboard, Loader2, Lock, LogOut, MapPin, Menu, Phone, Plus, QrCode, RefreshCw, ScanLine, Search, Settings2, ShieldCheck, Sparkles, Ticket, Trash2, Unlock, UserCheck, Users, UserX, X, Zap } from 'lucide-react';
@@ -454,8 +456,9 @@ function EventPass() {
     }
     setToast('อัปเดตรายการคณะและสาขาแล้ว');
   }
-  async function importCsv(){
+  async function importCsv(roster=false){
     if(!csvFile)return;
+    if(roster && !isSupabaseConfigured){setToast('กรุณาเชื่อมต่อฐานข้อมูลก่อนสร้างบัญชีนักศึกษา');return;}
     const csvText=(await csvFile.text()).replace(/^\uFEFF/,'');
     const lines=csvText.split(/\r?\n/).filter(line=>line.trim());
     if(lines.length<2){setToast('ไฟล์ CSV ต้องมีหัวตารางและข้อมูลนักศึกษาอย่างน้อย 1 แถว');return;}
@@ -464,15 +467,17 @@ function EventPass() {
     const headerAliases:Record<string,string[]>={
       student_id:['student_id','รหัสนักศึกษา','รหัสประจำตัวนักศึกษา'],
       full_name:['full_name','ชื่อ-นามสกุล','ชื่อสกุล','ชื่อและนามสกุล'],
+      prefix:['คำนำหน้าไทย'],first_name:['ชื่อไทย'],last_name:['นามสกุลไทย'],enrollment_year:['รุ่น','enrollment_year'],
       faculty:['faculty','คณะ'],
       major:['major','สาขา','สาขาวิชา'],
-      class_group:['class_group','หมู่เรียน','กลุ่มเรียน'],
+      class_group:['class_group','หมู่เรียน','กลุ่มเรียน','หมู่'],
       study_year:['study_year','ชั้นปี','ชั้นปีปัจจุบัน','ชั้นปีที่กำลังศึกษา','ระดับชั้นปี','ระดับชั้นปีปัจจุบัน','ปีที่กำลังศึกษา'],
       birth_date:['birth_date','วันเกิด','วันเดือนปีเกิด'],
       phone:['phone','เบอร์โทร','เบอร์โทรศัพท์','โทรศัพท์','โทรศัพท์มือถือ'],
     };
     const indexes=Object.fromEntries(Object.entries(headerAliases).map(([key,aliases])=>[key,headers.findIndex(header=>aliases.some(alias=>csvHeaderKey(alias)===header))])) as Record<string,number>;
-    const missing=['student_id','full_name','faculty','major','class_group','birth_date','phone'].filter(key=>indexes[key]<0);
+    const missing=['student_id','faculty','major','class_group','birth_date'].filter(key=>indexes[key]<0);
+    if(indexes.full_name<0 && (indexes.first_name<0 || indexes.last_name<0))missing.push('ชื่อไทย / นามสกุลไทย หรือชื่อ-นามสกุล');
     if(indexes.study_year<0)missing.push('study_year / ชั้นปีที่กำลังศึกษา');
     if(missing.length){setToast(`ไม่พบหัวตาราง: ${missing.join(', ')} · รองรับชื่อคอลัมน์ภาษาไทยหรืออังกฤษ`);return;}
     const readField=(row:string[],key:string)=>indexes[key]>=0?(row[indexes[key]]||'').trim():'';
@@ -480,17 +485,18 @@ function EventPass() {
     const students=lines.slice(1).map((line,index)=>{
       const row=parseCsvLine(line,delimiter);
       const student_id=westernDigits(readField(row,'student_id'));
-      const full_name=readField(row,'full_name');
+      const full_name=readField(row,'full_name') || readField(row,'prefix')+readField(row,'first_name')+' '+readField(row,'last_name');
       const faculty=readField(row,'faculty');
       const major=readField(row,'major');
       const class_group=readField(row,'class_group');
       const rawStudyYear=westernDigits(readField(row,'study_year')).replace(/\D/g,'');
       const suppliedStudyYear=Number(rawStudyYear)||0;
       const study_year=suppliedStudyYear;
-      const enrollment_year=study_year>0?currentBuddhistYear-study_year+1:0;
-      const birth_date=westernDigits(readField(row,'birth_date')).replace(/\D/g,'');
+      const enrollment_year=Number(westernDigits(readField(row,'enrollment_year'))) || (study_year>0?currentBuddhistYear-study_year+1:0);
+      const birthParts=westernDigits(readField(row,'birth_date')).split('/');
+      const birth_date=birthParts.length===3?birthParts[0].padStart(2,'0')+birthParts[1].padStart(2,'0')+birthParts[2]:westernDigits(readField(row,'birth_date')).replace(/\D/g,'');
       const phone=westernDigits(readField(row,'phone'));
-      if(!student_id||!full_name||!birth_date||birth_date.length!==8||study_year<1||study_year>8){
+      if(!student_id||!full_name||!birthDateToInput(birth_date)||study_year<1||study_year>8){
         setToast(`ข้อมูลแถวที่ ${index+2} ไม่ครบหรือไม่ถูกต้อง · ตรวจรหัส ชื่อ ชั้นปี และวันเกิด 8 หลัก`);
         return null;
       }
@@ -499,12 +505,14 @@ function EventPass() {
     if(students.length!==lines.length-1)return;
     if(isSupabaseConfigured&&supabase&&user?.role==='ADMIN'){
       if(!sessionToken){setToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบแอดมินใหม่');return;}
-      const {data,error}=await supabase.rpc('admin_import_event_students',{p_admin_token:sessionToken,p_event_id:selectedEvent,p_students:students});
+      const {data,error}=roster
+        ? await supabase.rpc('admin_import_student_roster',{p_admin_token:sessionToken,p_students:students})
+        : await supabase.rpc('admin_import_event_students',{p_admin_token:sessionToken,p_event_id:selectedEvent,p_students:students});
       if(error||!data?.success){setToast(data?.message||error?.message||'นำเข้ารายชื่อไม่สำเร็จ');return;}
       const loaded=await supabase.rpc('load_workspace',{p_session_token:sessionToken});
       if(!loaded.error&&loaded.data?.success)setStore(workspaceStore(loaded.data));
       setCsvFile(null);
-      setToast(`นำเข้า ${data.imported_count||0} คน · ข้าม ${data.skipped_count||0} คน · จับคู่ Passcode อัตโนมัติ ${data.passcodes_assigned_count||0} รายการ`);
+      setToast(roster?`สร้างบัญชี ${data.imported_count||0} คน · ข้ามบัญชีที่มีอยู่ ${data.skipped_count||0} คน`:`นำเข้า ${data.imported_count||0} คน · ข้าม ${data.skipped_count||0} คน · จับคู่ Passcode อัตโนมัติ ${data.passcodes_assigned_count||0} รายการ`);
       return;
     }
     let imported=0,skipped=0;const people=[...store.users],regs=[...store.regs],codes=[...store.codes];
@@ -686,7 +694,7 @@ function EventPass() {
     )}
 
     <div key={view} className="page-transition mx-auto mt-6 max-w-[1440px]">
-      {!user?<Landing loginError={loginError} enterAs={()=>void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…',enterAs)} saving={saving||Boolean(loadingMessage)}/>:view==='scanner'&&user.role!=='STUDENT'?<ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={()=>setScannerLocked(value=>!value)} startScanner={()=>void withLoading('กำลังเปิดกล้อง…',startScanner)} stopScanner={()=>void withLoading('กำลังปิดกล้อง…',stopScanner)} scanMode={()=>void withLoading('กำลังเปลี่ยนโหมดสแกน…',setScanMode)} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async(raw:string)=>{await withLoading('กำลังตรวจสอบ QR…',()=>scanPayload(raw));}} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={()=>setModal('walkin')}/>:view==='admin'&&user.role==='ADMIN'?<AdminView deleteBatch={(kind,values)=>withLoading('กำลังลบรายการ…',()=>deleteBatch(kind,values))} sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args)=>withLoading('กำลังบันทึกคณะและสาขา…',()=>manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={()=>setModal('event')} openCodes={()=>setModal('codes')} openStaff={()=>setModal('staff')} editUser={(target:User)=>{setEditingUser(target);setEditingFaculty(target.faculty);setEditingMajor(target.major);setModal('editUser')}} deleteUser={(target:User)=>void withLoading('กำลังลบบัญชีผู้ใช้…',()=>deleteManagedUser(target))} deleteActivity={()=>void withLoading('กำลังลบกิจกรรม…',deleteActivity)} deleteRegistration={(id:string)=>void withLoading('กำลังนำรายชื่อออก…',()=>deleteRegistration(id))} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={()=>void withLoading('กำลังนำเข้ารายชื่อ…',importCsv)} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch:Partial<Event>)=>withLoading('กำลังบันทึกการเปลี่ยนแปลง…',()=>updateSelectedEvent(patch))} />:view==='studentStats'&&user.role==='STUDENT'?<StudentStatsView user={user} events={store.events.filter(e=>studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs}/>:view==='event'&&user.role==='STUDENT'?<EventDetail session={sessionToken} event={store.events.find(e=>e.id===activeEvent)||currentEvent} user={user} registration={studentRegs.find(r=>r.event_id===activeEvent)} back={()=>setView('home')}/>:<StudentHome user={user} events={store.events.filter(e=>e.status==='ACTIVE'&&studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs} select={(id:string)=>{setActiveEvent(id);setView('event')}} store={store}/>}
+      {!user?<Landing loginError={loginError} enterAs={()=>void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…',enterAs)} saving={saving||Boolean(loadingMessage)}/>:view==='scanner'&&user.role!=='STUDENT'?<ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={()=>setScannerLocked(value=>!value)} startScanner={()=>void withLoading('กำลังเปิดกล้อง…',startScanner)} stopScanner={()=>void withLoading('กำลังปิดกล้อง…',stopScanner)} scanMode={()=>void withLoading('กำลังเปลี่ยนโหมดสแกน…',setScanMode)} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async(raw:string)=>{await withLoading('กำลังตรวจสอบ QR…',()=>scanPayload(raw));}} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={()=>setModal('walkin')}/>:view==='admin'&&user.role==='ADMIN'?<AdminView deleteBatch={(kind,values)=>withLoading('กำลังลบรายการ…',()=>deleteBatch(kind,values))} sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args)=>withLoading('กำลังบันทึกคณะและสาขา…',()=>manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={()=>setModal('event')} openCodes={()=>setModal('codes')} openStaff={()=>setModal('staff')} editUser={(target:User)=>{setEditingUser(target);setEditingFaculty(target.faculty);setEditingMajor(target.major);setModal('editUser')}} deleteUser={(target:User)=>void withLoading('กำลังลบบัญชีผู้ใช้…',()=>deleteManagedUser(target))} deleteActivity={()=>void withLoading('กำลังลบกิจกรรม…',deleteActivity)} deleteRegistration={(id:string)=>void withLoading('กำลังนำรายชื่อออก…',()=>deleteRegistration(id))} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={roster=>void withLoading('กำลังนำเข้ารายชื่อ…',()=>importCsv(roster))} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch:Partial<Event>)=>withLoading('กำลังบันทึกการเปลี่ยนแปลง…',()=>updateSelectedEvent(patch))} />:view==='studentStats'&&user.role==='STUDENT'?<StudentStatsView user={user} events={store.events.filter(e=>studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs}/>:view==='event'&&user.role==='STUDENT'?<EventDetail session={sessionToken} event={store.events.find(e=>e.id===activeEvent)||currentEvent} user={user} registration={studentRegs.find(r=>r.event_id===activeEvent)} back={()=>setView('home')}/>:<StudentHome session={sessionToken} refresh={refreshWorkspace} user={user} events={store.events.filter(e=>e.status==='ACTIVE'&&studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs} select={(id:string)=>{setActiveEvent(id);setView('event')}} store={store}/>}
     </div>
     {user&&<div className="mx-auto mt-10 flex max-w-[1440px] items-center justify-between border-t border-slate-200/70 px-2 py-4 text-[10px] text-slate-500"><span>© 2026 ARU Student Organization · ระบบลงทะเบียนกิจกรรม</span><span className="hidden items-center gap-1 sm:flex"><ShieldCheck size={12}/>ข้อมูลกิจกรรมอัปเดตแบบเรียลไทม์</span></div>}
     {modal==='walkin'&&<Modal submitLabel="บันทึกรายชื่อหน้างาน" submitDisabled={walkinStudyYear>1&&reserveLeft===0} title="ลงทะเบียนหน้างาน" subtitle="เพิ่มนักศึกษาและผูกสิทธิ์กิจกรรม" close={()=>setModal(null)}><form id="staff-admin-form" onSubmit={e=>void withLoading('กำลังบันทึกรายชื่อ…',()=>addWalkin(e))} className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><Field label="รหัสนักศึกษา" name="student_id" required placeholder="เช่น 69123456"/><label className="text-sm">คำนำหน้า<select name="prefix" required defaultValue="" className="mt-1 block h-11 w-full rounded-xl border px-3"><option value="">เลือกคำนำหน้า</option><option>นาย</option><option>นางสาว</option></select></label><Field label="ชื่อ–นามสกุล" name="full_name" required placeholder="ชื่อ นามสกุล"/><label className="block text-[11px] font-semibold text-slate-600">คณะ<select name="faculty" value={walkinFaculty} required onChange={e=>{setWalkinFaculty(e.target.value);setWalkinMajor('')}} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800"><option value="">เลือกคณะ</option>{academicCatalog.map(faculty=><option key={faculty.id} value={faculty.name}>{faculty.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">สาขาวิชา<select name="major" value={walkinMajor} required disabled={!walkinFaculty} onChange={e=>setWalkinMajor(e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 disabled:opacity-50"><option value="">เลือกสาขา</option>{(academicCatalog.find(faculty=>faculty.name===walkinFaculty)?.majors||[]).map(major=><option key={major.id} value={major.name}>{major.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">ชั้นปีที่กำลังศึกษา<select name="study_year" value={walkinStudyYear} onChange={e=>setWalkinStudyYear(Number(e.target.value))} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{Array.from({length:8},(_,i)=>i+1).map(year=><option key={year} value={year}>ปี {year}</option>)}</select></label><label className="text-sm">หมู่เรียน<select name="class_group" required defaultValue="" className="mt-1 block h-11 w-full rounded-xl border px-3"><option value="">เลือกหมู่เรียน</option>{[1,2,3,4].map(n=><option key={n}>{n}</option>)}</select></label><BirthDateField/><Field label="เบอร์โทรศัพท์" name="phone" placeholder="08X-XXX-XXXX"/></div><div className={cx('flex items-center justify-between rounded-2xl px-4 py-3 text-xs',reserveLeft?'bg-amber-50 text-amber-900':'bg-rose-50 text-rose-700')}><span className="flex items-center gap-2"><Ticket size={15}/>Passcode สำรองคงเหลือ</span><b>{reserveLeft} รหัส</b></div><p className="text-center text-[10px] leading-5 text-slate-400">นักศึกษาชั้นปี 2 ขึ้นไปจะได้รับ Passcode หลังเช็กเอาต์ · ปี 1 ใช้ QR Check-in/Check-out</p></form></Modal>}
@@ -891,7 +899,7 @@ function Landing({enterAs,saving,loginError}:{enterAs:()=>void;saving:boolean;lo
   </div>}
 function MetricChip({icon,label,value}:{icon:React.ReactNode;label:string;value:string}){return <div className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur-md"><div className="flex items-center gap-1.5 text-amber-200">{icon}<span className="text-[9px] font-semibold text-white/70">{label}</span></div><b className="mt-1 block text-sm">{value}</b></div>}
 
-function StudentHome({user,events,regs,select,store}:{user:User;events:Event[];regs:Registration[];select:(id:string)=>void;store:Store}){
+function StudentHome({user,events,regs,select,store,session,refresh}:{session:string;refresh:()=>Promise<void>;user:User;events:Event[];regs:Registration[];select:(id:string)=>void;store:Store}){
   const latestConfirmed=[...regs].filter(r=>r.status==='ATTENDING'||r.status==='COMPLETED').sort((a,b)=>Date.parse(b.checkout_at||b.checkin_at||'')-Date.parse(a.checkout_at||a.checkin_at||''))[0];
   const latestEvent=latestConfirmed?store.events.find(e=>e.id===latestConfirmed.event_id):undefined;
   return <div className="space-y-5">
@@ -932,6 +940,7 @@ function StudentHome({user,events,regs,select,store}:{user:User;events:Event[];r
         {events.length===0&&!store.applications?.length&&<Empty message="ยังไม่มีกิจกรรมที่เปิดและลงทะเบียนไว้"/>}
       </div>
     </section>
+    <OpenEvents token={session} refresh={refresh}/>
     <UserProfileSummary user={user}/>
   </div>;
 }
@@ -1245,7 +1254,7 @@ function UserProfileSummary({user}:{user:User}){
   </section>;
 }
 
-function AdminView({deleteBatch,sessionToken,store,academicCatalog,manageAcademicCatalog,selectedEvent,selectedEventId,setSelectedEvent,openCreate,openCodes,openStaff,editUser,deleteUser,deleteActivity,deleteRegistration,csvFile,setCsvFile,importCsv,refreshWorkspace,loadEventDashboard,updateEvent}:{deleteBatch:(kind:'students'|'codes',values:string[])=>Promise<boolean|undefined>;sessionToken:string;store:Store;academicCatalog:AcademicFaculty[];manageAcademicCatalog:(action:CatalogAction,facultyId:string,facultyName:string,majorId:string,majorName:string)=>unknown;selectedEvent:Event;selectedEventId:string;setSelectedEvent:(id:string)=>void;openCreate:()=>void;openCodes:()=>void;openStaff:()=>void;editUser:(user:User)=>void;deleteUser:(user:User)=>void;deleteActivity:()=>void;deleteRegistration:(userId:string)=>void;csvFile:File|null;setCsvFile:(f:File|null)=>void;importCsv:()=>void;refreshWorkspace:()=>Promise<void>;loadEventDashboard:()=>Promise<EventDashboardRow[]>;updateEvent:(p:Partial<Event>)=>void|Promise<void>}) {
+function AdminView({deleteBatch,sessionToken,store,academicCatalog,manageAcademicCatalog,selectedEvent,selectedEventId,setSelectedEvent,openCreate,openCodes,openStaff,editUser,deleteUser,deleteActivity,deleteRegistration,csvFile,setCsvFile,importCsv,refreshWorkspace,loadEventDashboard,updateEvent}:{deleteBatch:(kind:'students'|'codes',values:string[])=>Promise<boolean|undefined>;sessionToken:string;store:Store;academicCatalog:AcademicFaculty[];manageAcademicCatalog:(action:CatalogAction,facultyId:string,facultyName:string,majorId:string,majorName:string)=>unknown;selectedEvent:Event;selectedEventId:string;setSelectedEvent:(id:string)=>void;openCreate:()=>void;openCodes:()=>void;openStaff:()=>void;editUser:(user:User)=>void;deleteUser:(user:User)=>void;deleteActivity:()=>void;deleteRegistration:(userId:string)=>void;csvFile:File|null;setCsvFile:(f:File|null)=>void;importCsv:(roster?:boolean)=>void;refreshWorkspace:()=>Promise<void>;loadEventDashboard:()=>Promise<EventDashboardRow[]>;updateEvent:(p:Partial<Event>)=>void|Promise<void>}) {
  const removePasscodes=useCallback((values:string[])=>deleteBatch('codes',values),[deleteBatch]);
  const [managementPanel,setManagementPanel]=useState<'registration'|'passcodes'|'settings'|null>(null);
  useEffect(()=>setManagementPanel(null),[selectedEventId]);
@@ -1519,7 +1528,7 @@ function AdminView({deleteBatch,sessionToken,store,academicCatalog,manageAcademi
             {csvFile?csvFile.name:'เลือกไฟล์ CSV'}
             <input type="file" accept=".csv,text/csv" className="sr-only" onChange={e=>setCsvFile(e.target.files?.[0]||null)}/>
           </label>
-          <button disabled={!csvFile} onClick={importCsv} className="action-primary mt-2 w-full">
+          <button disabled={!csvFile} onClick={()=>importCsv()} className="action-primary mt-2 w-full">
             นำเข้ารายชื่อและจับคู่ Passcode อัตโนมัติ
           </button>
         </div>
@@ -1686,6 +1695,14 @@ function AdminView({deleteBatch,sessionToken,store,academicCatalog,manageAcademi
     </div>
   )}
 
+  {(adminTab==='all' || adminTab==='users') && <section className="bento space-y-3 p-5">
+    <h2 className="font-bold">นำเข้าทะเบียนนักศึกษาเพื่อสร้างบัญชี</h2>
+    <p className="text-sm text-slate-600">นำเข้า CSV UTF-8 จากทะเบียนนักศึกษา แล้วใช้รหัสนักศึกษาและวันเกิด พ.ศ. 8 หลักเข้าสู่ระบบเพื่อเลือกกิจกรรมได้</p>
+    <p className="text-sm text-slate-600">รองรับคำนำหน้าไทย ชื่อไทย นามสกุลไทย และวันเกิด เช่น 18/11/2550 · เบอร์โทรเว้นว่างได้ · รหัสนักศึกษาที่มีบัญชีแล้วจะถูกข้าม</p>
+    <input type="file" accept=".csv,text/csv" aria-label="ไฟล์ทะเบียนนักศึกษา CSV" onChange={event=>setCsvFile(event.target.files?.[0]||null)} className="block w-full text-sm"/>
+    {csvFile && <p className="break-all text-sm">ไฟล์ที่เลือก {csvFile.name}</p>}
+    <button className="action-primary" disabled={!csvFile} onClick={()=>importCsv(true)}><FileUp size={18}/>นำเข้าและสร้างบัญชีนักศึกษา</button>
+  </section>}
   {/* TAB 4: User Accounts Management */}
   {(adminTab === 'all' || adminTab === 'users') && (
     <section className="bento overflow-hidden shadow-sm">
