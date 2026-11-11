@@ -138,6 +138,15 @@ function EventPass() {
     }
   },[user,store.regs,store.applications,workspaceReady]);
 
+  const expireAdminSession=useCallback((token:string)=>{
+    // Ignore a response belonging to a previous login.
+    if(sessionStorage.getItem('aru-session-token')!==token)return;
+    let cachedRole='';try{cachedRole=JSON.parse(sessionStorage.getItem('aru-user-v1')||'null')?.role||'';}catch{}
+    if(cachedRole!=='ADMIN')return;
+    sessionStorage.removeItem('aru-session-token');sessionStorage.removeItem('aru-user-v1');
+    setSessionToken('');setUser(null);setWorkspaceReady(false);setView('home');setModal(null);
+    setLoginError('เซสชันแอดมินหมดอายุหรือถูกยกเลิก กรุณาเข้าสู่ระบบใหม่แล้วบันทึกอีกครั้ง');
+  },[]);
   const isImportingRef = useRef(false);
   const refreshingWorkspaceRef = useRef(false);
   const refreshWorkspace=useCallback(async()=>{
@@ -146,10 +155,11 @@ function EventPass() {
     try{
       const {data,error}=await supabase.rpc('load_workspace',{p_session_token:sessionToken});
       if(!error&&data?.success){setStore(workspaceStore(data));setAcademicCatalog(workspaceCatalog(data));}
+      else if(!error&&data?.success===false)expireAdminSession(sessionToken);
     }finally{
       refreshingWorkspaceRef.current=false;
     }
-  },[sessionToken]);
+  },[sessionToken,expireAdminSession]);
 
   const loadEventDashboard=useCallback(async()=>{
     if(!sessionToken||!supabase)return [] as EventDashboardRow[];
@@ -157,16 +167,16 @@ function EventPass() {
     return !error&&data?.success&&Array.isArray(data.events)?data.events as EventDashboardRow[]:[];
   },[sessionToken]);
 
-  useEffect(()=>{setStore(readStore());localStorage.removeItem('aru-user-v1');const session=sessionStorage.getItem('aru-user-v1');if(session){try{setUser(JSON.parse(session) as User)}catch{sessionStorage.removeItem('aru-user-v1')}}const token=sessionStorage.getItem('aru-session-token')||'';setSessionToken(token);if(token&&supabase){void supabase.rpc('load_workspace',{p_session_token:token}).then(({data,error})=>{if(!error&&data?.success){setWorkspaceReady(true);setStore(workspaceStore(data));setAcademicCatalog(workspaceCatalog(data));if(data.user){setUser(data.user as User);sessionStorage.setItem('aru-user-v1',JSON.stringify(data.user));}if(data.events?.[0]){setSelectedEvent(data.events[0].id);setActiveEvent(data.events[0].id);}}});}},[]);
+  useEffect(()=>{setStore(readStore());localStorage.removeItem('aru-user-v1');const session=sessionStorage.getItem('aru-user-v1');if(session){try{setUser(JSON.parse(session) as User)}catch{sessionStorage.removeItem('aru-user-v1')}}const token=sessionStorage.getItem('aru-session-token')||'';setSessionToken(token);if(token&&supabase){void supabase.rpc('load_workspace',{p_session_token:token}).then(({data,error})=>{if(!error&&data?.success){setWorkspaceReady(true);setStore(workspaceStore(data));setAcademicCatalog(workspaceCatalog(data));if(data.user){setUser(data.user as User);sessionStorage.setItem('aru-user-v1',JSON.stringify(data.user));}if(data.events?.[0]){setSelectedEvent(data.events[0].id);setActiveEvent(data.events[0].id);}}else if(!error&&data?.success===false)expireAdminSession(token);});}},[expireAdminSession]);
   useEffect(()=>{try{localStorage.setItem(storeKey,JSON.stringify(store));}catch{}},[store]);
   useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(''),2800);return()=>clearTimeout(t)},[toast]);
   useEffect(()=>{
     const client=supabase;
     if(!sessionToken||!client)return;
-    const heartbeat=()=>{const eventId=view==='scanner'?activeEvent:null;void client.rpc('heartbeat_session',{p_session_token:sessionToken,p_active_event_id:eventId});};
+    const heartbeat=()=>{const eventId=view==='scanner'?activeEvent:null;void client.rpc('heartbeat_session',{p_session_token:sessionToken,p_active_event_id:eventId}).then(({data,error})=>{if(!error&&data?.success===false)expireAdminSession(sessionToken);});};
     heartbeat();const timer=window.setInterval(heartbeat,15000);window.addEventListener('focus',heartbeat);document.addEventListener('visibilitychange',heartbeat);
     return()=>{window.clearInterval(timer);window.removeEventListener('focus',heartbeat);document.removeEventListener('visibilitychange',heartbeat);};
-  },[sessionToken,view,activeEvent,selectedEvent]);
+  },[sessionToken,view,activeEvent,selectedEvent,expireAdminSession]);
   useEffect(()=>{
     if(!scannerLocked)return;
     const previousOverflow=document.body.style.overflow;
@@ -357,7 +367,15 @@ function EventPass() {
     if(detailsChanged&&isSupabaseConfigured&&supabase&&/^[0-9a-f-]{36}$/i.test(selected.id)){
       if(!sessionToken){setToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบแอดมินใหม่');return;}
       const {data,error}=await supabase.rpc('admin_update_event_details',{p_admin_token:sessionToken,p_event_id:selected.id,p_title:patch.title??null,p_location:patch.location??null,p_activity_hours:patch.activity_hours??null,p_status:patch.status??null});
-      if(error||!data?.success){setToast(data?.message||error?.message||'บันทึกข้อมูลกิจกรรมไม่สำเร็จ');return;}
+      if(error||!data?.success){
+        if(data?.error_code==='SESSION_EXPIRED'){expireAdminSession(sessionToken);return;}
+        // Also diagnose installations still using migration 034's generic error.
+        if(error?.message?.includes('สงวนสิทธิ์เฉพาะแอดมิน')){
+          const check=await supabase.rpc('load_workspace',{p_session_token:sessionToken});
+          if(!check.error&&check.data?.success===false){expireAdminSession(sessionToken);return;}
+        }
+        setToast(data?.message||error?.message||'บันทึกข้อมูลกิจกรรมไม่สำเร็จ');return;
+      }
     }
     if(patch.redirect_url_year1!==undefined&&isSupabaseConfigured&&supabase&&/^[0-9a-f-]{36}$/i.test(selected.id)){
       if(!sessionToken){setToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบแอดมินใหม่');return;}
@@ -561,6 +579,18 @@ function EventPass() {
     setToast(`นำเข้า ${imported} คน · ข้าม ${skipped} คน · จับคู่ Passcode อัตโนมัติแล้ว`);
   }
 
+  async function enrollRosterToEvent(){
+    if(!isSupabaseConfigured||!supabase||user?.role!=='ADMIN'||!selectedEvent)return;
+    if(!sessionToken){setToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบแอดมินใหม่');return;}
+    const {data,error}=await supabase.rpc('admin_enroll_roster_to_event',{p_admin_token:sessionToken,p_event_id:selectedEvent});
+    if(error||!data?.success){
+      setToast(data?.message||error?.message||'ผูกรายชื่อเข้ากิจกรรมไม่สำเร็จ');
+      return;
+    }
+    await refreshWorkspace();
+    setToast(`ผูกรายชื่อเข้ากิจกรรมสำเร็จ ${data.enrolled_count.toLocaleString()} คน (สถานะ: รอสแกนเข้างาน โดยยังไม่ตัด Passcode)`);
+  }
+
   return <main className="canvas-grid min-h-screen px-3 pb-8 pt-3 sm:px-6 sm:pt-5 lg:px-10">
     <header className="glass sticky top-3 z-50 mx-auto flex max-w-[1440px] items-center justify-between rounded-full border border-white/80 px-4 py-2.5 shadow-[0_12px_45px_rgba(52,61,78,.07)] sm:px-6">
       <button className="flex items-center gap-3 text-left transition hover:opacity-90" onClick={()=>setView(user?.role==='ADMIN'?'admin':user?.role==='STAFF'?'scanner':'home')}>
@@ -720,7 +750,7 @@ function EventPass() {
     )}
 
     <div key={view} className="page-transition mx-auto mt-6 max-w-[1440px]">
-      {!user?<Landing loginError={loginError} enterAs={()=>void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…',enterAs)} saving={saving||Boolean(loadingMessage)}/>:view==='scanner'&&user.role!=='STUDENT'?<ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={()=>setScannerLocked(value=>!value)} startScanner={()=>void withLoading('กำลังเปิดกล้อง…',startScanner)} stopScanner={()=>void withLoading('กำลังปิดกล้อง…',stopScanner)} scanMode={()=>void withLoading('กำลังเปลี่ยนโหมดสแกน…',setScanMode)} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async(raw:string)=>{await withLoading('กำลังตรวจสอบ QR…',()=>scanPayload(raw));}} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={()=>setModal('walkin')}/>:view==='admin'&&user.role==='ADMIN'?<AdminView isImportingRef={isImportingRef} deleteBatch={(kind,values)=>withLoading('กำลังลบรายการ…',()=>deleteBatch(kind,values))} sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args)=>withLoading('กำลังบันทึกคณะและสาขา…',()=>manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={()=>setModal('event')} openCodes={()=>setModal('codes')} openStaff={()=>setModal('staff')} editUser={(target:User)=>{setEditingUser(target);setEditingFaculty(target.faculty);setEditingMajor(target.major);setModal('editUser')}} deleteUser={(target:User)=>void withLoading('กำลังลบบัญชีผู้ใช้…',()=>deleteManagedUser(target))} deleteActivity={()=>void withLoading('กำลังลบกิจกรรม…',deleteActivity)} deleteRegistration={(id:string)=>void withLoading('กำลังนำรายชื่อออก…',()=>deleteRegistration(id))} importError={importError} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={roster=>void withLoading('กำลังนำเข้ารายชื่อ…',()=>importCsv(roster))} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch:Partial<Event>)=>withLoading('กำลังบันทึกการเปลี่ยนแปลง…',()=>updateSelectedEvent(patch))} />:view==='studentStats'&&user.role==='STUDENT'?<StudentStatsView user={user} events={store.events.filter(e=>studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs}/>:view==='event'&&user.role==='STUDENT'?<EventDetail session={sessionToken} event={store.events.find(e=>e.id===activeEvent)||currentEvent} user={user} registration={studentRegs.find(r=>r.event_id===activeEvent)} back={()=>setView('home')}/>:<StudentHome session={sessionToken} refresh={refreshWorkspace} user={user} events={store.events.filter(e=>e.status==='ACTIVE'&&studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs} select={(id:string)=>{setActiveEvent(id);setView('event')}} store={store}/>}
+      {!user?<Landing loginError={loginError} enterAs={()=>void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…',enterAs)} saving={saving||Boolean(loadingMessage)}/>:view==='scanner'&&user.role!=='STUDENT'?<ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={()=>setScannerLocked(value=>!value)} startScanner={()=>void withLoading('กำลังเปิดกล้อง…',startScanner)} stopScanner={()=>void withLoading('กำลังปิดกล้อง…',stopScanner)} scanMode={()=>void withLoading('กำลังเปลี่ยนโหมดสแกน…',setScanMode)} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async(raw:string)=>{await withLoading('กำลังตรวจสอบ QR…',()=>scanPayload(raw));}} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={()=>setModal('walkin')}/>:view==='admin'&&user.role==='ADMIN'?<AdminView isImportingRef={isImportingRef} deleteBatch={(kind,values)=>withLoading('กำลังลบรายการ…',()=>deleteBatch(kind,values))} sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args)=>withLoading('กำลังบันทึกคณะและสาขา…',()=>manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={()=>setModal('event')} openCodes={()=>setModal('codes')} openStaff={()=>setModal('staff')} editUser={(target:User)=>{setEditingUser(target);setEditingFaculty(target.faculty);setEditingMajor(target.major);setModal('editUser')}} deleteUser={(target:User)=>void withLoading('กำลังลบบัญชีผู้ใช้…',()=>deleteManagedUser(target))} deleteActivity={()=>void withLoading('กำลังลบกิจกรรม…',deleteActivity)} deleteRegistration={(id:string)=>void withLoading('กำลังนำรายชื่อออก…',()=>deleteRegistration(id))} importError={importError} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={roster=>void withLoading('กำลังนำเข้ารายชื่อ…',()=>importCsv(roster))} enrollRosterToEvent={()=>withLoading('กำลังผูกรายชื่อเข้ากิจกรรม…',enrollRosterToEvent)} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch:Partial<Event>)=>withLoading('กำลังบันทึกการเปลี่ยนแปลง…',()=>updateSelectedEvent(patch))} />:view==='studentStats'&&user.role==='STUDENT'?<StudentStatsView user={user} events={store.events.filter(e=>studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs}/>:view==='event'&&user.role==='STUDENT'?<EventDetail session={sessionToken} event={store.events.find(e=>e.id===activeEvent)||currentEvent} user={user} registration={studentRegs.find(r=>r.event_id===activeEvent)} back={()=>setView('home')}/>:<StudentHome session={sessionToken} refresh={refreshWorkspace} user={user} events={store.events.filter(e=>e.status==='ACTIVE'&&studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs} select={(id:string)=>{setActiveEvent(id);setView('event')}} store={store}/>}
     </div>
     {user&&<div className="mx-auto mt-10 flex max-w-[1440px] items-center justify-between border-t border-slate-200/70 px-2 py-4 text-[10px] text-slate-500"><span>© 2026 ARU Student Organization · ระบบลงทะเบียนกิจกรรม</span><span className="hidden items-center gap-1 sm:flex"><ShieldCheck size={12}/>ข้อมูลกิจกรรมอัปเดตแบบเรียลไทม์</span></div>}
     {modal==='walkin'&&<Modal submitLabel="บันทึกรายชื่อหน้างาน" title="ลงทะเบียนหน้างาน" subtitle="เพิ่มนักศึกษาและผูกสิทธิ์กิจกรรม" close={()=>setModal(null)}><form id="staff-admin-form" onSubmit={e=>void withLoading('กำลังบันทึกรายชื่อ…',()=>addWalkin(e))} className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><Field label="รหัสนักศึกษา" name="student_id" required placeholder="เช่น 69123456"/><label className="text-sm">คำนำหน้า<select name="prefix" required defaultValue="" className="mt-1 block h-11 w-full rounded-xl border px-3"><option value="">เลือกคำนำหน้า</option><option>นาย</option><option>นางสาว</option></select></label><Field label="ชื่อ–นามสกุล" name="full_name" required placeholder="ชื่อ นามสกุล"/><label className="block text-[11px] font-semibold text-slate-600">คณะ<select name="faculty" value={walkinFaculty} required onChange={e=>{setWalkinFaculty(e.target.value);setWalkinMajor('')}} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800"><option value="">เลือกคณะ</option>{academicCatalog.map(faculty=><option key={faculty.id} value={faculty.name}>{faculty.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">สาขาวิชา<select name="major" value={walkinMajor} required disabled={!walkinFaculty} onChange={e=>setWalkinMajor(e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 disabled:opacity-50"><option value="">เลือกสาขา</option>{(academicCatalog.find(faculty=>faculty.name===walkinFaculty)?.majors||[]).map(major=><option key={major.id} value={major.name}>{major.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">ชั้นปีที่กำลังศึกษา<select name="study_year" value={walkinStudyYear} onChange={e=>setWalkinStudyYear(Number(e.target.value))} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{Array.from({length:8},(_,i)=>i+1).map(year=><option key={year} value={year}>ปี {year}</option>)}</select></label><label className="text-sm">หมู่เรียน<select name="class_group" required defaultValue="" className="mt-1 block h-11 w-full rounded-xl border px-3"><option value="">เลือกหมู่เรียน</option>{[1,2,3,4].map(n=><option key={n}>{n}</option>)}</select></label><BirthDateField/><Field label="เบอร์โทรศัพท์" name="phone" placeholder="08X-XXX-XXXX"/></div><div className={cx('flex items-center justify-between rounded-2xl px-4 py-3 text-xs',reserveLeft?'bg-amber-50 text-amber-900':'bg-rose-50 text-rose-700')}><span className="flex items-center gap-2"><Ticket size={15}/>Passcode สำรองคงเหลือ</span><b>{reserveLeft} รหัส</b></div><p className="text-center text-[10px] leading-5 text-slate-400">นักศึกษาชั้นปี 2 ขึ้นไปจะได้รับ Passcode หลังเช็กเอาต์ · ปี 1 ใช้ QR Check-in/Check-out</p></form></Modal>}
@@ -1281,12 +1311,16 @@ function UserProfileSummary({user}:{user:User}){
   </section>;
 }
 
-function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,academicCatalog,manageAcademicCatalog,selectedEvent,selectedEventId,setSelectedEvent,openCreate,openCodes,openStaff,editUser,deleteUser,deleteActivity,deleteRegistration,csvFile,setCsvFile,importCsv,refreshWorkspace,loadEventDashboard,updateEvent}:{isImportingRef:React.MutableRefObject<boolean>;importError:string;deleteBatch:(kind:'students'|'codes',values:string[])=>Promise<boolean|undefined>;sessionToken:string;store:Store;academicCatalog:AcademicFaculty[];manageAcademicCatalog:(action:CatalogAction,facultyId:string,facultyName:string,majorId:string,majorName:string)=>unknown;selectedEvent:Event;selectedEventId:string;setSelectedEvent:(id:string)=>void;openCreate:()=>void;openCodes:()=>void;openStaff:()=>void;editUser:(user:User)=>void;deleteUser:(user:User)=>void;deleteActivity:()=>void;deleteRegistration:(userId:string)=>void;csvFile:File|null;setCsvFile:(f:File|null)=>void;importCsv:(roster?:boolean)=>void;refreshWorkspace:()=>Promise<void>;loadEventDashboard:()=>Promise<EventDashboardRow[]>;updateEvent:(p:Partial<Event>)=>void|Promise<void>}) {
+function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,academicCatalog,manageAcademicCatalog,selectedEvent,selectedEventId,setSelectedEvent,openCreate,openCodes,openStaff,editUser,deleteUser,deleteActivity,deleteRegistration,csvFile,setCsvFile,importCsv,enrollRosterToEvent,refreshWorkspace,loadEventDashboard,updateEvent}:{isImportingRef:React.MutableRefObject<boolean>;importError:string;deleteBatch:(kind:'students'|'codes',values:string[])=>Promise<boolean|undefined>;sessionToken:string;store:Store;academicCatalog:AcademicFaculty[];manageAcademicCatalog:(action:CatalogAction,facultyId:string,facultyName:string,majorId:string,majorName:string)=>unknown;selectedEvent:Event;selectedEventId:string;setSelectedEvent:(id:string)=>void;openCreate:()=>void;openCodes:()=>void;openStaff:()=>void;editUser:(user:User)=>void;deleteUser:(user:User)=>void;deleteActivity:()=>void;deleteRegistration:(userId:string)=>void;csvFile:File|null;setCsvFile:(f:File|null)=>void;importCsv:(roster?:boolean)=>void;enrollRosterToEvent:()=>void|Promise<void>;refreshWorkspace:()=>Promise<void>;loadEventDashboard:()=>Promise<EventDashboardRow[]>;updateEvent:(p:Partial<Event>)=>void|Promise<void>}) {
  const [correction,setCorrection]=useState<{reg:Registration;name:string}|null>(null);
  const [nextStatus,setNextStatus]=useState<Registration['status']>('REGISTERED');
  const [correctionReason,setCorrectionReason]=useState('');
  const [correctionError,setCorrectionError]=useState('');
  const [correcting,setCorrecting]=useState(false);
+ const unenrolledRosterCount = useMemo(() => {
+   const registeredUserIds = new Set(store.regs.filter(r => r.event_id === selectedEventId).map(r => r.user_id));
+   return store.users.filter(u => u.role === 'STUDENT' && !registeredUserIds.has(u.id)).length;
+ }, [store.users, store.regs, selectedEventId]);
  useEffect(()=>setCorrection(null),[selectedEventId]);
  async function saveCorrection(e:React.FormEvent){
    e.preventDefault();if(!correction||correcting)return;
@@ -1613,6 +1647,23 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
           <button disabled={!csvFile} onClick={()=>importCsv()} className="action-primary mt-2 w-full">
             นำเข้ารายชื่อและจับคู่ Passcode อัตโนมัติ
           </button>
+          {unenrolledRosterCount > 0 && isSupabaseConfigured && (
+            <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5">
+              <b className="block text-xs font-bold text-amber-950">
+                มีบัญชีนักศึกษาในระบบที่ยังไม่ได้ผูกกับกิจกรรมนี้ {unenrolledRosterCount.toLocaleString()} คน
+              </b>
+              <p className="mt-1 text-[10px] text-amber-800 leading-relaxed">
+                ผูกรายชื่อทั้งหมดเข้ากิจกรรมนี้ในสถานะ “รอสแกนเข้างาน” ได้ในคลิกเดียว นักศึกษาจะเห็นบัตร QR พร้อมสแกนเข้างานทันที และระบบจะไม่ตัด Passcode จนกว่าจะสแกนเข้าจริง
+              </p>
+              <button
+                type="button"
+                onClick={() => void enrollRosterToEvent()}
+                className="action-primary mt-2.5 w-full"
+              >
+                <Users size={15}/> ผูกรายชื่อนักศึกษาทั้งหมดเข้ากิจกรรม ({unenrolledRosterCount.toLocaleString()} คน)
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -1926,17 +1977,23 @@ const PasscodeList=memo(function PasscodeList({eventId,store,openCodes,remove,to
 }){
   const [matching,setMatching]=useState(false);
   const [matchNotice,setMatchNotice]=useState('');
-  const waiting=useMemo(()=>{
-    const seniors=new Set(store.users.filter(user=>user.study_year>1&&user.role==='STUDENT').map(user=>user.id));
-    return store.regs.filter(reg=>reg.event_id===eventId&&!reg.passcode&&seniors.has(reg.user_id)).length;
-  },[store.users,store.regs,eventId]);
+  const seniors=useMemo(()=>{
+    return new Set(store.users.filter(user=>user.study_year>1&&user.role==='STUDENT').map(user=>user.id));
+  },[store.users]);
+  const waitingAttended=useMemo(()=>{
+    return store.regs.filter(reg=>reg.event_id===eventId&&!reg.passcode&&seniors.has(reg.user_id)&&(reg.status==='ATTENDING'||reg.status==='COMPLETED')).length;
+  },[store.regs,eventId,seniors]);
+  const waitingUnchecked=useMemo(()=>{
+    return store.regs.filter(reg=>reg.event_id===eventId&&!reg.passcode&&seniors.has(reg.user_id)&&reg.status==='REGISTERED').length;
+  },[store.regs,eventId,seniors]);
   async function matchCodes(){
     if(!supabase || matching)return;
     setMatching(true);setMatchNotice('');
     try{
       const {data,error}=await supabase.rpc('admin_match_waiting_passcodes',{p_token:token,p_event:eventId});
       if(error)throw new Error(error.message);
-      setMatchNotice(`จับคู่ Passcode แล้ว ${data.matched_count} คน`);await refresh();
+      setMatchNotice(data?.matched_count>0?`จับคู่ Passcode สำเร็จ ${data.matched_count} คน`:'ไม่มีผู้เข้างานที่รอ Passcode หรือไม่มีรหัสสำรองคงเหลือ');
+      await refresh();
     }catch(error){setMatchNotice(error instanceof Error?error.message:'จับคู่ไม่สำเร็จ');}
     finally{setMatching(false);}
   }
@@ -1985,9 +2042,32 @@ const PasscodeList=memo(function PasscodeList({eventId,store,openCodes,remove,to
       <h2 className="font-bold text-slate-900">Passcode ของกิจกรรม</h2>
       <button type="button" onClick={openCodes} className="action-primary"><Plus size={16}/>เพิ่มหลายรหัส</button>
     </div>
-    <div ref={listTop} className="scroll-mt-3"/><p className="text-sm text-slate-600">ทั้งหมด {rows.length} รหัส · ว่าง {availableCount} รหัส</p>
-    <div className="flex flex-wrap items-center gap-3"><p className="text-sm">รอจับคู่ {waiting} คน</p>
-      <button className="action-primary" disabled={matching||!waiting||!availableCount||!token} onClick={()=>void matchCodes()}>{matching?'กำลังจับคู่…':'จับคู่รหัสให้รายชื่อที่รอ'}</button></div>
+    <div ref={listTop} className="scroll-mt-3"/>
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs text-slate-500">ทั้งหมด {rows.length} รหัส · รหัสสำรองคงเหลือ <b>{availableCount}</b> รหัส</p>
+          <p className="text-sm font-extrabold text-slate-900 mt-1">
+            สแกนเข้างานจริงแล้ว (ปี 2+ รอ Passcode): <span className="text-[#7c0a02] font-black">{waitingAttended}</span> คน
+          </p>
+          {waitingUnchecked > 0 && (
+            <p className="text-[11px] text-slate-500">
+              ลงทะเบียนแต่ยังไม่สแกนเข้า: {waitingUnchecked} คน (ระบบจะไม่ตัด Passcode ให้จนกว่าจะสแกนเข้างาน)
+            </p>
+          )}
+        </div>
+        <button
+          className="action-primary"
+          disabled={matching||!waitingAttended||!availableCount||!token}
+          onClick={()=>void matchCodes()}
+        >
+          {matching?'กำลังจับคู่…':`จับคู่รหัสให้ผู้เข้างานจริง (${waitingAttended} คน)`}
+        </button>
+      </div>
+      <p className="text-[11px] leading-relaxed text-slate-600">
+        💡 <b>เกณฑ์การจัดสรร Passcode:</b> รหัสสำรองจะถูกจับคู่ให้เฉพาะนักศึกษาปี 2 ขึ้นไปที่ <b>สแกนเข้างานจริงแล้ว</b> (กำลังเข้าร่วม หรือ เช็กเอาต์แล้ว) โดยเรียงลำดับจากคนที่เช็กเอาต์ก่อน และตามลำดับเวลาที่สแกนเข้างาน
+      </p>
+    </div>
     {matchNotice && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm">{matchNotice}</p>}
     <input aria-label="ค้นหา Passcode หรือผู้รับ" placeholder="ค้นหารหัส ชื่อ หรือรหัสนักศึกษา" value={query}
       onChange={e=>{setQuery(e.target.value);setPageIndex(0);setSelection([]);}} className="h-11 w-full rounded-xl border border-slate-300 px-3"/>

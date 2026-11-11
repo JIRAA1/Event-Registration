@@ -10,10 +10,13 @@ begin
   assert (select title='New title' and location='New place' and activity_hours=6 and status='ACTIVE' from events where id=e);
   perform admin_update_event_details(token,e,p_status=>'CLOSED');
   assert (select title='New title' and location='New place' and activity_hours=6 and status='CLOSED' from events where id=e);
-  begin
-    perform admin_update_event_details('invalid',e,p_location=>'Wrong');
-    raise exception 'unauthorized write' using errcode='23505';
-  exception when raise_exception then assert sqlerrm like '%แอดมิน%'; end;
+  assert admin_update_event_details('invalid',e,p_location=>'Wrong')->>'error_code'='SESSION_EXPIRED';
+  update app_sessions set expires_at=now()-interval '1 second' where user_id=a;
+  assert admin_update_event_details(token,e,p_location=>'Wrong')->>'error_code'='SESSION_EXPIRED';
+  update app_sessions set expires_at=now()+interval '1 hour' where user_id=a;
+  update users set role='STAFF' where id=a;
+  assert admin_update_event_details(token,e,p_location=>'Wrong')->>'error_code'='FORBIDDEN';
+  update users set role='ADMIN' where id=a;
   begin
     perform admin_update_event_details(token,e,p_location=>'   ');
     raise exception 'blank accepted' using errcode='23505';
