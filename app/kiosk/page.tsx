@@ -1,5 +1,7 @@
 'use client';
 import {useEffect,useState} from 'react';
+import {PasswordInput} from '../password-input';
+import {LoginHelp} from '../register/registration-admin';
 import BrowserGate from '../browser-gate';
 import {RegistrationForm} from '../register/registration-form';
 import {RegistrationFrame} from '../register/registration-frame';
@@ -42,7 +44,7 @@ function StationLogin(){
     onSubmit={e=>{e.preventDefault();if(!busy)void login(e.currentTarget);}}>
     <h2 className="text-xl font-bold">เข้าสู่ระบบด้วยบัญชีเครื่อง</h2>
     <label className="block">ชื่อบัญชีเครื่อง<input name="username" required className="mt-1 block h-11 w-full rounded-xl border px-3"/></label>
-    <label className="block">รหัสผ่านเครื่อง<input type="password" name="password" required className="mt-1 block h-11 w-full rounded-xl border px-3"/></label>
+    <label className="block">รหัสผ่านเครื่อง<PasswordInput autoComplete="current-password" name="password" required className="mt-1 block h-11 w-full rounded-xl border px-3"/></label>
     {error&&<p role="alert" className="rounded-xl bg-rose-50 p-3 text-rose-800">{error}</p>}<button disabled={busy} className="action-primary w-full">{busy?'กำลังเข้าสู่ระบบ…':'เข้าสู่ระบบเครื่อง'}</button>
-  </form><footer><a href="/" className="text-sm underline">กลับหน้า Event Pass</a></footer></RegistrationFrame>;
+  </form><LoginHelp loginFailed={error.includes('รหัสผ่านไม่ถูกต้อง')}/><footer><a href="/" className="text-sm underline">กลับหน้า Event Pass</a></footer></RegistrationFrame>;
 }

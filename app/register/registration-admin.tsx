@@ -1,19 +1,35 @@
 'use client';
-import {memo,useEffect,useMemo,useRef,useState} from 'react';
+import {memo,useEffect,useId,useMemo,useRef,useState} from 'react';
 import {errorText,signupRpc,type QueueState,type SignupInfo} from '@/lib/event-registration';
 import {isSupabaseConfigured} from '@/lib/supabase';
 
-export function LoginHelp({loginFailed}:{loginFailed:boolean}){
+export function LoginHelp({loginFailed,popupOnly=false}:{loginFailed:boolean;popupOnly?:boolean}){
   const [link,setLink]=useState('');
+  const dialog=useRef<HTMLDialogElement>(null);
+  const titleId=useId();
+  useEffect(()=>{
+    const popup=dialog.current;
+    if(!popup)return;
+    if(loginFailed && !popup.open)popup.showModal();
+    if(!loginFailed && popup.open)popup.close();
+    return ()=>popup.close();
+  },[loginFailed]);
   useEffect(()=>{
     let active=true;
     if(isSupabaseConfigured)void signupRpc<SignupInfo>('registration_info',{}).then(data=>{if(active)setLink(data.contact);}).catch(()=>{});
     return ()=>{active=false;};
   },[]);
   return <div className="mt-4 flex flex-wrap justify-between gap-3 text-sm">
-    {link && <a className="font-bold text-[#7c0a02] underline" href={link} target="_blank" rel="noreferrer">เข้าใช้บัญชีไม่ได้? ติดต่อแอดมิน</a>}
-    {!link && loginFailed && <p>ติดต่อแอดมินที่จุดลงทะเบียนหน้างาน พร้อมแจ้งรหัสนักศึกษา</p>}
-
+    {!popupOnly && link && <a className="font-bold text-[#7c0a02] underline" href={link} target="_blank" rel="noreferrer">เข้าใช้บัญชีไม่ได้? ติดต่อแอดมิน</a>}
+    {!popupOnly && !link && loginFailed && <p>ติดต่อแอดมินที่จุดลงทะเบียนหน้างาน พร้อมแจ้งรหัสนักศึกษา</p>}
+    <dialog ref={dialog} aria-labelledby={titleId} className="m-auto w-[calc(100%_-_2rem)] max-w-md rounded-2xl border-0 bg-white p-6 text-slate-800 shadow-xl backdrop:bg-slate-950/50">
+      <h2 id={titleId} className="text-xl font-bold">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</h2>
+      <p className="mt-3 leading-6">ตรวจสอบชื่อผู้ใช้และรหัสผ่านอีกครั้ง หากมั่นใจว่ากรอกถูกต้องแล้ว กรุณาติดต่อแอดมินเพื่อตรวจสอบบัญชี</p>
+      <div className="mt-5 flex flex-wrap gap-3">
+        {link?<a className="action-primary" href={link} target="_blank" rel="noreferrer">ติดต่อแอดมิน</a>:<p>ติดต่อแอดมินที่จุดลงทะเบียนหน้างาน พร้อมแจ้งชื่อผู้ใช้</p>}
+        <button type="button" autoFocus className="action-secondary" onClick={()=>dialog.current?.close()}>กลับไปตรวจสอบรหัสผ่าน</button>
+      </div>
+    </dialog>
   </div>;
 }
 export const RegistrationAdmin=memo(function RegistrationAdmin({eventId,token,refresh,mode='queue'}:{eventId:string;token:string;refresh:()=>Promise<void>;mode?:'queue'|'settings'}) {

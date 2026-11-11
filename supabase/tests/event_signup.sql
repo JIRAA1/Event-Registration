@@ -1,4 +1,4 @@
--- Run against an isolated database after migrations 001-026.
+-- Run against an isolated database after migrations 001-027.
 begin;
 set local search_path=public,extensions,pg_temp;
 do $test$
@@ -22,6 +22,14 @@ begin
   insert into app_sessions(user_id,token_hash,expires_at) values(admin_id,encode(digest(admin_token,'sha256'),'hex'),now()+interval '1 hour');
   insert into events(title) values('Registration QA A') returning id into event_a;
   insert into events(title) values('Registration QA B') returning id into event_b;
+  result:=registration_admin(admin_token,event_a,'CONTACT','https://example.org/contact');
+  assert result->>'contact'='https://example.org/contact';
+  assert registration_info(event_b)->>'contact'='https://example.org/contact';
+  assert registration_admin(admin_token,event_a,'CONTACT','')->>'contact'='';
+  begin
+    perform registration_admin('invalid-token',event_a,'CONTACT','https://example.org/unauthorized');
+    raise exception 'unauthorized contact update accepted' using errcode='23505';
+  exception when raise_exception then assert sqlerrm like '%แอดมิน%'; end;
   profile:=jsonb_build_object('student_id','๐๖๙๑๒๓๔๕','full_name','QA Student','faculty','คณะครุศาสตร์','major','คณิตศาสตร์',
     'birth_date','01012549','phone','0800000000','study_year','2','class_group','1','prefix','นาย');
 

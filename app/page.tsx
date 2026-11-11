@@ -5,6 +5,7 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { StudentQr } from './student-qr';
 import { RegistrationAdmin, LoginHelp } from './register/registration-admin';
 import BrowserGate from './browser-gate';
+import {PasswordInput} from './password-input';
 import {BirthDateField} from './birth-date-field';
 import { Camera, CameraOff, Save, Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Clipboard, Clock3, Download, ExternalLink, Eye, FileSpreadsheet, FileUp, Filter, Gauge, GraduationCap, Layers, LayoutDashboard, Loader2, Lock, LogOut, MapPin, Menu, Phone, Plus, QrCode, RefreshCw, ScanLine, Search, Settings2, ShieldCheck, Sparkles, Ticket, Trash2, Unlock, UserCheck, Users, UserX, X, Zap } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
@@ -774,7 +775,7 @@ function NavButton({
     </button>
   );
 }
-function Field({label,...props}:{label:string;name:string;id?:string;type?:string;required?:boolean;placeholder?:string;defaultValue?:string|number;min?:string|number;max?:string|number;minLength?:number;autoComplete?:string;enterKeyHint?:"go"|"next"}){return <label className="block text-[11px] font-semibold text-slate-600">{label}<input {...props} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 placeholder:text-slate-300"/></label>}
+function Field({label,...props}:{label:string;name:string;id?:string;type?:string;required?:boolean;placeholder?:string;defaultValue?:string|number;min?:string|number;max?:string|number;minLength?:number;autoComplete?:string;enterKeyHint?:"go"|"next"}){const Input=props.type==='password'?PasswordInput:'input';return <label className="block text-[11px] font-semibold text-slate-600">{label}<Input {...props} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 placeholder:text-slate-300"/></label>}
 function Modal({title,subtitle,close,children,submitLabel,submitDisabled=false,wide=false}:{
   title:string;subtitle:string;close:()=>void;children:React.ReactNode;submitLabel?:string;submitDisabled?:boolean;wide?:boolean;
 }){
@@ -863,7 +864,7 @@ function Landing({enterAs,saving,loginError}:{enterAs:()=>void;saving:boolean;lo
       </button>
     </form>
     {loginError && <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{loginError}</p>}
-    <LoginHelp loginFailed={Boolean(loginError)}/>
+    <LoginHelp loginFailed={loginError.includes('รหัสผ่านไม่ถูกต้อง')}/>
   </section>
 
 

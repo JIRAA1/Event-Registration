@@ -4,6 +4,8 @@ import {useEffect,useRef,useState} from 'react';
 import {QRCodeCanvas} from 'qrcode.react';
 import {RegistrationFrame} from './registration-frame';
 import styles from './registration.module.css';
+import {PasswordInput} from '../password-input';
+import {LoginHelp} from './registration-admin';
 import {BirthDateField} from '../birth-date-field';
 import {errorText,newReceipt,normalizeDigits,signupRpc,type ApplicationProfile,type Receipt,type SignupInfo} from '@/lib/event-registration';
 
@@ -218,7 +220,7 @@ export function RegistrationForm({eventId,station,onExit,correctionId}:{eventId:
           : method==='error' ? <p role="alert">{lookup?.message}</p>
           : method==='pending' ? <p role="status">มีใบสมัครรอยืนยันสำหรับกิจกรรมนี้แล้ว กรุณากลับไปยังหน้าที่ส่งใบสมัครหรือติดต่อแอดมิน</p>
           : method==='existing' ? <>
-            <label className="block text-sm">รหัสผ่าน<input type="password" name="password" required className={input} autoComplete="current-password"/></label><p className="text-sm text-slate-600">รหัสผ่านเริ่มต้นของนักศึกษาคือวันเดือนปีเกิด พ.ศ. 8 หลัก เช่น 22062549 หากเปลี่ยนแล้วให้ใช้รหัสผ่านปัจจุบัน</p>
+            <label className="block text-sm">รหัสผ่าน<PasswordInput name="password" required className={input} autoComplete="current-password"/></label><p className="text-sm text-slate-600">รหัสผ่านเริ่มต้นของนักศึกษาคือวันเดือนปีเกิด พ.ศ. 8 หลัก เช่น 22062549 หากเปลี่ยนแล้วให้ใช้รหัสผ่านปัจจุบัน</p>
           </>:<div className={styles.profile}>
             <label className="block text-sm">คำนำหน้า<select name="prefix" required defaultValue={initial?.prefix||''} className={input}>
               <option value="">เลือกคำนำหน้า</option><option>นาย</option><option>นางสาว</option></select></label>
@@ -234,6 +236,7 @@ export function RegistrationForm({eventId,station,onExit,correctionId}:{eventId:
           {method!=='lookup' && <button disabled={busy} className="action-primary w-full">{busy?'กำลังส่ง…':method==='error'||method==='pending'?'ตรวจสอบอีกครั้ง':method==='existing'?'ยืนยันบัญชีและสมัครเข้าร่วม':station||edit?'ส่งใบสมัครให้แอดมินยืนยัน':'ลงทะเบียนและรับบัญชี'}</button>}
         </form>
       </>}
+    <LoginHelp popupOnly loginFailed={error.includes('รหัสผ่านไม่ถูกต้อง')}/>
     <footer>{info?.contact && <a href={info.contact} target="_blank" rel="noreferrer" className="action-secondary">ติดต่อแอดมิน</a>}
     {station?<button className="block text-sm underline" onClick={onExit}>ออกจากบัญชีเครื่อง</button>:<a className="block text-sm underline" href={loginUrl}>กลับหน้า Event Pass</a>}
     </footer>
