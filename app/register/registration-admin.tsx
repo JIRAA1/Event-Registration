@@ -1,5 +1,5 @@
 'use client';
-import {useEffect,useState} from 'react';
+import {memo,useEffect,useMemo,useRef,useState} from 'react';
 import {errorText,signupRpc,type QueueState,type SignupInfo} from '@/lib/event-registration';
 import {isSupabaseConfigured} from '@/lib/supabase';
 
@@ -16,7 +16,7 @@ export function LoginHelp({loginFailed}:{loginFailed:boolean}){
 
   </div>;
 }
-export function RegistrationAdmin({eventId,token,refresh}:{eventId:string;token:string;refresh:()=>Promise<void>}) {
+export const RegistrationAdmin=memo(function RegistrationAdmin({eventId,token,refresh,mode='queue'}:{eventId:string;token:string;refresh:()=>Promise<void>;mode?:'queue'|'settings'}) {
   const [data,setData]=useState<QueueState>();
   const [contact,setContact]=useState<string|null>(null);
   const [device,setDevice]=useState<{username:string;password:string}>();
@@ -25,9 +25,19 @@ export function RegistrationAdmin({eventId,token,refresh}:{eventId:string;token:
   const [revision,reload]=useState(0);
   const [url,setUrl]=useState('');
   const [notes,setNotes]=useState<Record<string,string>>({});
+  const [pageIndex,setPageIndex]=useState(0);
+  const listTop=useRef<HTMLDivElement>(null);
+  const pageCount=Math.max(1,Math.ceil((data?.queue.length||0)/15));
+  const page=Math.min(pageIndex,pageCount-1);
+  useEffect(()=>{if(pageIndex!==page)setPageIndex(page);},[pageIndex,page]);
+  function changePage(next:number){
+    setPageIndex(next);
+    listTop.current?.scrollIntoView({block:'start'});
+  }
   const [selected,setSelected]=useState<string[]>([]);
   const eligible=data?.queue.filter(row=>row.status==='PENDING').map(row=>row.id) || [];
-  const chosen=eligible.filter(id=>selected.includes(id));
+  const checked=useMemo(()=>new Set(selected),[selected]);
+  const chosen=eligible.filter(id=>checked.has(id));
   const exportIds=chosen.length?chosen:(data?.queue.map(row=>row.id)??[]);
   async function approveSelected(){
     await signupRpc('registration_approve_many',{p_token:token,p_event:eventId,p_ids:chosen});
@@ -59,13 +69,13 @@ export function RegistrationAdmin({eventId,token,refresh}:{eventId:string;token:
       try{
         if(!document.hidden){
           const next=await signupRpc<QueueState>('registration_admin',{p_token:token,p_event:eventId,p_action:'QUEUE'});
-          if(active)setData(next);
+          if(active)setData(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next);
         }
       }catch(e){if(active)setNotice(errorText(e));}
-      if(active)timer=setTimeout(poll,5000);
+      if(active && mode==='queue')timer=setTimeout(poll,5000);
     };
     void poll();return ()=>{active=false;clearTimeout(timer);};
-  },[eventId,token,revision]);
+  },[eventId,token,revision,mode]);
   async function run(task:()=>Promise<void>){
     setBusy(true);setNotice('');
     try{await task();reload(n=>n+1);}catch(e){setNotice(errorText(e));}finally{setBusy(false);}
@@ -79,25 +89,26 @@ export function RegistrationAdmin({eventId,token,refresh}:{eventId:string;token:
     await refresh();setNotice(decision==='APPROVE'?'อนุมัติและเพิ่มรายชื่อแล้ว':'อัปเดตคำขอแล้ว');
   }
   if(!isSupabaseConfigured)return <p className="bento p-4">เชื่อมต่อ Supabase เพื่อเปิดรับสมัครและใช้เครื่องหน้างาน</p>;
-  return <section className="bento space-y-4 p-5">
-    <h2 className="text-lg font-bold">รับสมัครและอนุมัติรายชื่อ</h2>
+  return <section className="space-y-4">
     {notice && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm">{notice}</p>}
+    {!data && <p role="status">กำลังโหลดข้อมูล…</p>}
     {data && <>
-      <div className="flex flex-wrap items-center gap-3"><b>{data.open?'เปิดรับสมัครออนไลน์':'ปิดรับสมัครออนไลน์'}</b>
+      {mode==='queue' && <>
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-slate-50 p-3"><b>{data.open?'เปิดรับสมัครออนไลน์':'ปิดรับสมัครออนไลน์'}</b>
         <button disabled={busy} className="action-secondary" onClick={()=>void run(async()=>{setData(await admin(data.open?'CLOSE':'OPEN'));})}>{data.open?'ปิดรับออนไลน์':'เปิดรับออนไลน์'}</button>
         <a className="action-secondary" href={url} target="_blank" rel="noreferrer">ดูหน้าสมัคร</a>
         <button className="action-secondary" onClick={()=>void run(async()=>{await navigator.clipboard.writeText(url);setNotice('คัดลอกลิงก์แล้ว');})}>คัดลอกลิงก์สมัคร</button></div>
-      <h3 className="font-bold">คิวของกิจกรรมนี้ ({data.queue.length})</h3>
+      <div ref={listTop} className="scroll-mt-3"/><h3 className="font-bold">คิวของกิจกรรมนี้ ({data.queue.length})</h3>
       <div className="flex flex-wrap items-center gap-3">
         <button disabled={busy||!exportIds.length} className="action-secondary" onClick={()=>void run(exportApplicants)}>
           ส่งออก{chosen.length?'ที่เลือก':'รายชื่อในคิว'} {exportIds.length} รายการ (CSV)
         </button>
         {eligible.length>0 && <><label className="flex min-h-11 items-center gap-2"><input type="checkbox" disabled={busy} checked={chosen.length===eligible.length}
-          onChange={e=>setSelected(e.target.checked?eligible:[])}/>เลือกทั้งหมดที่รอยืนยัน</label>
+          onChange={e=>setSelected(e.target.checked?eligible:[])}/>เลือกที่รอยืนยันทุกหน้า ({eligible.length})</label>
           <button className="action-primary" disabled={busy||!chosen.length} onClick={()=>void run(approveSelected)}>อนุมัติที่เลือก ({chosen.length})</button></>}
       </div>
       {!data.queue.length && <p className="text-sm text-slate-600">ไม่มีใบสมัครรอตรวจ</p>}
-      {data.queue.map(r=><article key={r.id} className="space-y-2 rounded-xl border p-3">
+      {data.queue.slice(page*15,page*15+15).map(r=><article key={r.id} className="space-y-2 rounded-xl border p-3">
         <label className="flex min-h-11 items-center gap-3"><input type="checkbox" disabled={busy||r.status!=='PENDING'} checked={chosen.includes(r.id)}
           onChange={e=>setSelected(ids=>e.target.checked?[...ids,r.id]:ids.filter(id=>id!==r.id))}/><b>{r.profile.prefix}{r.profile.full_name} · {r.student_id}</b></label><p className="text-sm">{r.kiosk?'หน้างาน':'ออนไลน์'} · {r.id.slice(0,8).toUpperCase()} · {r.status==='CORRECT'?'รอผู้สมัครแก้ไข':'รอยืนยัน'}</p>
         <p className="text-sm">{r.profile.faculty} · {r.profile.major} · ปี {r.profile.study_year} · หมู่ {r.profile.class_group} · โทร {r.profile.phone}</p>
@@ -106,7 +117,14 @@ export function RegistrationAdmin({eventId,token,refresh}:{eventId:string;token:
         {r.profile.birth_date && <button className="action-secondary" disabled={busy||!notes[r.id]?.trim()} onClick={()=>void run(()=>review(r.id,'CORRECT'))}>ส่งกลับให้แก้ไข</button>}
         <button className="action-danger" disabled={busy} onClick={()=>void run(()=>review(r.id,'CANCEL'))}>ยกเลิกใบสมัคร</button></div>
       </article>)}
-      <details className="rounded-xl border p-3"><summary className="cursor-pointer font-bold">ตั้งค่าเครื่อง iPad และช่องทางติดต่อ</summary>
+      <nav aria-label="หน้ารายชื่อผู้สมัคร" className="flex flex-wrap items-center justify-between gap-2">
+        <button className="action-secondary" disabled={busy||page===0} onClick={()=>changePage(page-1)}>ก่อนหน้า</button>
+        <span className="text-sm" aria-live="polite">หน้า {page+1} / {pageCount} · หน้าละ 15 คน</span>
+        <button className="action-secondary" disabled={busy||page+1>=pageCount} onClick={()=>changePage(page+1)}>ถัดไป</button>
+      </nav>
+      </>}
+      {mode==='settings' && <div className="rounded-xl border p-4">
+        <h3 className="font-bold">เครื่องลงทะเบียน iPad</h3>
         <div className="mt-3 space-y-3">
           <p className="break-all text-sm">{data.station?'บัญชีเครื่อง '+data.station:'ยังไม่มีบัญชีเครื่องสำหรับกิจกรรมนี้'}</p>
           <button className="action-secondary" disabled={busy} onClick={()=>void run(async()=>{
@@ -115,10 +133,10 @@ export function RegistrationAdmin({eventId,token,refresh}:{eventId:string;token:
           })}>{data.station?'ออกรหัสผ่านเครื่องใหม่':'สร้างบัญชีเครื่องหน้างาน'}</button>
           {device && <div className="break-all rounded-xl bg-amber-50 p-3 text-sm"><p>{device.username}</p><p>รหัสผ่านเครื่อง {device.password}</p><button className="underline" onClick={()=>setDevice(undefined)}>ซ่อนรหัสผ่าน</button></div>}
           <a className="block text-sm underline" href="/kiosk" target="_blank" rel="noreferrer">เปิดหน้าเครื่องลงทะเบียน</a>
-          <label className="block text-sm">ลิงก์ติดต่อแอดมินบนหน้า Login (ทุกกิจกรรม)<input type="url" value={contact??data.contact} onChange={e=>setContact(e.target.value)} placeholder="https://..." className="mt-1 block h-11 w-full rounded-xl border px-3"/></label>
+          <label className="block border-t pt-4 text-sm">ลิงก์ติดต่อแอดมินบนหน้า Login (ทุกกิจกรรม)<input type="url" value={contact??data.contact} onChange={e=>setContact(e.target.value)} placeholder="https://..." className="mt-1 block h-11 w-full rounded-xl border px-3"/></label>
           <button className="action-primary" disabled={busy||contact===null} onClick={()=>void run(async()=>{setData(await admin('CONTACT',contact?.trim()||''));setContact(null);setNotice('บันทึกช่องทางติดต่อแล้ว');})}>บันทึกช่องทางติดต่อ</button>
         </div>
-      </details>
+      </div>}
     </>}
   </section>;
-}
+});

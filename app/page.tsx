@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { StudentQr } from './student-qr';
 import { RegistrationAdmin, LoginHelp } from './register/registration-admin';
@@ -1244,7 +1244,8 @@ function UserProfileSummary({user}:{user:User}){
 }
 
 function AdminView({deleteBatch,sessionToken,store,academicCatalog,manageAcademicCatalog,selectedEvent,selectedEventId,setSelectedEvent,openCreate,openCodes,openStaff,editUser,deleteUser,deleteActivity,deleteRegistration,csvFile,setCsvFile,importCsv,refreshWorkspace,loadEventDashboard,updateEvent}:{deleteBatch:(kind:'students'|'codes',values:string[])=>Promise<boolean|undefined>;sessionToken:string;store:Store;academicCatalog:AcademicFaculty[];manageAcademicCatalog:(action:CatalogAction,facultyId:string,facultyName:string,majorId:string,majorName:string)=>unknown;selectedEvent:Event;selectedEventId:string;setSelectedEvent:(id:string)=>void;openCreate:()=>void;openCodes:()=>void;openStaff:()=>void;editUser:(user:User)=>void;deleteUser:(user:User)=>void;deleteActivity:()=>void;deleteRegistration:(userId:string)=>void;csvFile:File|null;setCsvFile:(f:File|null)=>void;importCsv:()=>void;refreshWorkspace:()=>Promise<void>;loadEventDashboard:()=>Promise<EventDashboardRow[]>;updateEvent:(p:Partial<Event>)=>void|Promise<void>}) {
- const [managementPanel,setManagementPanel]=useState<'registration'|'passcodes'|null>(null);
+ const removePasscodes=useCallback((values:string[])=>deleteBatch('codes',values),[deleteBatch]);
+ const [managementPanel,setManagementPanel]=useState<'registration'|'passcodes'|'settings'|null>(null);
  useEffect(()=>setManagementPanel(null),[selectedEventId]);
  const [adminTab, setAdminTab] = useState<'dashboard' | 'events' | 'report' | 'users' | 'catalog' | 'all'>('dashboard');
  const [redirectDraft,setRedirectDraft]=useState(selectedEvent.redirect_url_year1);
@@ -1289,7 +1290,8 @@ function AdminView({deleteBatch,sessionToken,store,academicCatalog,manageAcademi
   },[loadEventDashboard,refreshWorkspace,sessionToken]);
  const regs=store.regs.filter(r=>r.event_id===selectedEventId),reserves=store.codes.filter(c=>c.event_id===selectedEventId&&c.is_reserve),remaining=reserves.filter(c=>!c.assigned_to).length,completed=regs.filter(r=>r.status==='COMPLETED').length;
   const [reportStudyYear,setReportStudyYear]=useState('ALL'),[reportFaculty,setReportFaculty]=useState('ALL'),[reportMajor,setReportMajor]=useState('ALL'),[reportClassGroup,setReportClassGroup]=useState('ALL'),[reportStatus,setReportStatus]=useState<'ALL'|'ATTENDED'|'NO_CHECKIN'|'NO_CHECKOUT'>('ATTENDED');
-  const reportPopulation=regs.map(reg=>({reg,person:store.users.find(u=>u.id===reg.user_id)})).filter((row):row is {reg:Registration;person:User}=>Boolean(row.person));
+  const reportPeople=useMemo(()=>new Map(store.users.map(person=>[person.id,person])),[store.users]);
+ const reportPopulation=regs.map(reg=>({reg,person:reportPeople.get(reg.user_id)})).filter((row):row is {reg:Registration;person:User}=>Boolean(row.person));
   const reportStudyYears=Array.from(new Set(reportPopulation.map(row=>row.person.study_year).filter(year=>year>0))).sort((a,b)=>a-b);
   const reportFaculties=Array.from(new Set(reportPopulation.map(row=>row.person.faculty))).sort();
   const optionRows=reportPopulation.filter(row=>(reportStudyYear==='ALL'||String(row.person.study_year)===reportStudyYear)&&(reportFaculty==='ALL'||row.person.faculty===reportFaculty));
@@ -1390,19 +1392,23 @@ function AdminView({deleteBatch,sessionToken,store,academicCatalog,manageAcademi
   </div>
   )}
   {store.events.length>0 && ['dashboard','events','all'].includes(adminTab) &&
-    <div className="grid gap-3 sm:grid-cols-2">
-      <button type="button" aria-haspopup="dialog" onClick={()=>setManagementPanel('registration')} className="action-primary justify-between px-5 py-4 text-left">
-        <span className="flex items-center gap-3"><UserCheck size={22}/>รับสมัครและอนุมัติรายชื่อ</span><ChevronRight size={20}/>
-      </button>
-      <button type="button" aria-haspopup="dialog" onClick={()=>setManagementPanel('passcodes')} className="action-secondary justify-between px-5 py-4 text-left">
-        <span className="flex items-center gap-3"><Ticket size={22}/>จัดการ Passcode</span><ChevronRight size={20}/>
-      </button>
+    <div className="grid gap-3 lg:grid-cols-3">
+      {([
+        {id:'registration',title:'รับสมัครและอนุมัติรายชื่อ',detail:'เปิดรับสมัคร ตรวจรายชื่อ และส่งออก CSV',icon:UserCheck},
+        {id:'passcodes',title:'จัดการ Passcode',detail:'ค้นหา ตรวจสถานะ เพิ่มและลบรหัส',icon:Ticket},
+        {id:'settings',title:'เครื่อง iPad และช่องทางติดต่อ',detail:'ตั้งค่าบัญชีเครื่องและลิงก์ติดต่อแอดมิน',icon:Settings2},
+      ] as const).map(item=><button key={item.id} type="button" aria-haspopup="dialog" onClick={()=>setManagementPanel(item.id)}
+        className="flex min-h-24 items-center gap-3 rounded-2xl border border-slate-300 bg-white p-4 text-left hover:border-[#7c0a02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7c0a02]">
+        <span className="rounded-xl bg-rose-50 p-3 text-[#7c0a02]"><item.icon size={22}/></span>
+        <span className="min-w-0 flex-1"><strong className="block text-sm">{item.title}</strong><span className="mt-1 block text-xs text-slate-600">{item.detail}</span></span>
+        <ChevronRight size={20}/>
+      </button>)}
     </div>}
-  {managementPanel && <Modal wide title={managementPanel==='registration'?'รับสมัครและอนุมัติรายชื่อ':'จัดการ Passcode'}
+  {managementPanel && <Modal wide title={managementPanel==='registration'?'รับสมัครและอนุมัติรายชื่อ':managementPanel==='settings'?'ตั้งค่าเครื่อง iPad และช่องทางติดต่อ':'จัดการ Passcode'}
     subtitle={selectedEvent.title} close={()=>setManagementPanel(null)}>
-    {managementPanel==='registration'
-      ? <RegistrationAdmin key={selectedEvent.id} token={sessionToken} eventId={selectedEvent.id} refresh={refreshWorkspace}/>
-      : <PasscodeList key={selectedEventId} eventId={selectedEventId} store={store} openCodes={openCodes} remove={values=>deleteBatch('codes',values)}/>}
+    {managementPanel==='passcodes'
+      ? <PasscodeList key={selectedEventId} eventId={selectedEventId} store={store} openCodes={openCodes} remove={removePasscodes}/>
+      : <RegistrationAdmin key={selectedEvent.id+managementPanel} mode={managementPanel==='settings'?'settings':'queue'} token={sessionToken} eventId={selectedEvent.id} refresh={refreshWorkspace}/>}
   </Modal>}
   {/* TAB 1: Dashboard Section */}
   {(adminTab === 'all' || adminTab === 'dashboard') && (
@@ -1812,14 +1818,19 @@ function BulkActions({eligible,selected,setSelection,label,remove}:{
   </div>;
 }
 
-function PasscodeList({eventId,store,openCodes,remove}:{
+const PasscodeList=memo(function PasscodeList({eventId,store,openCodes,remove}:{
   eventId:string;store:Store;openCodes:()=>void;remove:(values:string[])=>Promise<boolean|undefined>;
 }){
   const [filter,setFilter]=useState('');
   const [query,setQuery]=useState('');
   const [selection,setSelection]=useState<string[]>([]);
   const [pageIndex,setPageIndex]=useState(0);
-  const listRef=useRef<HTMLUListElement>(null);
+  const listTop=useRef<HTMLDivElement>(null);
+  function changePage(next:number){
+    setPageIndex(next);
+    listTop.current?.scrollIntoView({block:'start'});
+  }
+
   const rows=useMemo(()=>{
     const people=new Map(store.users.map(u=>[u.id,u]));
     const matches=new Map(store.regs.filter(r=>r.event_id===eventId && r.passcode).map(r=>[r.passcode,r]));
@@ -1844,20 +1855,18 @@ function PasscodeList({eventId,store,openCodes,remove}:{
   const eligible=useMemo(()=>visible.filter(row=>row.status==='ว่าง').map(row=>row.code),[visible]);
   const checked=useMemo(()=>new Set(selection),[selection]);
   const selected=useMemo(()=>eligible.filter(code=>checked.has(code)),[eligible,checked]);
-  const pageSize=50;
+  const pageSize=20;
   const pageCount=Math.ceil(visible.length/pageSize);
   const page=Math.min(pageIndex,Math.max(0,pageCount-1));
   const start=page*pageSize;
-  useEffect(()=>{
-    if (listRef.current) listRef.current.scrollTop=0;
-  },[page,query,filter]);
+
   useEffect(()=>{if(pageIndex!==page)setPageIndex(page);},[pageIndex,page]);
-  return <section className="bento space-y-3 p-4 sm:p-5">
+  return <section className="space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h2 className="font-bold text-slate-900">Passcode ของกิจกรรม</h2>
       <button type="button" onClick={openCodes} className="action-primary"><Plus size={16}/>เพิ่มหลายรหัส</button>
     </div>
-    <p className="text-sm text-slate-600">ทั้งหมด {rows.length} รหัส · ว่าง {availableCount} รหัส</p>
+    <div ref={listTop} className="scroll-mt-3"/><p className="text-sm text-slate-600">ทั้งหมด {rows.length} รหัส · ว่าง {availableCount} รหัส</p>
     <input aria-label="ค้นหา Passcode หรือผู้รับ" placeholder="ค้นหารหัส ชื่อ หรือรหัสนักศึกษา" value={query}
       onChange={e=>{setQuery(e.target.value);setPageIndex(0);setSelection([]);}} className="h-11 w-full rounded-xl border border-slate-300 px-3"/>
     <label className="flex items-center gap-2 text-sm">สถานะ
@@ -1867,7 +1876,7 @@ function PasscodeList({eventId,store,openCodes,remove}:{
     </label>
     <BulkActions eligible={eligible} selected={selected} setSelection={setSelection} label="ลบรหัส"
       remove={async()=>{if(await remove(selected))setSelection([]);}}/>
-    <ul ref={listRef} aria-label="รายการ Passcode" className="max-h-96 divide-y overflow-y-auto">
+    <ul aria-label="รายการ Passcode" className="divide-y">
       {visible.slice(start,start+pageSize).map(r=><li key={r.code}><label className="flex min-h-12 items-center gap-3 py-2">
         <input type="checkbox" aria-label={'เลือก Passcode '+r.code} disabled={r.status!=='ว่าง'} checked={r.status==='ว่าง' && checked.has(r.code)}
           onChange={e=>setSelection(e.target.checked?[...selected,r.code]:selected.filter(c=>c!==r.code))} className="h-5 w-5 shrink-0 accent-[#7c0a02]"/>
@@ -1878,13 +1887,13 @@ function PasscodeList({eventId,store,openCodes,remove}:{
       </label></li>)}
     </ul>
     {pageCount>1 && <nav aria-label="หน้ารายการ Passcode" className="flex flex-wrap items-center justify-between gap-2">
-      <button type="button" className="action-secondary disabled:opacity-40" disabled={page===0} onClick={()=>setPageIndex(page-1)}>ก่อนหน้า</button>
+      <button type="button" className="action-secondary disabled:opacity-40" disabled={page===0} onClick={()=>changePage(page-1)}>ก่อนหน้า</button>
       <span aria-live="polite" className="text-sm text-slate-600">หน้า {page+1} / {pageCount}</span>
-      <button type="button" className="action-secondary disabled:opacity-40" disabled={page+1>=pageCount} onClick={()=>setPageIndex(page+1)}>ถัดไป</button>
+      <button type="button" className="action-secondary disabled:opacity-40" disabled={page+1>=pageCount} onClick={()=>changePage(page+1)}>ถัดไป</button>
     </nav>}
     {!visible.length && <Empty message={rows.length?'ไม่พบรหัสตามตัวกรอง':'ยังไม่มี Passcode ในกิจกรรมนี้'}/>}
   </section>;
-}
+});
 
 function AdminMetric({label,value,note,icon,tone}:{label:string;value:number;note:string;icon:React.ReactNode;tone:string}){
   const styles:Record<string,{bg:string;iconBg:string;text:string;border:string}>={
