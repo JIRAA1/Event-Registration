@@ -138,10 +138,17 @@ function EventPass() {
     }
   },[user,store.regs,store.applications,workspaceReady]);
 
+  const isImportingRef = useRef(false);
+  const refreshingWorkspaceRef = useRef(false);
   const refreshWorkspace=useCallback(async()=>{
-    if(!sessionToken||!supabase)return;
-    const {data,error}=await supabase.rpc('load_workspace',{p_session_token:sessionToken});
-    if(!error&&data?.success){setStore(workspaceStore(data));setAcademicCatalog(workspaceCatalog(data));}
+    if(!sessionToken||!supabase||refreshingWorkspaceRef.current)return;
+    refreshingWorkspaceRef.current=true;
+    try{
+      const {data,error}=await supabase.rpc('load_workspace',{p_session_token:sessionToken});
+      if(!error&&data?.success){setStore(workspaceStore(data));setAcademicCatalog(workspaceCatalog(data));}
+    }finally{
+      refreshingWorkspaceRef.current=false;
+    }
   },[sessionToken]);
 
   const loadEventDashboard=useCallback(async()=>{
@@ -497,16 +504,21 @@ function EventPass() {
     if(isSupabaseConfigured&&supabase&&user?.role==='ADMIN'){
       if(!sessionToken){setToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบแอดมินใหม่');return;}
       if(roster){
-        const result=await importRosterInBatches(students,
-          batch=>supabase!.rpc('admin_import_student_roster',{p_admin_token:sessionToken,p_students:batch}),
-          (processed,total)=>setLoadingMessage(`นำเข้ารายชื่อ ${processed.toLocaleString()} / ${total.toLocaleString()} แถว`));
-        await refreshWorkspace();
-        if(result.error){
-          setImportError(`ยืนยันผลแล้ว ${result.processed} / ${students.length} แถว · สร้างบัญชี ${result.imported} คน · ข้าม ${result.skipped} คน · ${result.error} · กดนำเข้าไฟล์เดิมอีกครั้งเพื่อทำต่อ ระบบจะข้ามบัญชีที่สร้างสำเร็จแล้ว`);
-          setToast('นำเข้ายังไม่ครบ กรุณาดูรายละเอียดใต้ส่วนเลือกไฟล์');
-        }else{
-          setCsvFile(null);
-          setToast(`สร้างบัญชี ${result.imported} คน · ข้ามบัญชีที่มีอยู่ ${result.skipped} คน`);
+        isImportingRef.current=true;
+        try{
+          const result=await importRosterInBatches(students,
+            batch=>supabase!.rpc('admin_import_student_roster',{p_admin_token:sessionToken,p_students:batch}),
+            (processed,total)=>setLoadingMessage(`นำเข้ารายชื่อ ${processed.toLocaleString()} / ${total.toLocaleString()} แถว`));
+          await refreshWorkspace();
+          if(result.error){
+            setImportError(`ยืนยันผลแล้ว ${result.processed} / ${students.length} แถว · สร้างบัญชี ${result.imported} คน · ข้าม ${result.skipped} คน · ${result.error} · กดนำเข้าไฟล์เดิมอีกครั้งเพื่อทำต่อ ระบบจะข้ามบัญชีที่สร้างสำเร็จแล้ว`);
+            setToast('นำเข้ายังไม่ครบ กรุณาดูรายละเอียดใต้ส่วนเลือกไฟล์');
+          }else{
+            setCsvFile(null);
+            setToast(`สร้างบัญชีใหม่ ${result.imported} คน · ข้ามบัญชีเดิมที่มีอยู่แล้ว ${result.skipped} คน (รวม ${students.length} คน)`);
+          }
+        }finally{
+          isImportingRef.current=false;
         }
         return;
       }
@@ -702,7 +714,7 @@ function EventPass() {
     )}
 
     <div key={view} className="page-transition mx-auto mt-6 max-w-[1440px]">
-      {!user?<Landing loginError={loginError} enterAs={()=>void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…',enterAs)} saving={saving||Boolean(loadingMessage)}/>:view==='scanner'&&user.role!=='STUDENT'?<ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={()=>setScannerLocked(value=>!value)} startScanner={()=>void withLoading('กำลังเปิดกล้อง…',startScanner)} stopScanner={()=>void withLoading('กำลังปิดกล้อง…',stopScanner)} scanMode={()=>void withLoading('กำลังเปลี่ยนโหมดสแกน…',setScanMode)} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async(raw:string)=>{await withLoading('กำลังตรวจสอบ QR…',()=>scanPayload(raw));}} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={()=>setModal('walkin')}/>:view==='admin'&&user.role==='ADMIN'?<AdminView deleteBatch={(kind,values)=>withLoading('กำลังลบรายการ…',()=>deleteBatch(kind,values))} sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args)=>withLoading('กำลังบันทึกคณะและสาขา…',()=>manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={()=>setModal('event')} openCodes={()=>setModal('codes')} openStaff={()=>setModal('staff')} editUser={(target:User)=>{setEditingUser(target);setEditingFaculty(target.faculty);setEditingMajor(target.major);setModal('editUser')}} deleteUser={(target:User)=>void withLoading('กำลังลบบัญชีผู้ใช้…',()=>deleteManagedUser(target))} deleteActivity={()=>void withLoading('กำลังลบกิจกรรม…',deleteActivity)} deleteRegistration={(id:string)=>void withLoading('กำลังนำรายชื่อออก…',()=>deleteRegistration(id))} importError={importError} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={roster=>void withLoading('กำลังนำเข้ารายชื่อ…',()=>importCsv(roster))} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch:Partial<Event>)=>withLoading('กำลังบันทึกการเปลี่ยนแปลง…',()=>updateSelectedEvent(patch))} />:view==='studentStats'&&user.role==='STUDENT'?<StudentStatsView user={user} events={store.events.filter(e=>studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs}/>:view==='event'&&user.role==='STUDENT'?<EventDetail session={sessionToken} event={store.events.find(e=>e.id===activeEvent)||currentEvent} user={user} registration={studentRegs.find(r=>r.event_id===activeEvent)} back={()=>setView('home')}/>:<StudentHome session={sessionToken} refresh={refreshWorkspace} user={user} events={store.events.filter(e=>e.status==='ACTIVE'&&studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs} select={(id:string)=>{setActiveEvent(id);setView('event')}} store={store}/>}
+      {!user?<Landing loginError={loginError} enterAs={()=>void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…',enterAs)} saving={saving||Boolean(loadingMessage)}/>:view==='scanner'&&user.role!=='STUDENT'?<ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={()=>setScannerLocked(value=>!value)} startScanner={()=>void withLoading('กำลังเปิดกล้อง…',startScanner)} stopScanner={()=>void withLoading('กำลังปิดกล้อง…',stopScanner)} scanMode={()=>void withLoading('กำลังเปลี่ยนโหมดสแกน…',setScanMode)} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async(raw:string)=>{await withLoading('กำลังตรวจสอบ QR…',()=>scanPayload(raw));}} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={()=>setModal('walkin')}/>:view==='admin'&&user.role==='ADMIN'?<AdminView isImportingRef={isImportingRef} deleteBatch={(kind,values)=>withLoading('กำลังลบรายการ…',()=>deleteBatch(kind,values))} sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args)=>withLoading('กำลังบันทึกคณะและสาขา…',()=>manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={()=>setModal('event')} openCodes={()=>setModal('codes')} openStaff={()=>setModal('staff')} editUser={(target:User)=>{setEditingUser(target);setEditingFaculty(target.faculty);setEditingMajor(target.major);setModal('editUser')}} deleteUser={(target:User)=>void withLoading('กำลังลบบัญชีผู้ใช้…',()=>deleteManagedUser(target))} deleteActivity={()=>void withLoading('กำลังลบกิจกรรม…',deleteActivity)} deleteRegistration={(id:string)=>void withLoading('กำลังนำรายชื่อออก…',()=>deleteRegistration(id))} importError={importError} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={roster=>void withLoading('กำลังนำเข้ารายชื่อ…',()=>importCsv(roster))} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch:Partial<Event>)=>withLoading('กำลังบันทึกการเปลี่ยนแปลง…',()=>updateSelectedEvent(patch))} />:view==='studentStats'&&user.role==='STUDENT'?<StudentStatsView user={user} events={store.events.filter(e=>studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs}/>:view==='event'&&user.role==='STUDENT'?<EventDetail session={sessionToken} event={store.events.find(e=>e.id===activeEvent)||currentEvent} user={user} registration={studentRegs.find(r=>r.event_id===activeEvent)} back={()=>setView('home')}/>:<StudentHome session={sessionToken} refresh={refreshWorkspace} user={user} events={store.events.filter(e=>e.status==='ACTIVE'&&studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs} select={(id:string)=>{setActiveEvent(id);setView('event')}} store={store}/>}
     </div>
     {user&&<div className="mx-auto mt-10 flex max-w-[1440px] items-center justify-between border-t border-slate-200/70 px-2 py-4 text-[10px] text-slate-500"><span>© 2026 ARU Student Organization · ระบบลงทะเบียนกิจกรรม</span><span className="hidden items-center gap-1 sm:flex"><ShieldCheck size={12}/>ข้อมูลกิจกรรมอัปเดตแบบเรียลไทม์</span></div>}
     {modal==='walkin'&&<Modal submitLabel="บันทึกรายชื่อหน้างาน" submitDisabled={walkinStudyYear>1&&reserveLeft===0} title="ลงทะเบียนหน้างาน" subtitle="เพิ่มนักศึกษาและผูกสิทธิ์กิจกรรม" close={()=>setModal(null)}><form id="staff-admin-form" onSubmit={e=>void withLoading('กำลังบันทึกรายชื่อ…',()=>addWalkin(e))} className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><Field label="รหัสนักศึกษา" name="student_id" required placeholder="เช่น 69123456"/><label className="text-sm">คำนำหน้า<select name="prefix" required defaultValue="" className="mt-1 block h-11 w-full rounded-xl border px-3"><option value="">เลือกคำนำหน้า</option><option>นาย</option><option>นางสาว</option></select></label><Field label="ชื่อ–นามสกุล" name="full_name" required placeholder="ชื่อ นามสกุล"/><label className="block text-[11px] font-semibold text-slate-600">คณะ<select name="faculty" value={walkinFaculty} required onChange={e=>{setWalkinFaculty(e.target.value);setWalkinMajor('')}} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800"><option value="">เลือกคณะ</option>{academicCatalog.map(faculty=><option key={faculty.id} value={faculty.name}>{faculty.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">สาขาวิชา<select name="major" value={walkinMajor} required disabled={!walkinFaculty} onChange={e=>setWalkinMajor(e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 disabled:opacity-50"><option value="">เลือกสาขา</option>{(academicCatalog.find(faculty=>faculty.name===walkinFaculty)?.majors||[]).map(major=><option key={major.id} value={major.name}>{major.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">ชั้นปีที่กำลังศึกษา<select name="study_year" value={walkinStudyYear} onChange={e=>setWalkinStudyYear(Number(e.target.value))} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{Array.from({length:8},(_,i)=>i+1).map(year=><option key={year} value={year}>ปี {year}</option>)}</select></label><label className="text-sm">หมู่เรียน<select name="class_group" required defaultValue="" className="mt-1 block h-11 w-full rounded-xl border px-3"><option value="">เลือกหมู่เรียน</option>{[1,2,3,4].map(n=><option key={n}>{n}</option>)}</select></label><BirthDateField/><Field label="เบอร์โทรศัพท์" name="phone" placeholder="08X-XXX-XXXX"/></div><div className={cx('flex items-center justify-between rounded-2xl px-4 py-3 text-xs',reserveLeft?'bg-amber-50 text-amber-900':'bg-rose-50 text-rose-700')}><span className="flex items-center gap-2"><Ticket size={15}/>Passcode สำรองคงเหลือ</span><b>{reserveLeft} รหัส</b></div><p className="text-center text-[10px] leading-5 text-slate-400">นักศึกษาชั้นปี 2 ขึ้นไปจะได้รับ Passcode หลังเช็กเอาต์ · ปี 1 ใช้ QR Check-in/Check-out</p></form></Modal>}
@@ -1262,7 +1274,7 @@ function UserProfileSummary({user}:{user:User}){
   </section>;
 }
 
-function AdminView({importError,deleteBatch,sessionToken,store,academicCatalog,manageAcademicCatalog,selectedEvent,selectedEventId,setSelectedEvent,openCreate,openCodes,openStaff,editUser,deleteUser,deleteActivity,deleteRegistration,csvFile,setCsvFile,importCsv,refreshWorkspace,loadEventDashboard,updateEvent}:{importError:string;deleteBatch:(kind:'students'|'codes',values:string[])=>Promise<boolean|undefined>;sessionToken:string;store:Store;academicCatalog:AcademicFaculty[];manageAcademicCatalog:(action:CatalogAction,facultyId:string,facultyName:string,majorId:string,majorName:string)=>unknown;selectedEvent:Event;selectedEventId:string;setSelectedEvent:(id:string)=>void;openCreate:()=>void;openCodes:()=>void;openStaff:()=>void;editUser:(user:User)=>void;deleteUser:(user:User)=>void;deleteActivity:()=>void;deleteRegistration:(userId:string)=>void;csvFile:File|null;setCsvFile:(f:File|null)=>void;importCsv:(roster?:boolean)=>void;refreshWorkspace:()=>Promise<void>;loadEventDashboard:()=>Promise<EventDashboardRow[]>;updateEvent:(p:Partial<Event>)=>void|Promise<void>}) {
+function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,academicCatalog,manageAcademicCatalog,selectedEvent,selectedEventId,setSelectedEvent,openCreate,openCodes,openStaff,editUser,deleteUser,deleteActivity,deleteRegistration,csvFile,setCsvFile,importCsv,refreshWorkspace,loadEventDashboard,updateEvent}:{isImportingRef:React.MutableRefObject<boolean>;importError:string;deleteBatch:(kind:'students'|'codes',values:string[])=>Promise<boolean|undefined>;sessionToken:string;store:Store;academicCatalog:AcademicFaculty[];manageAcademicCatalog:(action:CatalogAction,facultyId:string,facultyName:string,majorId:string,majorName:string)=>unknown;selectedEvent:Event;selectedEventId:string;setSelectedEvent:(id:string)=>void;openCreate:()=>void;openCodes:()=>void;openStaff:()=>void;editUser:(user:User)=>void;deleteUser:(user:User)=>void;deleteActivity:()=>void;deleteRegistration:(userId:string)=>void;csvFile:File|null;setCsvFile:(f:File|null)=>void;importCsv:(roster?:boolean)=>void;refreshWorkspace:()=>Promise<void>;loadEventDashboard:()=>Promise<EventDashboardRow[]>;updateEvent:(p:Partial<Event>)=>void|Promise<void>}) {
  const removePasscodes=useCallback((values:string[])=>deleteBatch('codes',values),[deleteBatch]);
  const [managementPanel,setManagementPanel]=useState<'registration'|'passcodes'|'settings'|null>(null);
  useEffect(()=>setManagementPanel(null),[selectedEventId]);
@@ -1290,8 +1302,9 @@ function AdminView({importError,deleteBatch,sessionToken,store,academicCatalog,m
     let active=true;
     let channel:ReturnType<NonNullable<typeof client>['channel']>|undefined;
     let fallbackTimer:number|undefined;
+    let debounceTimer:ReturnType<typeof setTimeout>|undefined;
     const refresh=async()=>{const rows=await loadEventDashboard();if(active)setDashboardRows(rows);};
-    const startFallback=()=>{if(!active)return;setDashboardLive(false);if(!fallbackTimer)fallbackTimer=window.setInterval(()=>{void refresh();void refreshWorkspace();},3000);};
+    const startFallback=()=>{if(!active)return;setDashboardLive(false);if(!fallbackTimer)fallbackTimer=window.setInterval(()=>{if(!isImportingRef.current){void refresh();void refreshWorkspace();}},10000);};
     const stopFallback=()=>{if(fallbackTimer){window.clearInterval(fallbackTimer);fallbackTimer=undefined;}};
     void refresh();
     void refreshWorkspace();
@@ -1299,14 +1312,20 @@ function AdminView({importError,deleteBatch,sessionToken,store,academicCatalog,m
     void hashSessionToken(sessionToken).then(tokenHash=>{
       if(!active)return;
       channel=client.channel(`aru-admin-dashboard:${tokenHash}`,{config:{private:true}})
-        .on('broadcast',{event:'dashboard_changed'},({payload})=>{void refresh();if(payload?.source_table!=='app_sessions')void refreshWorkspace();})
+        .on('broadcast',{event:'dashboard_changed'},({payload})=>{
+          if(debounceTimer)clearTimeout(debounceTimer);
+          debounceTimer=setTimeout(()=>{
+            void refresh();
+            if(payload?.source_table!=='app_sessions' && !isImportingRef.current)void refreshWorkspace();
+          },1500);
+        })
         .subscribe(status=>{
           if(status==='SUBSCRIBED'){setDashboardLive(true);stopFallback();void refresh();}
           else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED')startFallback();
         });
     }).catch(()=>{if(active)startFallback();});
-    return()=>{active=false;stopFallback();if(channel)void client.removeChannel(channel);};
-  },[loadEventDashboard,refreshWorkspace,sessionToken]);
+    return()=>{active=false;if(debounceTimer)clearTimeout(debounceTimer);stopFallback();if(channel)void client.removeChannel(channel);};
+  },[loadEventDashboard,refreshWorkspace,sessionToken,isImportingRef]);
  const regs=store.regs.filter(r=>r.event_id===selectedEventId),reserves=store.codes.filter(c=>c.event_id===selectedEventId&&c.is_reserve),remaining=reserves.filter(c=>!c.assigned_to).length,completed=regs.filter(r=>r.status==='COMPLETED').length;
   const [reportStudyYear,setReportStudyYear]=useState('ALL'),[reportFaculty,setReportFaculty]=useState('ALL'),[reportMajor,setReportMajor]=useState('ALL'),[reportClassGroup,setReportClassGroup]=useState('ALL'),[reportStatus,setReportStatus]=useState<'ALL'|'ATTENDED'|'NO_CHECKIN'|'NO_CHECKOUT'>('ATTENDED');
   const reportPeople=useMemo(()=>new Map(store.users.map(person=>[person.id,person])),[store.users]);
@@ -1350,6 +1369,11 @@ function AdminView({importError,deleteBatch,sessionToken,store,academicCatalog,m
  const query=userQuery.trim().toLocaleLowerCase('th');
  const managedUsers=matchingAccounts.filter(account=>[account.full_name,account.student_id,account.faculty,account.major,account.class_group]
    .some(value=>value?.toLocaleLowerCase('th').includes(query)));
+ const [userPage,setUserPage]=useState(0);
+ const userPageSize=24;
+ const totalUserPages=Math.max(1,Math.ceil(managedUsers.length/userPageSize));
+ useEffect(()=>{setUserPage(0);},[userQuery,accountFilters]);
+ const paginatedUsers=managedUsers.slice(userPage*userPageSize,(userPage+1)*userPageSize);
 
   const [studentIds,setStudentIds]=useState<string[]>([]);
   const attendingIds=new Set(store.regs.filter(r=>r.status==='ATTENDING').map(r=>r.user_id));
@@ -1735,7 +1759,7 @@ function AdminView({importError,deleteBatch,sessionToken,store,academicCatalog,m
           label="ลบนักศึกษา" remove={async()=>{if(await deleteBatch('students',selectedStudents))setStudentIds([]);}}/>
       </div>
       <div className="grid gap-3 p-5 pt-2 sm:grid-cols-2 xl:grid-cols-3">
-        {managedUsers.map(account=><article key={account.id} className="flex min-w-0 items-start gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs hover:shadow-md transition">
+        {paginatedUsers.map(account=><article key={account.id} className="flex min-w-0 items-start gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs hover:shadow-md transition">
           {account.role==='STUDENT' && <label className="flex min-h-11 shrink-0 items-center">
             <input type="checkbox" aria-label={`เลือก ${account.full_name} ${account.student_id}`} className="h-5 w-5 accent-[#7c0a02]"
               disabled={attendingIds.has(account.id)} checked={!attendingIds.has(account.id) && checkedIds.has(account.id)}
@@ -1763,6 +1787,15 @@ function AdminView({importError,deleteBatch,sessionToken,store,academicCatalog,m
           </div>
         </article>)}
         {managedUsers.length===0&&<p className="col-span-full rounded-xl bg-slate-50 p-6 text-center text-xs text-slate-400">ไม่พบบัญชีที่ตรงกับตัวกรองและคำค้น</p>}
+        {totalUserPages>1 && (
+          <nav aria-label="หน้ารายชื่อบัญชีผู้ใช้" className="col-span-full flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3">
+            <button type="button" className="action-secondary" disabled={userPage===0} onClick={()=>setUserPage(p=>p-1)}>ก่อนหน้า</button>
+            <span className="text-xs font-semibold text-slate-700" aria-live="polite">
+              หน้า {userPage+1} / {totalUserPages} · แสดง {userPage*userPageSize+1}–{Math.min((userPage+1)*userPageSize,managedUsers.length)} จาก {managedUsers.length} บัญชี
+            </span>
+            <button type="button" className="action-secondary" disabled={userPage+1>=totalUserPages} onClick={()=>setUserPage(p=>p+1)}>ถัดไป</button>
+          </nav>
+        )}
       </div>
     </section>
   )}
