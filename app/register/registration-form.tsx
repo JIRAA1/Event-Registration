@@ -20,7 +20,7 @@ export function RegistrationForm({eventId,station,onExit,correctionId}:{eventId:
   const [info,setInfo]=useState<SignupInfo>();
   const [error,setError]=useState('');
   const [studentNumber,setStudentNumber]=useState('');
-  const [lookup,setLookup]=useState<{id:string;step:'existing'|'new'|'pending'|'error';message?:string}>();
+  const [lookup,setLookup]=useState<{id:string;step:'existing'|'new'|'missing'|'pending'|'error';message?:string}>();
   const [lookupRetry,setLookupRetry]=useState(0);
   const [secret,setSecret]=useState('');
   const [receipt,setReceipt]=useState<Receipt>();
@@ -73,7 +73,7 @@ export function RegistrationForm({eventId,station,onExit,correctionId}:{eventId:
     const timer=setTimeout(async()=>{
       try{
         const step=await signupRpc<'existing'|'new'|'pending'>('registration_account_step',{p_event:eventId,p_student_id:number});
-        if(active)setLookup({id:number,step});
+        if(active)setLookup({id:number,step:step==='new'||step==='pending'?'missing':step});
       }catch(e){if(active)setLookup({id:number,step:'error',message:errorText(e)});}
     },450);
     return ()=>{active=false;clearTimeout(timer);};
@@ -150,7 +150,7 @@ export function RegistrationForm({eventId,station,onExit,correctionId}:{eventId:
     const values=new FormData(form);
     const get=(k:string)=>String(values.get(k)||'').trim();
     const studentId=normalizeDigits(get('student_id'));
-    if(method==='lookup' || method==='error' || method==='pending'){
+    if(method==='lookup' || method==='error' || method==='pending' || method==='missing'){
       setLookup(undefined);setLookupRetry(n=>n+1);return;
     }
     if(method==='existing' && !station && !edit){
@@ -217,6 +217,7 @@ export function RegistrationForm({eventId,station,onExit,correctionId}:{eventId:
             inputMode="numeric" pattern="[0-9๐-๙]{7,8}" maxLength={8} placeholder="รหัสนักศึกษา 7–8 หลัก" value={studentNumber}
             readOnly={edit || busy} onChange={e=>{const next=normalizeDigits(e.target.value);if(next!==studentNumber){setStudentNumber(next);setLookup(undefined);setError('');if(!station)setFaculty('');}}}/></label>
           {method==='lookup' ? <p role="status" className="text-sm text-slate-600">{number.length>=7?'กำลังตรวจสอบรหัสนักศึกษา…':'กรอกรหัสนักศึกษาเพื่อเริ่มสมัคร'}</p>
+          : method==='missing' ? <div role="alert" className="space-y-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900"><p className="font-bold">รหัสนักศึกษาไม่ถูกต้อง กรุณาตรวจสอบ</p><p>หากมั่นใจว่ารหัสนักศึกษาถูกต้อง กรุณาติดต่อแอดมิน</p>{info.contact?<a href={info.contact} target="_blank" rel="noreferrer" className="action-primary w-full">ติดต่อแอดมิน</a>:<p>กรุณาติดต่อผู้ดูแลกิจกรรมหรือจุดลงทะเบียนหน้างาน</p>}</div>
           : method==='error' ? <p role="alert">{lookup?.message}</p>
           : method==='pending' ? <p role="status">มีใบสมัครรอยืนยันสำหรับกิจกรรมนี้แล้ว กรุณากลับไปยังหน้าที่ส่งใบสมัครหรือติดต่อแอดมิน</p>
           : method==='existing' ? <>
@@ -233,7 +234,7 @@ export function RegistrationForm({eventId,station,onExit,correctionId}:{eventId:
             <label className="block text-sm">หมู่เรียน<select name="class_group" required defaultValue={initial?.class_group||''} className={input}>
               <option value="">เลือกหมู่เรียน</option>{[1,2,3,4].map(n=><option key={n}>{n}</option>)}</select></label>
           </div>}
-          {method!=='lookup' && <button disabled={busy} className="action-primary w-full">{busy?'กำลังส่ง…':method==='error'||method==='pending'?'ตรวจสอบอีกครั้ง':method==='existing'?'ยืนยันบัญชีและสมัครเข้าร่วม':station||edit?'ส่งใบสมัครให้แอดมินยืนยัน':'ลงทะเบียนและรับบัญชี'}</button>}
+          {method!=='lookup' && <button disabled={busy} className="action-primary w-full">{busy?'กำลังส่ง…':method==='error'||method==='pending'||method==='missing'?'ตรวจสอบอีกครั้ง':method==='existing'?'ยืนยันบัญชีและสมัครเข้าร่วม':station||edit?'ส่งใบสมัครให้แอดมินยืนยัน':'ลงทะเบียนและรับบัญชี'}</button>}
         </form>
       </>}
     <LoginHelp popupOnly loginFailed={error.includes('รหัสผ่านไม่ถูกต้อง')}/>
