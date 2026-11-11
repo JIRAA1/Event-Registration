@@ -4,12 +4,13 @@ import {useEffect,useRef,useState} from 'react';
 import {QRCodeCanvas} from 'qrcode.react';
 import {RegistrationFrame} from './registration-frame';
 import styles from './registration.module.css';
+import {BirthDateField} from '../birth-date-field';
 import {errorText,newReceipt,normalizeDigits,signupRpc,type ApplicationProfile,type Receipt,type SignupInfo} from '@/lib/event-registration';
 
 const input='mt-1 block min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-base';
 const fields=[
   ['full_name','ชื่อและนามสกุล'],
-  ['birth_date','วันเกิด 8 หลัก (ววดดปปปป พ.ศ.)'],['phone','เบอร์โทรศัพท์'],
+  ['phone','เบอร์โทรศัพท์'],
 ] as const;
 
 export function RegistrationForm({eventId,station,onExit,correctionId}:{eventId:string;station?:string;onExit?:()=>void;correctionId?:string}) {
@@ -222,7 +223,8 @@ export function RegistrationForm({eventId,station,onExit,correctionId}:{eventId:
             <label className="block text-sm">คำนำหน้า<select name="prefix" required defaultValue={initial?.prefix||''} className={input}>
               <option value="">เลือกคำนำหน้า</option><option>นาย</option><option>นางสาว</option></select></label>
             {fields.map(([name,label])=><label key={name} className="block text-sm">{label}<input required name={name} defaultValue={initial?.[name]}
-              inputMode={['birth_date','phone'].includes(name)?'numeric':'text'} maxLength={name==='full_name'?255:name==='phone'?10:8} autoComplete="off" className={input}/>{name==='birth_date' && <small>เช่น 22 มิถุนายน 2549 กรอก 22062549</small>}</label>)}
+              inputMode={name==='phone'?'numeric':'text'} maxLength={name==='full_name'?255:10} autoComplete="off" className={input}/></label>)}
+            <BirthDateField defaultValue={initial?.birth_date}/>
             <label className="block text-sm">คณะ<select required value={faculty} onChange={e=>setFaculty(e.target.value)} className={input}><option value="">เลือกคณะ</option>{Object.keys(info.catalog||{}).map(f=><option key={f}>{f}</option>)}</select></label>
             <label className="block text-sm">สาขา<select key={faculty} name="major" required defaultValue={initial?.faculty===faculty?initial.major:''} className={input}><option value="">เลือกสาขา</option>{info.catalog?.[faculty]?.map(m=><option key={m}>{m}</option>)}</select></label>
             <label className="block text-sm">ชั้นปี<select name="study_year" defaultValue={initial?.study_year||''} required className={input}><option value="">เลือกชั้นปี</option>{[1,2,3,4,5,6,7,8].map(y=><option key={y}>{y}</option>)}</select></label>
