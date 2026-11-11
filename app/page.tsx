@@ -1275,6 +1275,23 @@ function UserProfileSummary({user}:{user:User}){
 }
 
 function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,academicCatalog,manageAcademicCatalog,selectedEvent,selectedEventId,setSelectedEvent,openCreate,openCodes,openStaff,editUser,deleteUser,deleteActivity,deleteRegistration,csvFile,setCsvFile,importCsv,refreshWorkspace,loadEventDashboard,updateEvent}:{isImportingRef:React.MutableRefObject<boolean>;importError:string;deleteBatch:(kind:'students'|'codes',values:string[])=>Promise<boolean|undefined>;sessionToken:string;store:Store;academicCatalog:AcademicFaculty[];manageAcademicCatalog:(action:CatalogAction,facultyId:string,facultyName:string,majorId:string,majorName:string)=>unknown;selectedEvent:Event;selectedEventId:string;setSelectedEvent:(id:string)=>void;openCreate:()=>void;openCodes:()=>void;openStaff:()=>void;editUser:(user:User)=>void;deleteUser:(user:User)=>void;deleteActivity:()=>void;deleteRegistration:(userId:string)=>void;csvFile:File|null;setCsvFile:(f:File|null)=>void;importCsv:(roster?:boolean)=>void;refreshWorkspace:()=>Promise<void>;loadEventDashboard:()=>Promise<EventDashboardRow[]>;updateEvent:(p:Partial<Event>)=>void|Promise<void>}) {
+ const [correction,setCorrection]=useState<{reg:Registration;name:string}|null>(null);
+ const [nextStatus,setNextStatus]=useState<Registration['status']>('REGISTERED');
+ const [correctionReason,setCorrectionReason]=useState('');
+ const [correctionError,setCorrectionError]=useState('');
+ const [correcting,setCorrecting]=useState(false);
+ useEffect(()=>setCorrection(null),[selectedEventId]);
+ async function saveCorrection(e:React.FormEvent){
+   e.preventDefault();if(!correction||correcting)return;
+   setCorrecting(true);setCorrectionError('');
+   try{
+     if(!supabase)throw new Error('กรุณาเชื่อมต่อระบบฐานข้อมูล');
+     const {error}=await supabase.rpc('admin_correct_attendance',{p_token:sessionToken,p_event:correction.reg.event_id,p_user:correction.reg.user_id,p_expected_status:correction.reg.status,p_status:nextStatus,p_reason:correctionReason.trim()});
+     if(error)throw error;
+     await refreshWorkspace();setDashboardRows(await loadEventDashboard());setCorrection(null);
+   }catch(error){setCorrectionError(error instanceof Error?error.message:(error as {message?:string}).message||'บันทึกไม่สำเร็จ');}
+   finally{setCorrecting(false);}
+ }
  const removePasscodes=useCallback((values:string[])=>deleteBatch('codes',values),[deleteBatch]);
  const [managementPanel,setManagementPanel]=useState<'registration'|'passcodes'|'settings'|null>(null);
  useEffect(()=>setManagementPanel(null),[selectedEventId]);
@@ -1381,8 +1398,22 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
   const checkedIds=new Set(studentIds);
   const selectedStudents=eligibleStudents.filter(id=>checkedIds.has(id));
 
-  function exportAttendance(){const csvRows=[['รหัสนักศึกษา','ชื่อ-นามสกุล','ชั้นปี','คณะ','สาขาวิชา','หมู่เรียน','เบอร์โทรศัพท์','สถานะ','เวลาเช็กอิน','ผู้เช็กอิน','เวลาเช็กเอาต์','สตาฟเช็กเอาต์'],...selectedReportRows.map(({reg,person})=>[person.student_id,person.full_name,person.study_year,person.faculty,person.major,person.class_group,person.phone||'',({REGISTERED:'รอสแกนเข้างาน',ATTENDING:'กำลังเข้าร่วมกิจกรรม',COMPLETED:'เข้าร่วมกิจกรรมสำเร็จ'}[reg.status]),reg.checkin_at||'',reg.checkin_station?'เครื่องลงทะเบียน iPad':reg.checkin_staff_name||store.users.find(u=>u.id===reg.checked_in_by)?.full_name||'',reg.checkout_at||'',reg.checkout_staff_name||store.users.find(u=>u.id===reg.checked_out_by)?.full_name||''])];const quote=(value:string|number)=>{const text=String(value);return '"'+(/^[=+@\-\t\r\n]/.test(text)?"'":'')+text.replace(/"/g,'""')+'"';};const csv='\uFEFF'+csvRows.map(row=>row.map(quote).join(',')).join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='aru-attendance-'+reportStatus.toLowerCase()+'-'+selectedEventId+'.csv';link.click();URL.revokeObjectURL(url);}
+  function exportAttendance(allRegistered=false){const rows=allRegistered?reportPopulation:selectedReportRows;const csvRows=[['รหัสนักศึกษา','ชื่อ-นามสกุล','ชั้นปี','คณะ','สาขาวิชา','หมู่เรียน','เบอร์โทรศัพท์','สถานะ','เวลาเช็กอิน','ผู้เช็กอิน','เวลาเช็กเอาต์','สตาฟเช็กเอาต์'],...rows.map(({reg,person})=>[person.student_id,person.full_name,person.study_year,person.faculty,person.major,person.class_group,person.phone||'',({REGISTERED:'รอสแกนเข้างาน',ATTENDING:'กำลังเข้าร่วมกิจกรรม',COMPLETED:'เข้าร่วมกิจกรรมสำเร็จ'}[reg.status]),reg.checkin_at||'',reg.checkin_station?'เครื่องลงทะเบียน iPad':reg.checkin_staff_name||store.users.find(u=>u.id===reg.checked_in_by)?.full_name||'',reg.checkout_at||'',reg.checkout_staff_name||store.users.find(u=>u.id===reg.checked_out_by)?.full_name||''])];const quote=(value:string|number)=>{const text=String(value);return '"'+(/^[=+@\-\t\r\n]/.test(text)?"'":'')+text.replace(/"/g,'""')+'"';};const csv='\uFEFF'+csvRows.map(row=>row.map(quote).join(',')).join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='aru-attendance-'+(allRegistered?'registered-all':reportStatus.toLowerCase())+'-'+selectedEventId+'.csv';link.click();URL.revokeObjectURL(url);}
  return <div className="space-y-6">
+  {correction&&<Modal title="แก้สถานะเข้าร่วมกิจกรรม" subtitle={correction.name} close={()=>{if(!correcting)setCorrection(null);}}>
+    <form onSubmit={saveCorrection} className="space-y-4">
+      <div className="flex items-center gap-2 text-sm">สถานะปัจจุบัน <StatusPill status={correction.reg.status}/></div>
+      <label className="block text-sm font-bold">เปลี่ยนเป็น
+        <select value={nextStatus} onChange={e=>setNextStatus(e.target.value as Registration['status'])} disabled={correcting} className="mt-2 min-h-12 w-full rounded-xl border border-slate-300 p-3">
+          <option value="REGISTERED">รอสแกนเข้างาน</option><option value="ATTENDING">กำลังเข้าร่วมกิจกรรม</option><option value="COMPLETED">เข้าร่วมกิจกรรมสำเร็จ</option>
+        </select>
+      </label>
+      <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{nextStatus==='REGISTERED'?'ล้างเวลาเข้าและออก เพื่อให้สแกนเข้างานใหม่':nextStatus==='ATTENDING'?'ล้างเวลาออก หากยังไม่มีเวลาเข้า จะใช้เวลาที่บันทึกนี้':'หากยังไม่มีเวลาเข้า–ออก จะใช้เวลาที่บันทึกนี้'} · QR เดิมจะถูกยกเลิก และเก็บ Passcode ที่จับคู่ไว้</p>
+      <label className="block text-sm font-bold">เหตุผลที่แก้ไข<textarea required maxLength={500} disabled={correcting} value={correctionReason} onChange={e=>setCorrectionReason(e.target.value)} placeholder="เช่น สตาฟสแกนออกงานผิดคน" className="mt-2 min-h-24 w-full rounded-xl border border-slate-300 p-3"/></label>
+      {correctionError&&<p role="alert" className="text-sm text-red-700">{correctionError}</p>}
+      <button disabled={correcting||nextStatus===correction.reg.status||!correctionReason.trim()} className="action-primary w-full"><Save size={18}/>{correcting?'กำลังบันทึก…':'ยืนยันเปลี่ยนสถานะ'}</button>
+    </form>
+  </Modal>}
   {/* Header Section */}
   <div className="flex flex-wrap items-end justify-between gap-3 px-2">
     <div>
@@ -1620,7 +1651,7 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
               <option value="ALL">ทุกหมู่เรียน</option>
               {reportClassGroups.map(group=><option key={group}>{group}</option>)}
             </select>
-            <button onClick={exportAttendance} className="action-secondary">
+            <button onClick={()=>exportAttendance()} className="action-secondary">
               <Download size={13}/>
               ส่งออกผู้เข้าร่วม CSV ({selectedReportRows.length})
             </button>
@@ -1672,7 +1703,7 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
                   <td className="px-4 py-3 text-slate-600">{checkinStaff||'—'}</td>
                   <td className="px-4 py-3 text-slate-600 font-mono">{reg.checkout_at?new Date(reg.checkout_at).toLocaleString('th-TH'):'—'}</td>
                   <td className="px-4 py-3 text-slate-600">{checkoutStaff||'—'}</td>
-                  <td className="px-4 py-3"><button onClick={()=>deleteRegistration(reg.user_id)} title="ลบการลงทะเบียนกิจกรรม" aria-label="ลบการลงทะเบียนกิจกรรม" className="action-danger" ><Trash2 size={14}/></button></td>
+                  <td className="px-4 py-3"><div className="flex flex-wrap gap-2"><button className="action-secondary" onClick={()=>{setCorrection({reg,name:person.full_name+" · "+person.student_id});setNextStatus(reg.status);setCorrectionReason('');setCorrectionError('');}}>แก้สถานะ</button><button onClick={()=>deleteRegistration(reg.user_id)} title="ลบการลงทะเบียนกิจกรรม" aria-label="ลบการลงทะเบียนกิจกรรม" className="action-danger" ><Trash2 size={14}/></button></div></td>
                 </tr>;
               })}
               {selectedReportRows.length===0&&<tr><td colSpan={12} className="p-8 text-center text-xs text-slate-400">ไม่มีรายชื่อในหมวดนี้</td></tr>}
@@ -1682,12 +1713,12 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
       </section>
 
       <section className="bento overflow-hidden shadow-sm">
-        <div className="flex items-center justify-between p-5 border-b border-slate-100">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-5 border-b border-slate-100">
           <div>
             <h2 className="text-sm font-extrabold text-slate-900">รายชื่อนักศึกษาที่ลงทะเบียนกิจกรรมนี้</h2>
             <p className="mt-0.5 text-[9px] text-slate-500">{selectedEvent.title}</p>
           </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1.5 text-[9px] font-bold text-slate-700">{regs.length} คน</span>
+          <button onClick={()=>exportAttendance(true)} disabled={!reportPopulation.length} className="action-primary"><Download size={16}/>ส่งออกรายชื่อ CSV ({reportPopulation.length})</button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1040px] text-left">
@@ -1716,7 +1747,7 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
                   <td className="px-4 py-3 text-slate-600">{p.class_group||'—'}</td>
                   <td className="px-4 py-3"><StatusPill status={reg.status}/></td>
                   <td className="px-4 py-3 font-mono text-slate-600 font-bold">{p.study_year>1?(assignedPasscode||'รอจ่ายรหัส'):'ไม่ใช้'}</td>
-                  <td className="px-4 py-3"><button onClick={()=>deleteRegistration(reg.user_id)} title="ลบการลงทะเบียนกิจกรรม" aria-label="ลบการลงทะเบียนกิจกรรม" className="action-danger" ><Trash2 size={14}/></button></td>
+                  <td className="px-4 py-3"><div className="flex flex-wrap gap-2"><button className="action-secondary" onClick={()=>{setCorrection({reg,name:p.full_name+" · "+p.student_id});setNextStatus(reg.status);setCorrectionReason('');setCorrectionError('');}}>แก้สถานะ</button><button onClick={()=>deleteRegistration(reg.user_id)} title="ลบการลงทะเบียนกิจกรรม" aria-label="ลบการลงทะเบียนกิจกรรม" className="action-danger" ><Trash2 size={14}/></button></div></td>
                 </tr>;
               })}
               {regs.length===0&&<tr><td colSpan={8} className="p-8 text-center text-xs text-slate-400">ยังไม่มีผู้ลงทะเบียน</td></tr>}

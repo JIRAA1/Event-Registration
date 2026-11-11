@@ -57,6 +57,27 @@ begin
   assert load_workspace(student_token)->'registrations'->0->>'passcode'='LATE-TWO';
   assert (select count(distinct r.passcode_id)=2 from event_registrations r where r.event_id=event_a);
   assert registration_station_checkin(station_token,event_a,'16899992','01012549')->>'status'='COMPLETED';
+  perform admin_correct_attendance(admin_token,event_a,second_id,'COMPLETED','ATTENDING','Wrong checkout');
+  assert (select r.status='ATTENDING' and r.checkout_at is null and r.checked_out_by is null and r.checkin_at=checkin_time and r.passcode_id is not null from event_registrations r where r.event_id=event_a and r.user_id=second_id);
+  assert not exists(select 1 from event_pass_private.qr_tickets t join event_registrations r on r.id=t.registration_id where r.event_id=event_a and r.user_id=second_id);
+  assert load_workspace(student_token)->'registrations'->0->>'passcode' is null;
+  ticket:=issue_event_qr(student_token,event_a);
+  assert ticket->>'mode'='CHECKOUT';
+  begin
+    perform admin_correct_attendance(student_token,event_a,second_id,'ATTENDING','REGISTERED','Not admin');
+    raise exception 'unauthorized update' using errcode='23505';
+  exception when raise_exception then assert sqlerrm like '%แอดมิน%'; end;
+  begin
+    perform admin_correct_attendance(admin_token,event_a,second_id,'COMPLETED','REGISTERED','Stale update');
+    raise exception 'stale update accepted' using errcode='23505';
+  exception when raise_exception then assert sqlerrm like '%สถานะเปลี่ยน%'; end;
+  perform admin_correct_attendance(admin_token,event_a,second_id,'ATTENDING','REGISTERED','Wrong checkin');
+  assert (select r.checkin_at is null and r.checkout_at is null and not r.checkin_station and r.checked_in_by is null from event_registrations r where r.event_id=event_a and r.user_id=second_id);
+  ticket:=issue_event_qr(student_token,event_a);
+  assert ticket->>'mode'='CHECKIN';
+  perform admin_correct_attendance(admin_token,event_a,second_id,'REGISTERED','COMPLETED','Confirmed attendance');
+  assert (select r.checkin_at is not null and r.checkout_at>=r.checkin_at and r.checked_in_by=admin_id and r.checked_out_by=admin_id from event_registrations r where r.event_id=event_a and r.user_id=second_id);
+  assert (select count(*)=3 from event_pass_private.attendance_corrections c where c.user_id=second_id);
 end;
 $test$;
 rollback;
