@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { StudentQr } from './student-qr';
 import { RegistrationAdmin, LoginHelp } from './register/registration-admin';
@@ -774,21 +774,33 @@ function NavButton({
   );
 }
 function Field({label,...props}:{label:string;name:string;id?:string;type?:string;required?:boolean;placeholder?:string;defaultValue?:string|number;min?:string|number;max?:string|number;minLength?:number;autoComplete?:string;enterKeyHint?:"go"|"next"}){return <label className="block text-[11px] font-semibold text-slate-600">{label}<input {...props} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 placeholder:text-slate-300"/></label>}
-function Modal({title,subtitle,close,children,submitLabel,submitDisabled=false}:{
-  title:string;subtitle:string;close:()=>void;children:React.ReactNode;submitLabel:string;submitDisabled?:boolean;
+function Modal({title,subtitle,close,children,submitLabel,submitDisabled=false,wide=false}:{
+  title:string;subtitle:string;close:()=>void;children:React.ReactNode;submitLabel?:string;submitDisabled?:boolean;wide?:boolean;
 }){
-  return <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}>
-    <section role="dialog" aria-modal="true" aria-labelledby="staff-admin-title" className="flex max-h-[94dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
-      <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
-        <div><h2 id="staff-admin-title" className="text-lg font-bold">{title}</h2><p className="mt-1 text-xs text-slate-600">{subtitle}</p></div>
-        <button type="button" aria-label="ปิดหน้าต่าง" onClick={close} className="action-secondary"><X size={18}/></button>
+  const dialogRef=useRef<HTMLDialogElement>(null);
+  const titleId=useId();
+  useEffect(()=>{
+    const dialog=dialogRef.current;
+    if(!dialog)return;
+    const previousOverflow=document.body.style.overflow;
+    dialog.showModal();
+    document.body.style.overflow='hidden';
+    return()=>{dialog.close();document.body.style.overflow=previousOverflow;};
+  },[]);
+  return <dialog ref={dialogRef} aria-labelledby={titleId}
+    onCancel={e=>{e.preventDefault();close();}}
+    className={cx('m-auto max-h-[94dvh] w-[calc(100%_-_1rem)] overflow-hidden rounded-3xl border-0 bg-white p-0 text-slate-800 shadow-2xl backdrop:bg-slate-950/50',wide?'max-w-5xl':'max-w-lg')}>
+    <section className="flex max-h-[94dvh] min-w-0 flex-col">
+      <header className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+        <div className="min-w-0"><h2 id={titleId} className="text-lg font-bold">{title}</h2><p className="mt-1 break-words text-xs text-slate-600">{subtitle}</p></div>
+        <button type="button" autoFocus aria-label="ปิดหน้าต่าง" onClick={close} className="action-secondary shrink-0"><X size={18}/></button>
       </header>
-      <div className="min-h-0 overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
-      <footer className="border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="min-h-0 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5">{children}</div>
+      {submitLabel && <footer className="shrink-0 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <button form="staff-admin-form" type="submit" disabled={submitDisabled} className="action-primary w-full"><Save size={18}/>{submitLabel}</button>
-      </footer>
+      </footer>}
     </section>
-  </div>;
+  </dialog>;
 }
 
 function NeuralNetworkCanvas(){
@@ -1232,6 +1244,8 @@ function UserProfileSummary({user}:{user:User}){
 }
 
 function AdminView({deleteBatch,sessionToken,store,academicCatalog,manageAcademicCatalog,selectedEvent,selectedEventId,setSelectedEvent,openCreate,openCodes,openStaff,editUser,deleteUser,deleteActivity,deleteRegistration,csvFile,setCsvFile,importCsv,refreshWorkspace,loadEventDashboard,updateEvent}:{deleteBatch:(kind:'students'|'codes',values:string[])=>Promise<boolean|undefined>;sessionToken:string;store:Store;academicCatalog:AcademicFaculty[];manageAcademicCatalog:(action:CatalogAction,facultyId:string,facultyName:string,majorId:string,majorName:string)=>unknown;selectedEvent:Event;selectedEventId:string;setSelectedEvent:(id:string)=>void;openCreate:()=>void;openCodes:()=>void;openStaff:()=>void;editUser:(user:User)=>void;deleteUser:(user:User)=>void;deleteActivity:()=>void;deleteRegistration:(userId:string)=>void;csvFile:File|null;setCsvFile:(f:File|null)=>void;importCsv:()=>void;refreshWorkspace:()=>Promise<void>;loadEventDashboard:()=>Promise<EventDashboardRow[]>;updateEvent:(p:Partial<Event>)=>void|Promise<void>}) {
+ const [managementPanel,setManagementPanel]=useState<'registration'|'passcodes'|null>(null);
+ useEffect(()=>setManagementPanel(null),[selectedEventId]);
  const [adminTab, setAdminTab] = useState<'dashboard' | 'events' | 'report' | 'users' | 'catalog' | 'all'>('dashboard');
  const [redirectDraft,setRedirectDraft]=useState(selectedEvent.redirect_url_year1);
  const [bannerDraft,setBannerDraft]=useState(selectedEvent.banner_url||'');
@@ -1376,7 +1390,20 @@ function AdminView({deleteBatch,sessionToken,store,academicCatalog,manageAcademi
   </div>
   )}
   {store.events.length>0 && ['dashboard','events','all'].includes(adminTab) &&
-    <RegistrationAdmin key={selectedEvent.id} token={sessionToken} eventId={selectedEvent.id} refresh={refreshWorkspace}/>}
+    <div className="grid gap-3 sm:grid-cols-2">
+      <button type="button" aria-haspopup="dialog" onClick={()=>setManagementPanel('registration')} className="action-primary justify-between px-5 py-4 text-left">
+        <span className="flex items-center gap-3"><UserCheck size={22}/>รับสมัครและอนุมัติรายชื่อ</span><ChevronRight size={20}/>
+      </button>
+      <button type="button" aria-haspopup="dialog" onClick={()=>setManagementPanel('passcodes')} className="action-secondary justify-between px-5 py-4 text-left">
+        <span className="flex items-center gap-3"><Ticket size={22}/>จัดการ Passcode</span><ChevronRight size={20}/>
+      </button>
+    </div>}
+  {managementPanel && <Modal wide title={managementPanel==='registration'?'รับสมัครและอนุมัติรายชื่อ':'จัดการ Passcode'}
+    subtitle={selectedEvent.title} close={()=>setManagementPanel(null)}>
+    {managementPanel==='registration'
+      ? <RegistrationAdmin key={selectedEvent.id} token={sessionToken} eventId={selectedEvent.id} refresh={refreshWorkspace}/>
+      : <PasscodeList key={selectedEventId} eventId={selectedEventId} store={store} openCodes={openCodes} remove={values=>deleteBatch('codes',values)}/>}
+  </Modal>}
   {/* TAB 1: Dashboard Section */}
   {(adminTab === 'all' || adminTab === 'dashboard') && (
     <section className="bento p-5 sm:p-6 shadow-sm">
@@ -1492,8 +1519,6 @@ function AdminView({deleteBatch,sessionToken,store,academicCatalog,manageAcademi
 
       {/* Right column: Passcodes Pool + All Events */}
       <div className="space-y-5">
-        <PasscodeList key={selectedEventId} eventId={selectedEventId} store={store} openCodes={openCodes}
-          remove={values=>deleteBatch('codes',values)}/>
 
         <div className="bento p-5 shadow-sm">
           <h2 className="text-sm font-extrabold text-slate-900">กิจกรรมทั้งหมดในระบบ</h2>
