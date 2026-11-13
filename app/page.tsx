@@ -203,6 +203,8 @@ function EventPass() {
       window.location.assign(event.redirect_url_year1);
     };
     let refreshing = false;
+    let revision=0;
+    let refreshAgain=false;
     const refresh = async () => {
       if (disposed || document.hidden) return;
       if (pending) {
@@ -210,11 +212,12 @@ function EventPass() {
         pending = undefined;
         openAfterScan(event,status);
       }
-      if (refreshing) return;
+      if (refreshing) {refreshAgain=true;return;}
       refreshing = true;
+      const requestRevision=revision;
       try {
         const {data,error} = await client.rpc('load_workspace',{p_session_token:sessionToken});
-        if (disposed || error || !data?.success) return;
+        if (disposed || error || !data?.success || requestRevision!==revision) return;
         const next = workspaceStore(data);
         for (const reg of next.regs) {
           if (reg.user_id !== user.id) continue;
@@ -223,19 +226,24 @@ function EventPass() {
           if (previous && previous !== reg.status) openAfterScan(next.events.find(event => event.id === reg.event_id),reg.status);
         }
         setStore(next);
-      } finally { refreshing = false; }
+      } finally { refreshing = false;if(refreshAgain&&!disposed){refreshAgain=false;void refresh();} }
     };
     const startFallback=()=>{if(!disposed&&!pollTimer)pollTimer=setInterval(refresh,10000);};
     const stopFallback=()=>{if(pollTimer){clearInterval(pollTimer);pollTimer=undefined;}};
     const receiveUpdate=(message:{event_id?:string;user_id?:string;status?:Status;checkin_at?:string|null;checkout_at?:string|null;passcode?:string|null;operation?:string})=>{
       if(message.user_id!==user.id||!message.event_id)return;
+      revision++;
+      if(refreshing)refreshAgain=true;
+      if(message.status==='REGISTERED'){pending=undefined;opened.delete(message.event_id+'/ATTENDING');opened.delete(message.event_id+'/COMPLETED');}
       if(message.operation==='DELETE'){
         setStore(old=>({...old,regs:old.regs.filter(reg=>!(reg.event_id===message.event_id&&reg.user_id===user.id))}));
         void refresh();
         return;
       }
+      const known=storeRef.current.regs.some(reg=>reg.event_id===message.event_id&&reg.user_id===user.id);
+      if(!known){void refresh();return;}
       if(message.status){
-        setStore(old=>({...old,regs:old.regs.map(reg=>reg.event_id===message.event_id&&reg.user_id===user.id?{...reg,status:message.status!,checkin_at:message.checkin_at||reg.checkin_at,checkout_at:message.checkout_at||reg.checkout_at,passcode:message.passcode||reg.passcode}:reg)}));
+        setStore(old=>({...old,regs:old.regs.map(reg=>reg.event_id===message.event_id&&reg.user_id===user.id?{...reg,status:message.status!,checkin_at:message.checkin_at===undefined?reg.checkin_at:message.checkin_at??undefined,checkout_at:message.checkout_at===undefined?reg.checkout_at:message.checkout_at??undefined,passcode:message.passcode===undefined?reg.passcode:message.passcode??undefined}:reg)}));
         observed.set(message.event_id,message.status);
         openAfterScan(storeRef.current.events.find(event => event.id === message.event_id),message.status);
         if(message.status==='ATTENDING'||message.status==='COMPLETED')setToast(message.status==='COMPLETED'?'เข้าร่วมกิจกรรมสำเร็จ':'กำลังเข้าร่วมกิจกรรม');
@@ -1369,31 +1377,45 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
  useEffect(()=>{void refreshWorkspace();},[refreshWorkspace]);
   useEffect(()=>{
     const client=supabase;
-    let active=true;
+    let active=true,live=false,dirty=true,running=false;
     let channel:ReturnType<NonNullable<typeof client>['channel']>|undefined;
-    let fallbackTimer:number|undefined;
-    let debounceTimer:ReturnType<typeof setTimeout>|undefined;
-    const refresh=async()=>{const rows=await loadEventDashboard();if(active)setDashboardRows(rows);};
-    const startFallback=()=>{if(!active)return;setDashboardLive(false);if(!fallbackTimer)fallbackTimer=window.setInterval(()=>{if(!isImportingRef.current){void refresh();}},30000);};
-    const stopFallback=()=>{if(fallbackTimer){window.clearInterval(fallbackTimer);fallbackTimer=undefined;}};
-    void refresh();
-    if(!client||!sessionToken)return()=>{active=false;};
-    void hashSessionToken(sessionToken).then(tokenHash=>{
+    let lastWorkspace=0;
+    let scheduled:ReturnType<typeof setTimeout>|undefined;
+    const refresh=async(force=false)=>{
+      if(!active||document.hidden||running||isImportingRef.current)return;
+      running=true;
+      try{
+        const rows=await loadEventDashboard();if(active)setDashboardRows(rows);
+        if(active&&(force||!live||dirty)&& (force||Date.now()-lastWorkspace>=10000)){
+          dirty=false;lastWorkspace=Date.now();
+          await refreshWorkspace();
+        }
+      }finally{running=false;}
+    };
+    const visible=()=>{if(!document.hidden){dirty=true;void refresh(true);}};
+    // Presence has no broadcast: poll even when Realtime is connected.
+    const presenceTimer=window.setInterval(()=>{dirty=true;void refresh();},30000);
+    const dataTimer=window.setInterval(()=>{if(dirty)void refresh();},10000);
+    document.addEventListener('visibilitychange',visible);
+    void refresh(true);
+    if(client&&sessionToken)void hashSessionToken(sessionToken).then(tokenHash=>{
       if(!active)return;
       channel=client.channel(`aru-admin-dashboard:${tokenHash}`,{config:{private:true}})
         .on('broadcast',{event:'dashboard_changed'},()=>{
-          if(debounceTimer)clearTimeout(debounceTimer);
-          debounceTimer=setTimeout(()=>{
-            void refresh();
-          },1500);
+          dirty=true;
+          // Fixed window: continuous scans cannot postpone refresh indefinitely.
+          if(!scheduled)scheduled=setTimeout(()=>{scheduled=undefined;void refresh();},1500);
         })
         .subscribe(status=>{
-          if(status==='SUBSCRIBED'){setDashboardLive(true);stopFallback();void refresh();}
-          else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED')startFallback();
+          if(!active)return;
+          live=status==='SUBSCRIBED';setDashboardLive(live);
+          if(live){dirty=true;void refresh(true);}
         });
-    }).catch(()=>{if(active)startFallback();});
-    return()=>{active=false;if(debounceTimer)clearTimeout(debounceTimer);stopFallback();if(channel)void client.removeChannel(channel);};
-  },[loadEventDashboard,sessionToken,isImportingRef]);
+    }).catch(()=>{if(active){live=false;setDashboardLive(false);}});
+    return()=>{active=false;clearInterval(presenceTimer);clearInterval(dataTimer);if(scheduled)clearTimeout(scheduled);document.removeEventListener('visibilitychange',visible);if(channel&&client)void client.removeChannel(channel);};
+  },[loadEventDashboard,refreshWorkspace,sessionToken,isImportingRef]);
+  useEffect(()=>{void refreshWorkspace();},[adminTab,selectedEventId,managementPanel,refreshWorkspace]);
+
  const regs=store.regs.filter(r=>r.event_id===selectedEventId),reserves=store.codes.filter(c=>c.event_id===selectedEventId&&c.is_reserve),remaining=reserves.filter(c=>!c.assigned_to).length,completed=regs.filter(r=>r.status==='COMPLETED').length;
   const [reportStudyYear,setReportStudyYear]=useState('ALL'),[reportFaculty,setReportFaculty]=useState('ALL'),[reportMajor,setReportMajor]=useState('ALL'),[reportClassGroup,setReportClassGroup]=useState('ALL'),[reportStatus,setReportStatus]=useState<'ALL'|'ATTENDED'|'NO_CHECKIN'|'NO_CHECKOUT'>('ATTENDED');
   const reportPeople=useMemo(()=>new Map(store.users.map(person=>[person.id,person])),[store.users]);
@@ -1449,7 +1471,15 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
   const checkedIds=new Set(studentIds);
   const selectedStudents=eligibleStudents.filter(id=>checkedIds.has(id));
 
-  function exportAttendance(allRegistered=false){const rows=allRegistered?reportPopulation:selectedReportRows;const csvRows=[['รหัสนักศึกษา','ชื่อ-นามสกุล','ชั้นปี','คณะ','สาขาวิชา','หมู่เรียน','เบอร์โทรศัพท์','สถานะ','เวลาเช็กอิน','ผู้เช็กอิน','เวลาเช็กเอาต์','สตาฟเช็กเอาต์'],...rows.map(({reg,person})=>[person.student_id,person.full_name,person.study_year,person.faculty,person.major,person.class_group,person.phone||'',({REGISTERED:'รอสแกนเข้างาน',ATTENDING:'กำลังเข้าร่วมกิจกรรม',COMPLETED:'เข้าร่วมกิจกรรมสำเร็จ'}[reg.status]),reg.checkin_at||'',reg.checkin_station?'เครื่องลงทะเบียน iPad':reg.checkin_staff_name||store.users.find(u=>u.id===reg.checked_in_by)?.full_name||'',reg.checkout_at||'',reg.checkout_staff_name||store.users.find(u=>u.id===reg.checked_out_by)?.full_name||''])];const quote=(value:string|number)=>{const text=String(value);return '"'+(/^[=+@\-\t\r\n]/.test(text)?"'":'')+text.replace(/"/g,'""')+'"';};const csv='\uFEFF'+csvRows.map(row=>row.map(quote).join(',')).join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='aru-attendance-'+(allRegistered?'registered-all':reportStatus.toLowerCase())+'-'+selectedEventId+'.csv';link.click();URL.revokeObjectURL(url);}
+  async function exportAttendance(allRegistered=false){
+    let population=reportPopulation;
+    if(supabase&&sessionToken){
+      const {data,error}=await supabase.rpc('load_workspace',{p_session_token:sessionToken});
+      if(error||!data?.success){window.alert('โหลดรายชื่อสำหรับส่งออกไม่สำเร็จ กรุณาลองอีกครั้ง');return;}
+      const latest=workspaceStore(data);const people=new Map(latest.users.map(person=>[person.id,person]));
+      population=latest.regs.filter(reg=>reg.event_id===selectedEventId).map(reg=>({reg,person:people.get(reg.user_id)})).filter((row):row is {reg:Registration;person:User}=>Boolean(row.person));
+    }
+    const rows=allRegistered?population:population.filter(row=>(reportStudyYear==='ALL'||String(row.person.study_year)===reportStudyYear)&&(reportFaculty==='ALL'||row.person.faculty===reportFaculty)&&(reportMajor==='ALL'||row.person.major===reportMajor)&&(reportClassGroup==='ALL'||row.person.class_group===reportClassGroup)&&(reportStatus==='ALL'||(reportStatus==='ATTENDED'&&row.reg.status!=='REGISTERED')||(reportStatus==='NO_CHECKIN'&&row.reg.status==='REGISTERED')||(reportStatus==='NO_CHECKOUT'&&row.reg.status==='ATTENDING')));const csvRows=[['รหัสนักศึกษา','ชื่อ-นามสกุล','ชั้นปี','คณะ','สาขาวิชา','หมู่เรียน','เบอร์โทรศัพท์','สถานะ','เวลาเช็กอิน','ผู้เช็กอิน','เวลาเช็กเอาต์','สตาฟเช็กเอาต์'],...rows.map(({reg,person})=>[person.student_id,person.full_name,person.study_year,person.faculty,person.major,person.class_group,person.phone||'',({REGISTERED:'รอสแกนเข้างาน',ATTENDING:'กำลังเข้าร่วมกิจกรรม',COMPLETED:'เข้าร่วมกิจกรรมสำเร็จ'}[reg.status]),reg.checkin_at||'',reg.checkin_station?'เครื่องลงทะเบียน iPad':reg.checkin_staff_name||store.users.find(u=>u.id===reg.checked_in_by)?.full_name||'',reg.checkout_at||'',reg.checkout_staff_name||store.users.find(u=>u.id===reg.checked_out_by)?.full_name||''])];const quote=(value:string|number)=>{const text=String(value);return '"'+(/^[=+@\-\t\r\n]/.test(text)?"'":'')+text.replace(/"/g,'""')+'"';};const csv='\uFEFF'+csvRows.map(row=>row.map(quote).join(',')).join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='aru-attendance-'+(allRegistered?'registered-all':reportStatus.toLowerCase())+'-'+selectedEventId+'.csv';link.click();URL.revokeObjectURL(url);}
  return <div className="space-y-6">
   {correction&&<Modal title="แก้สถานะเข้าร่วมกิจกรรม" subtitle={correction.name} close={()=>{if(!correcting)setCorrection(null);}}>
     <form onSubmit={saveCorrection} className="space-y-4">
