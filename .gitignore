@@ -4,3 +4,11 @@ node_modules
 !.env.example
 npm-debug.log*
 *.tsbuildinfo
+
+# Local audits and separate project artifacts
+registration_audit/
+checkname-deploy/
+audit_registration.py
+compare_registration.py
+*.tar.gz
+tmp/
