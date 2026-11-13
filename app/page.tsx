@@ -175,9 +175,9 @@ function EventPass() {
   useEffect(()=>{
     const client=supabase;
     if(!sessionToken||!client)return;
-    const heartbeat=()=>{const eventId=view==='scanner'?activeEvent:null;void client.rpc('heartbeat_session',{p_session_token:sessionToken,p_active_event_id:eventId}).then(({data,error})=>{if(!error&&data?.success===false)expireAdminSession(sessionToken);});};
-    heartbeat();const timer=window.setInterval(heartbeat,15000);window.addEventListener('focus',heartbeat);document.addEventListener('visibilitychange',heartbeat);
-    return()=>{window.clearInterval(timer);window.removeEventListener('focus',heartbeat);document.removeEventListener('visibilitychange',heartbeat);};
+    const heartbeat=()=>{if(document.hidden)return;const eventId=view==='scanner'?activeEvent:null;void client.rpc('heartbeat_session',{p_session_token:sessionToken,p_active_event_id:eventId}).then(({data,error})=>{if(!error&&data?.success===false)expireAdminSession(sessionToken);});};
+    heartbeat();const timer=window.setInterval(heartbeat,60000);const onVisible=()=>{if(!document.hidden)heartbeat();};document.addEventListener('visibilitychange',onVisible);
+    return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',onVisible);};
   },[sessionToken,view,activeEvent,selectedEvent,expireAdminSession]);
   useEffect(()=>{
     if(!scannerLocked)return;
@@ -225,7 +225,7 @@ function EventPass() {
         setStore(next);
       } finally { refreshing = false; }
     };
-    const startFallback=()=>{if(!disposed&&!pollTimer)pollTimer=setInterval(refresh,2500);};
+    const startFallback=()=>{if(!disposed&&!pollTimer)pollTimer=setInterval(refresh,10000);};
     const stopFallback=()=>{if(pollTimer){clearInterval(pollTimer);pollTimer=undefined;}};
     const receiveUpdate=(message:{event_id?:string;user_id?:string;status?:Status;checkin_at?:string|null;checkout_at?:string|null;passcode?:string|null;operation?:string})=>{
       if(message.user_id!==user.id||!message.event_id)return;
@@ -240,7 +240,6 @@ function EventPass() {
         openAfterScan(storeRef.current.events.find(event => event.id === message.event_id),message.status);
         if(message.status==='ATTENDING'||message.status==='COMPLETED')setToast(message.status==='COMPLETED'?'เข้าร่วมกิจกรรมสำเร็จ':'กำลังเข้าร่วมกิจกรรม');
       }
-      void refresh();
     };
     document.addEventListener('visibilitychange',refresh);
     window.addEventListener('pageshow',refresh);
@@ -1375,19 +1374,17 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
     let fallbackTimer:number|undefined;
     let debounceTimer:ReturnType<typeof setTimeout>|undefined;
     const refresh=async()=>{const rows=await loadEventDashboard();if(active)setDashboardRows(rows);};
-    const startFallback=()=>{if(!active)return;setDashboardLive(false);if(!fallbackTimer)fallbackTimer=window.setInterval(()=>{if(!isImportingRef.current){void refresh();void refreshWorkspace();}},10000);};
+    const startFallback=()=>{if(!active)return;setDashboardLive(false);if(!fallbackTimer)fallbackTimer=window.setInterval(()=>{if(!isImportingRef.current){void refresh();}},30000);};
     const stopFallback=()=>{if(fallbackTimer){window.clearInterval(fallbackTimer);fallbackTimer=undefined;}};
     void refresh();
-    void refreshWorkspace();
     if(!client||!sessionToken)return()=>{active=false;};
     void hashSessionToken(sessionToken).then(tokenHash=>{
       if(!active)return;
       channel=client.channel(`aru-admin-dashboard:${tokenHash}`,{config:{private:true}})
-        .on('broadcast',{event:'dashboard_changed'},({payload})=>{
+        .on('broadcast',{event:'dashboard_changed'},()=>{
           if(debounceTimer)clearTimeout(debounceTimer);
           debounceTimer=setTimeout(()=>{
             void refresh();
-            if(payload?.source_table!=='app_sessions' && !isImportingRef.current)void refreshWorkspace();
           },1500);
         })
         .subscribe(status=>{
@@ -1396,7 +1393,7 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
         });
     }).catch(()=>{if(active)startFallback();});
     return()=>{active=false;if(debounceTimer)clearTimeout(debounceTimer);stopFallback();if(channel)void client.removeChannel(channel);};
-  },[loadEventDashboard,refreshWorkspace,sessionToken,isImportingRef]);
+  },[loadEventDashboard,sessionToken,isImportingRef]);
  const regs=store.regs.filter(r=>r.event_id===selectedEventId),reserves=store.codes.filter(c=>c.event_id===selectedEventId&&c.is_reserve),remaining=reserves.filter(c=>!c.assigned_to).length,completed=regs.filter(r=>r.status==='COMPLETED').length;
   const [reportStudyYear,setReportStudyYear]=useState('ALL'),[reportFaculty,setReportFaculty]=useState('ALL'),[reportMajor,setReportMajor]=useState('ALL'),[reportClassGroup,setReportClassGroup]=useState('ALL'),[reportStatus,setReportStatus]=useState<'ALL'|'ATTENDED'|'NO_CHECKIN'|'NO_CHECKOUT'>('ATTENDED');
   const reportPeople=useMemo(()=>new Map(store.users.map(person=>[person.id,person])),[store.users]);
