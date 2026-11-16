@@ -5,6 +5,7 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { StudentQr } from './student-qr';
 import { RegistrationAdmin, LoginHelp } from './register/registration-admin';
 import BrowserGate from './browser-gate';
+import {SingleStudent} from './register/single-student';
 import {RosterUpload} from './register/roster-upload';
 import {addPasscodeBatches,matchPasscodeBatches} from '@/lib/passcode-batches';
 import {importRosterInBatches} from '@/lib/import-roster';
@@ -1868,7 +1869,7 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
     </div>
   )}
 
-  {(adminTab==='all' || adminTab==='users') && <RosterUpload importError={importError} file={csvFile} setFile={setCsvFile} submit={()=>importCsv(true)}/>}
+  {(adminTab==='all' || adminTab==='users') && <><SingleStudent token={sessionToken} catalog={academicCatalog} refresh={refreshWorkspace}/><RosterUpload importError={importError} file={csvFile} setFile={setCsvFile} submit={()=>importCsv(true)}/></>}
   {/* TAB 4: User Accounts Management */}
   {(adminTab === 'all' || adminTab === 'users') && (
     <section className="bento overflow-hidden shadow-sm">
