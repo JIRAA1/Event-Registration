@@ -115,6 +115,15 @@ function EventPass() {
   storeRef.current=store;
   const selected=store.events.find(e=>e.id===selectedEvent)||store.events[0]||initialStore.events[0];
   const currentEvent=store.events.find(e=>e.id===activeEvent)||store.events[0]||initialStore.events[0];
+  const [deviceModes, setDeviceModes] = useState<Record<string, Event['scan_mode']>>({});
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('aru-scanner-modes') || '{}');
+      if (saved && typeof saved === 'object') setDeviceModes(saved);
+    } catch { /* A new scanner session starts with the event default. */ }
+  }, []);
+  const savedMode = deviceModes[activeEvent];
+  const deviceMode = savedMode === 'CHECKIN' || savedMode === 'CHECKOUT' ? savedMode : currentEvent.scan_mode;
   const studentRegs=useMemo(()=>store.regs.filter(r=>r.user_id===user?.id),[store.regs,user?.id]);
   const reserveLeft=store.codes.filter(c=>c.event_id===activeEvent&&c.is_reserve&&!c.assigned_to).length;
   const attendance=store.regs.filter(r=>r.event_id===activeEvent&&r.status!=='REGISTERED').length;
@@ -303,8 +312,8 @@ function EventPass() {
       const now=Date.now();
       if (now-(cooldown.current.get(raw)||0)<2000) return;
       cooldown.current.set(raw,now);
-      const {data,error}=await supabase.rpc('redeem_event_qr',{
-        p_session_token:sessionToken,p_event_id:activeEvent,p_scan_mode:currentEvent.scan_mode,p_ticket:match[1],
+      const {data,error}=await supabase.rpc('redeem_device_event_qr',{
+        p_session_token:sessionToken,p_event_id:activeEvent,p_scan_mode:deviceMode,p_ticket:match[1],
       });
       if (error || !data?.success) {
         setScanMessage({ok:false,title:data?.message||'สแกนไม่สำเร็จ',detail:error?'ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง':'กรุณาตรวจสอบบัตรก่อนสแกนอีกครั้ง'});
@@ -317,8 +326,8 @@ function EventPass() {
     let parsed:{e?:string;u?:string};try{parsed=JSON.parse(raw)}catch{setScanMessage({ok:false,title:'QR Code ไม่ถูกต้อง',detail:'รูปแบบรหัสไม่ตรงกับกิจกรรม'});setFlash('error');soundEngine.playError();return;}
     const eventId=parsed.e||activeEvent,userId=parsed.u||'';const key=`${eventId}:${userId}`;const now=Date.now();if(now-(cooldown.current.get(key)||0)<500)return;cooldown.current.set(key,now);
     const event=store.events.find(e=>e.id===eventId),reg=store.regs.find(r=>r.event_id===eventId&&r.user_id===userId),person=store.users.find(u=>u.id===userId);
-    if(!event||event.status!=='ACTIVE'||!reg||!person){setScanMessage({ok:false,title:'ไม่มีสิทธิ์เข้าร่วม',detail:'ไม่พบรายชื่อในกิจกรรมที่เลือก'});setFlash('error');soundEngine.playError();return;}
-    const checkout=event.scan_mode==='CHECKOUT';
+    if(eventId!==activeEvent||!event||event.status!=='ACTIVE'||!reg||!person){setScanMessage({ok:false,title:'ไม่มีสิทธิ์เข้าร่วม',detail:'ไม่พบรายชื่อในกิจกรรมที่เลือก'});setFlash('error');soundEngine.playError();return;}
+    const checkout=deviceMode==='CHECKOUT';
     if((!checkout&&reg.status!=='REGISTERED')||(checkout&&reg.status!=='ATTENDING')){setScanMessage({ok:false,title:reg.status==='COMPLETED'?'เช็กเอาต์แล้ว':'ตรวจสอบสถานะอีกครั้ง',detail:reg.status==='REGISTERED'?'ต้องเช็กอินก่อนจึงจะเช็กเอาต์ได้':'QR นี้ถูกสแกนไปแล้ว'});setFlash('error');soundEngine.playError();return;}
     const status:Status=checkout?'COMPLETED':'ATTENDING';const next={...store,regs:store.regs.map(r=>r===reg?{...r,status,...(checkout?{checkout_at:new Date().toISOString(),checked_out_by:user?.id}:{checkin_at:new Date().toISOString(),checked_in_by:user?.id})}:r)};save(next);
     setScanMessage({ok:true,title:person.full_name,detail:checkout?'เข้าร่วมสำเร็จ · เช็กเอาต์เรียบร้อย':'เช็กอินสำเร็จ · ยินดีต้อนรับ'});setFlash(checkout?'checkout':'success');checkout?soundEngine.playCheckOutSuccess():soundEngine.playCheckInSuccess();
@@ -353,7 +362,12 @@ function EventPass() {
     }
   }
   async function stopScanner(){if(scannerRef.current){try{await scannerRef.current.stop();await scannerRef.current.clear()}catch{}scannerRef.current=null;}setScannerOn(false);}
-  async function setScanMode(){const nextMode=currentEvent.scan_mode==='CHECKIN'?'CHECKOUT':'CHECKIN';if(isSupabaseConfigured&&supabase&&/^[0-9a-f-]{36}$/i.test(activeEvent)){if(!sessionToken){setToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');return;}const {data,error}=await supabase.rpc('set_event_scan_mode',{p_session_token:sessionToken,p_event_id:activeEvent,p_scan_mode:nextMode});if(error||!data?.success){setToast(data?.message||error?.message||'เปลี่ยนโหมดสแกนไม่สำเร็จ');return;}}save({...store,events:store.events.map(e=>e.id===activeEvent?{...e,scan_mode:nextMode}:e)});setScanMessage({ok:true,title:`เปิดโหมด${nextMode==='CHECKIN'?'เช็กอิน':'เช็กเอาต์'}`,detail:'สแกน QR Code ถัดไปเพื่อดำเนินการ'});}
+  function setScanMode(mode: Event['scan_mode']) {
+    const modes = { ...deviceModes, [activeEvent]: mode };
+    setDeviceModes(modes);
+    try { sessionStorage.setItem('aru-scanner-modes', JSON.stringify(modes)); } catch { /* Keep this choice in memory. */ }
+    setScanMessage({ok:true, title:mode === 'CHECKIN' ? 'เครื่องนี้เปิดสแกนเข้า' : 'เครื่องนี้เปิดสแกนออก', detail:'สแกน QR Code ถัดไปเพื่อดำเนินการ'});
+  }
   async function addWalkin(ev:React.FormEvent<HTMLFormElement>){
     ev.preventDefault();const f=new FormData(ev.currentTarget),studyYear=Number(f.get('study_year'))||1,year=new Date().getFullYear()+543-studyYear+1;
     const studentId=String(f.get('student_id')).trim(),fullName=String(f.get('prefix'))+String(f.get('full_name')).trim(),faculty=String(f.get('faculty')||''),major=String(f.get('major')||''),classGroup=String(f.get('class_group')||''),birthDate=String(f.get('birth_date')||''),phone=String(f.get('phone')||'');
@@ -771,7 +785,7 @@ return;}save({...store,codes:[...store.codes,...fresh]});setModal(null);setToast
     )}
 
     <div key={view} className="page-transition mx-auto mt-6 max-w-[1440px]">
-      {!user?<Landing loginError={loginError} enterAs={()=>void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…',enterAs)} saving={saving||Boolean(loadingMessage)}/>:view==='scanner'&&user.role!=='STUDENT'?<ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={()=>setScannerLocked(value=>!value)} startScanner={()=>void withLoading('กำลังเปิดกล้อง…',startScanner)} stopScanner={()=>void withLoading('กำลังปิดกล้อง…',stopScanner)} scanMode={()=>void withLoading('กำลังเปลี่ยนโหมดสแกน…',setScanMode)} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async(raw:string)=>{await withLoading('กำลังตรวจสอบ QR…',()=>scanPayload(raw));}} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={()=>setModal('walkin')}/>:view==='admin'&&user.role==='ADMIN'?<AdminView isImportingRef={isImportingRef} deleteBatch={(kind,values)=>withLoading('กำลังลบรายการ…',()=>deleteBatch(kind,values))} sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args)=>withLoading('กำลังบันทึกคณะและสาขา…',()=>manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={()=>setModal('event')} openCodes={()=>setModal('codes')} openStaff={()=>setModal('staff')} editUser={(target:User)=>{setEditingUser(target);setEditingFaculty(target.faculty);setEditingMajor(target.major);setModal('editUser')}} deleteUser={(target:User)=>void withLoading('กำลังลบบัญชีผู้ใช้…',()=>deleteManagedUser(target))} deleteActivity={()=>void withLoading('กำลังลบกิจกรรม…',deleteActivity)} deleteRegistration={(id:string)=>void withLoading('กำลังนำรายชื่อออก…',()=>deleteRegistration(id))} importError={importError} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={roster=>void withLoading('กำลังนำเข้ารายชื่อ…',()=>importCsv(roster))} enrollRosterToEvent={()=>withLoading('กำลังผูกรายชื่อเข้ากิจกรรม…',enrollRosterToEvent)} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch:Partial<Event>)=>withLoading('กำลังบันทึกการเปลี่ยนแปลง…',()=>updateSelectedEvent(patch))} />:view==='studentStats'&&user.role==='STUDENT'?<StudentStatsView user={user} events={store.events.filter(e=>studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs}/>:view==='event'&&user.role==='STUDENT'?<EventDetail session={sessionToken} event={store.events.find(e=>e.id===activeEvent)||currentEvent} user={user} registration={studentRegs.find(r=>r.event_id===activeEvent)} back={()=>setView('home')}/>:<StudentHome session={sessionToken} refresh={refreshWorkspace} user={user} events={store.events.filter(e=>e.status==='ACTIVE'&&studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs} select={(id:string)=>{setActiveEvent(id);setView('event')}} store={store}/>}
+      {!user?<Landing loginError={loginError} enterAs={()=>void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…',enterAs)} saving={saving||Boolean(loadingMessage)}/>:view==='scanner'&&user.role!=='STUDENT'?<ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={()=>setScannerLocked(value=>!value)} startScanner={()=>void withLoading('กำลังเปิดกล้อง…',startScanner)} stopScanner={()=>void withLoading('กำลังปิดกล้อง…',stopScanner)} deviceMode={deviceMode} scanMode={setScanMode} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async(raw:string)=>{await withLoading('กำลังตรวจสอบ QR…',()=>scanPayload(raw));}} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={()=>setModal('walkin')}/>:view==='admin'&&user.role==='ADMIN'?<AdminView isImportingRef={isImportingRef} deleteBatch={(kind,values)=>withLoading('กำลังลบรายการ…',()=>deleteBatch(kind,values))} sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args)=>withLoading('กำลังบันทึกคณะและสาขา…',()=>manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={()=>setModal('event')} openCodes={()=>setModal('codes')} openStaff={()=>setModal('staff')} editUser={(target:User)=>{setEditingUser(target);setEditingFaculty(target.faculty);setEditingMajor(target.major);setModal('editUser')}} deleteUser={(target:User)=>void withLoading('กำลังลบบัญชีผู้ใช้…',()=>deleteManagedUser(target))} deleteActivity={()=>void withLoading('กำลังลบกิจกรรม…',deleteActivity)} deleteRegistration={(id:string)=>void withLoading('กำลังนำรายชื่อออก…',()=>deleteRegistration(id))} importError={importError} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={roster=>void withLoading('กำลังนำเข้ารายชื่อ…',()=>importCsv(roster))} enrollRosterToEvent={()=>withLoading('กำลังผูกรายชื่อเข้ากิจกรรม…',enrollRosterToEvent)} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch:Partial<Event>)=>withLoading('กำลังบันทึกการเปลี่ยนแปลง…',()=>updateSelectedEvent(patch))} />:view==='studentStats'&&user.role==='STUDENT'?<StudentStatsView user={user} events={store.events.filter(e=>studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs}/>:view==='event'&&user.role==='STUDENT'?<EventDetail session={sessionToken} event={store.events.find(e=>e.id===activeEvent)||currentEvent} user={user} registration={studentRegs.find(r=>r.event_id===activeEvent)} back={()=>setView('home')}/>:<StudentHome session={sessionToken} refresh={refreshWorkspace} user={user} events={store.events.filter(e=>e.status==='ACTIVE'&&studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs} select={(id:string)=>{setActiveEvent(id);setView('event')}} store={store}/>}
     </div>
     {user&&<div className="mx-auto mt-10 flex max-w-[1440px] items-center justify-between border-t border-slate-200/70 px-2 py-4 text-[10px] text-slate-500"><span>© 2026 ARU Student Organization · ระบบลงทะเบียนกิจกรรม</span><span className="hidden items-center gap-1 sm:flex"><ShieldCheck size={12}/>ข้อมูลกิจกรรมอัปเดตแบบเรียลไทม์</span></div>}
     {modal==='walkin'&&<Modal submitLabel="บันทึกรายชื่อหน้างาน" title="ลงทะเบียนหน้างาน" subtitle="เพิ่มนักศึกษาและผูกสิทธิ์กิจกรรม" close={()=>setModal(null)}><form id="staff-admin-form" onSubmit={e=>void withLoading('กำลังบันทึกรายชื่อ…',()=>addWalkin(e))} className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><Field label="รหัสนักศึกษา" name="student_id" required placeholder="เช่น 69123456"/><label className="text-sm">คำนำหน้า<select name="prefix" required defaultValue="" className="mt-1 block h-11 w-full rounded-xl border px-3"><option value="">เลือกคำนำหน้า</option><option>นาย</option><option>นางสาว</option></select></label><Field label="ชื่อ–นามสกุล" name="full_name" required placeholder="ชื่อ นามสกุล"/><label className="block text-[11px] font-semibold text-slate-600">คณะ<select name="faculty" value={walkinFaculty} required onChange={e=>{setWalkinFaculty(e.target.value);setWalkinMajor('')}} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800"><option value="">เลือกคณะ</option>{academicCatalog.map(faculty=><option key={faculty.id} value={faculty.name}>{faculty.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">สาขาวิชา<select name="major" value={walkinMajor} required disabled={!walkinFaculty} onChange={e=>setWalkinMajor(e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 disabled:opacity-50"><option value="">เลือกสาขา</option>{(academicCatalog.find(faculty=>faculty.name===walkinFaculty)?.majors||[]).map(major=><option key={major.id} value={major.name}>{major.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">ชั้นปีที่กำลังศึกษา<select name="study_year" value={walkinStudyYear} onChange={e=>setWalkinStudyYear(Number(e.target.value))} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{Array.from({length:8},(_,i)=>i+1).map(year=><option key={year} value={year}>ปี {year}</option>)}</select></label><label className="text-sm">หมู่เรียน<select name="class_group" required defaultValue="" className="mt-1 block h-11 w-full rounded-xl border px-3"><option value="">เลือกหมู่เรียน</option>{[1,2,3,4].map(n=><option key={n}>{n}</option>)}</select></label><BirthDateField/><Field label="เบอร์โทรศัพท์" name="phone" placeholder="08X-XXX-XXXX"/></div><div className={cx('flex items-center justify-between rounded-2xl px-4 py-3 text-xs',reserveLeft?'bg-amber-50 text-amber-900':'bg-rose-50 text-rose-700')}><span className="flex items-center gap-2"><Ticket size={15}/>Passcode สำรองคงเหลือ</span><b>{reserveLeft} รหัส</b></div><p className="text-center text-[10px] leading-5 text-slate-400">นักศึกษาชั้นปี 2 ขึ้นไปจะได้รับ Passcode หลังเช็กเอาต์ · ปี 1 ใช้ QR Check-in/Check-out</p></form></Modal>}
@@ -1093,7 +1107,7 @@ function ScanResultEffect({message,flash}:{message:{ok:boolean;title:string;deta
  </div>;
 }
 
-function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,startScanner,stopScanner,scanMode,scanInput,setScanInput,scanPayload,scanMessage,flash,attendance,registered,reserveLeft,openWalkin,scannerLocked,toggleScannerLock}:{user:User;event:Event;events:Event[];activeEvent:string;setActiveEvent:(id:string)=>void;scannerOn:boolean;startScanner:()=>void;stopScanner:()=>void;scanMode:()=>void;scanInput:string;setScanInput:(s:string)=>void;scanPayload:(s:string)=>Promise<void>;scanMessage:{ok:boolean;title:string;detail:string}|null;flash:string;attendance:number;registered:number;reserveLeft:number;openWalkin:()=>void;scannerLocked:boolean;toggleScannerLock:()=>void}) {
+function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,startScanner,stopScanner,deviceMode,scanMode,scanInput,setScanInput,scanPayload,scanMessage,flash,attendance,registered,reserveLeft,openWalkin,scannerLocked,toggleScannerLock}:{user:User;event:Event;events:Event[];activeEvent:string;setActiveEvent:(id:string)=>void;scannerOn:boolean;startScanner:()=>void;stopScanner:()=>void;deviceMode:Event['scan_mode'];scanMode:(mode:Event['scan_mode'])=>void;scanInput:string;setScanInput:(s:string)=>void;scanPayload:(s:string)=>Promise<void>;scanMessage:{ok:boolean;title:string;detail:string}|null;flash:string;attendance:number;registered:number;reserveLeft:number;openWalkin:()=>void;scannerLocked:boolean;toggleScannerLock:()=>void}) {
  const pct=registered?Math.round(attendance/registered*100):0;
  return <div className={cx('space-y-5 rounded-[30px] p-1 transition',flash==='success'?'scanner-flash-success':flash==='checkout'?'scanner-flash-checkout':flash==='error'?'scanner-flash-error':'')}>
    {/* Scanner Header Bar */}
@@ -1144,38 +1158,39 @@ function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,sta
          </div>
 
          {/* Mode Switcher */}
+         <div><span className="text-xs font-bold text-slate-600">โหมดสแกนของเครื่องนี้</span>
          <div className="flex items-center rounded-2xl bg-slate-100 p-1 shadow-inner">
            <button
              type="button"
-             aria-pressed={event.scan_mode==='CHECKIN'}
-             onClick={() => { if(event.scan_mode !== 'CHECKIN') scanMode(); }}
+             aria-pressed={deviceMode==='CHECKIN'}
+             onClick={() => { scanMode('CHECKIN'); }}
              className={cx(
                'flex min-h-11 items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-extrabold transition-all duration-200',
-               event.scan_mode === 'CHECKIN'
+               deviceMode === 'CHECKIN'
                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/20 ring-2 ring-emerald-500/20'
                  : 'text-slate-600 hover:text-emerald-700'
              )}
            >
-             <span className={cx('h-2 w-2 rounded-full', event.scan_mode === 'CHECKIN' ? 'animate-pulse bg-emerald-200' : 'bg-slate-400')}/>
+             <span className={cx('h-2 w-2 rounded-full', deviceMode === 'CHECKIN' ? 'animate-pulse bg-emerald-200' : 'bg-slate-400')}/>
              <ArrowDownRight size={14}/>
              สแกนเข้า
            </button>
            <button
              type="button"
-             aria-pressed={event.scan_mode==='CHECKOUT'}
-             onClick={() => { if(event.scan_mode !== 'CHECKOUT') scanMode(); }}
+             aria-pressed={deviceMode==='CHECKOUT'}
+             onClick={() => { scanMode('CHECKOUT'); }}
              className={cx(
                'flex min-h-11 items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-extrabold transition-all duration-200',
-               event.scan_mode === 'CHECKOUT'
+               deviceMode === 'CHECKOUT'
                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-950/20 ring-2 ring-amber-400/20 font-black'
                  : 'text-slate-600 hover:text-amber-800'
              )}
            >
-             <span className={cx('h-2 w-2 rounded-full', event.scan_mode === 'CHECKOUT' ? 'animate-pulse bg-amber-900' : 'bg-slate-400')}/>
+             <span className={cx('h-2 w-2 rounded-full', deviceMode === 'CHECKOUT' ? 'animate-pulse bg-amber-900' : 'bg-slate-400')}/>
              <ArrowUpRight size={14}/>
              สแกนออก
            </button>
-         </div>
+         </div></div>
        </div>
 
        <div className="mb-4 grid gap-2 sm:grid-cols-2">
