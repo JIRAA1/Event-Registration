@@ -27,6 +27,9 @@ begin
   assert redeem_event_qr(admin_token,event_a,'CHECKOUT',(ticket->>'token')::uuid)->>'new_status'='COMPLETED';
   assert load_workspace(student_token)->'registrations'->0->>'passcode' is null;
   result:=admin_add_reserve_passcodes(admin_token,event_a,array['LATE-ONE']);
+  assert result->>'added_count'='1';
+  assert load_workspace(student_token)->'registrations'->0->>'passcode' is null;
+  result:=admin_match_passcodes_batch(admin_token,event_a,25);
   assert result->>'matched_count'='1';
   assert load_workspace(student_token)->'registrations'->0->>'passcode'='LATE-ONE';
   assert admin_match_waiting_passcodes(admin_token,event_a)->>'matched_count'='0';

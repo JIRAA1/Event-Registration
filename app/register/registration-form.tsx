@@ -38,7 +38,7 @@ export function RegistrationForm({eventId,station,onExit,correctionId}:{eventId:
   const loginUrl=origin+'/?event='+encodeURIComponent(eventId);
   useEffect(()=>{
     let active=true;
-    setOrigin(window.location.origin);
+    setOrigin((process.env.NEXT_PUBLIC_NATIVE_PUBLIC_SITE || window.location.origin));
     const saved=sessionStorage.getItem(storageKey);
     if(correctionId){
       signupRpc<{profile:ApplicationProfile;note:string}>('registration_correction',{

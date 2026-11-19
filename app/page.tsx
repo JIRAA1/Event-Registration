@@ -79,11 +79,12 @@ export default function Home() {
 }
 
 function EventPass() {
+  const offlineScanner = !isSupabaseConfigured && process.env.NEXT_PUBLIC_OFFLINE_SCANNER === 'true';
   const [store,setStore]=useState<Store>(initialStore);
   const [academicCatalog,setAcademicCatalog]=useState<AcademicFaculty[]>(defaultAcademicCatalog);
-  const [user,setUser]=useState<User|null>(null);
+  const [user,setUser]=useState<User|null>(offlineScanner ? staffUser : null);
   const [sessionToken,setSessionToken]=useState('');
-  const [view,setView]=useState<'home'|'studentStats'|'scanner'|'admin'|'event'>('home');
+  const [view,setView]=useState<'home'|'studentStats'|'scanner'|'admin'|'event'>(offlineScanner ? 'scanner' : 'home');
   const [activeEvent,setActiveEvent]=useState('evt-aru-01');
   const [selectedEvent,setSelectedEvent]=useState('evt-aru-01');
   const [flash,setFlash]=useState<'success'|'checkout'|'error'|''>('');
@@ -160,17 +161,32 @@ function EventPass() {
     setLoginError('เซสชันแอดมินหมดอายุหรือถูกยกเลิก กรุณาเข้าสู่ระบบใหม่แล้วบันทึกอีกครั้ง');
   },[]);
   const isImportingRef = useRef(false);
-  const refreshingWorkspaceRef = useRef(false);
-  const refreshWorkspace=useCallback(async()=>{
-    if(!sessionToken||!supabase||refreshingWorkspaceRef.current)return;
-    refreshingWorkspaceRef.current=true;
-    try{
-      const {data,error}=await supabase.rpc('load_workspace',{p_session_token:sessionToken});
-      if(!error&&data?.success){setStore(workspaceStore(data));setAcademicCatalog(workspaceCatalog(data));}
-      else if(!error&&data?.success===false)expireAdminSession(sessionToken);
-    }finally{
-      refreshingWorkspaceRef.current=false;
-    }
+  const refreshWorkspace=useMemo(()=>{
+    let running: Promise<void> | undefined;
+    let pending=false;
+    return function refreshWorkspace(): Promise<void> {
+      if(!sessionToken||!supabase)return Promise.resolve();
+      pending=true;
+      if(running)return running;
+      const client=supabase;
+      running=(async()=>{
+        do {
+          pending=false;
+          const {data,error}=await client.rpc('load_workspace',{p_session_token:sessionToken});
+          // A response from a logged-out account must not replace the next account's workspace.
+          if(sessionStorage.getItem('aru-session-token')!==sessionToken)return;
+          if(error)throw new Error(error.message||'โหลดข้อมูลไม่สำเร็จ');
+          if(data?.success){
+            setStore(workspaceStore(data));
+            setAcademicCatalog(workspaceCatalog(data));
+          }else{
+            expireAdminSession(sessionToken);
+            throw new Error(data?.message||'โหลดข้อมูลไม่สำเร็จ');
+          }
+        } while(pending);
+      })().finally(()=>{running=undefined;});
+      return running;
+    };
   },[sessionToken,expireAdminSession]);
 
   const loadEventDashboard=useCallback(async()=>{
@@ -376,7 +392,7 @@ function EventPass() {
     if(isSupabaseConfigured&&supabase&&user&&/^[0-9a-f-]{36}$/i.test(activeEvent)){
       if(!sessionToken){setToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบสตาฟอีกครั้ง');return;}const {data,error}=await supabase.rpc('register_walkin_student',{p_event_id:activeEvent,p_session_token:sessionToken,p_student_id:studentId,p_full_name:fullName,p_faculty:faculty,p_major:major,p_class_group:classGroup,p_enrollment_year:year,p_birth_date:birthDate,p_phone:phone,p_study_year:studyYear});
       if(error||!data?.success){setToast(data?.message||error?.message||'เพิ่มรายชื่อไม่สำเร็จ');return;}
-      if(sessionToken){const loaded=await supabase.rpc('load_workspace',{p_session_token:sessionToken});if(!loaded.error&&loaded.data?.success)setStore(workspaceStore(loaded.data));}
+      if(sessionToken)await refreshWorkspace();
       setModal(null);setToast(data.passcode_assigned?`เพิ่มรายชื่อแล้ว · Passcode ${data.passcode_preview}`:'เพิ่มรายชื่อแล้ว · ใช้ QR Check-in');return;
     }
 
@@ -425,8 +441,7 @@ function EventPass() {
       if(!sessionToken){setToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบแอดมินใหม่');return;}
       const {data,error}=await supabase.rpc('admin_delete_event_registration',{p_admin_token:sessionToken,p_event_id:selectedEvent,p_user_id:userId});
       if(error||!data?.success){setToast(data?.message||error?.message||'ลบรายชื่อไม่สำเร็จ');return;}
-      const loaded=await supabase.rpc('load_workspace',{p_session_token:sessionToken});
-      if(!loaded.error&&loaded.data?.success)setStore(workspaceStore(loaded.data));
+      await refreshWorkspace();
     }else{
       const reg=store.regs.find(row=>row.event_id===selectedEvent&&row.user_id===userId);
       save({...store,regs:store.regs.filter(row=>!(row.event_id===selectedEvent&&row.user_id===userId)),codes:store.codes.map(code=>reg?.passcode===code.code&&code.event_id===selectedEvent&&code.is_reserve?{...code,assigned_to:undefined}:code)});
@@ -589,8 +604,7 @@ return;}save({...store,codes:[...store.codes,...fresh]});setModal(null);setToast
           : data?.message||'นำเข้ารายชื่อไม่สำเร็จ';
         setImportError(message);setToast('นำเข้าไม่สำเร็จ กรุณาดูรายละเอียดใต้ส่วนเลือกไฟล์');return;
       }
-      const loaded=await supabase.rpc('load_workspace',{p_session_token:sessionToken});
-      if(!loaded.error&&loaded.data?.success)setStore(workspaceStore(loaded.data));
+      await refreshWorkspace();
       setCsvFile(null);
       setToast(roster?`สร้างบัญชี ${data.imported_count||0} คน · ข้ามบัญชีที่มีอยู่ ${data.skipped_count||0} คน`:`นำเข้า ${data.imported_count||0} คน · ข้าม ${data.skipped_count||0} คน · จับคู่ Passcode อัตโนมัติ ${data.passcodes_assigned_count||0} รายการ`);
       return;
@@ -1390,30 +1404,34 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
  };
  useEffect(()=>setRedirectDraft(selectedEvent.redirect_url_year1),[selectedEvent.id,selectedEvent.redirect_url_year1]);
  useEffect(()=>setBannerDraft(selectedEvent.banner_url||''),[selectedEvent.id,selectedEvent.banner_url]);
- useEffect(()=>{void refreshWorkspace();},[refreshWorkspace]);
   useEffect(()=>{
     const client=supabase;
-    let active=true,live=false,dirty=true,running=false;
+    let active=true,live=false,dirty=false,running=false;
     let channel:ReturnType<NonNullable<typeof client>['channel']>|undefined;
     let lastWorkspace=0;
+    let forcePending=false;
     let scheduled:ReturnType<typeof setTimeout>|undefined;
     const refresh=async(force=false)=>{
-      if(!active||document.hidden||running||isImportingRef.current)return;
+      if(!active||document.hidden)return;
+      if(force){dirty=true;forcePending=true;}
+      if(running||isImportingRef.current)return;
       running=true;
       try{
         const rows=await loadEventDashboard();if(active)setDashboardRows(rows);
-        if(active&&(force||!live||dirty)&& (force||Date.now()-lastWorkspace>=10000)){
-          dirty=false;lastWorkspace=Date.now();
-          await refreshWorkspace();
+        if(active&&dirty&&(forcePending||Date.now()-lastWorkspace>=10000)){
+          dirty=false;forcePending=false;lastWorkspace=Date.now();
+          try { await refreshWorkspace(); }
+          catch { dirty=true; }
+
         }
       }finally{running=false;}
     };
     const visible=()=>{if(!document.hidden){dirty=true;void refresh(true);}};
     // Presence has no broadcast: poll even when Realtime is connected.
-    const presenceTimer=window.setInterval(()=>{dirty=true;void refresh();},30000);
+    const presenceTimer=window.setInterval(()=>{if(!live)dirty=true;void refresh();},30000);
     const dataTimer=window.setInterval(()=>{if(dirty)void refresh();},10000);
     document.addEventListener('visibilitychange',visible);
-    void refresh(true);
+    void refresh();
     if(client&&sessionToken)void hashSessionToken(sessionToken).then(tokenHash=>{
       if(!active)return;
       channel=client.channel(`aru-admin-dashboard:${tokenHash}`,{config:{private:true}})
@@ -1425,12 +1443,13 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
         .subscribe(status=>{
           if(!active)return;
           live=status==='SUBSCRIBED';setDashboardLive(live);
-          if(live){dirty=true;void refresh(true);}
+          if(live){void refresh(true);}
+          else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){dirty=true;}
         });
-    }).catch(()=>{if(active){live=false;setDashboardLive(false);}});
+    }).catch(()=>{if(active){live=false;dirty=true;setDashboardLive(false);}});
     return()=>{active=false;clearInterval(presenceTimer);clearInterval(dataTimer);if(scheduled)clearTimeout(scheduled);document.removeEventListener('visibilitychange',visible);if(channel&&client)void client.removeChannel(channel);};
   },[loadEventDashboard,refreshWorkspace,sessionToken,isImportingRef]);
-  useEffect(()=>{void refreshWorkspace();},[adminTab,selectedEventId,managementPanel,refreshWorkspace]);
+
 
  const regs=store.regs.filter(r=>r.event_id===selectedEventId),reserves=store.codes.filter(c=>c.event_id===selectedEventId&&c.is_reserve),remaining=reserves.filter(c=>!c.assigned_to).length,completed=regs.filter(r=>r.status==='COMPLETED').length;
   const [reportStudyYear,setReportStudyYear]=useState('ALL'),[reportFaculty,setReportFaculty]=useState('ALL'),[reportMajor,setReportMajor]=useState('ALL'),[reportClassGroup,setReportClassGroup]=useState('ALL'),[reportStatus,setReportStatus]=useState<'ALL'|'ATTENDED'|'NO_CHECKIN'|'NO_CHECKOUT'>('ATTENDED');

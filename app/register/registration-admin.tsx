@@ -76,7 +76,7 @@ export const RegistrationAdmin=memo(function RegistrationAdmin({eventId,token,re
     setTimeout(()=>URL.revokeObjectURL(link.href),1000);
     setNotice(`ส่งออกรายชื่อ ${rows.length} รายการแล้ว`);
   }
-  useEffect(()=>setUrl(window.location.origin+'/register/'+eventId),[eventId]);
+  useEffect(()=>setUrl((process.env.NEXT_PUBLIC_NATIVE_PUBLIC_SITE || window.location.origin)+'/register/'+eventId),[eventId]);
   useEffect(()=>{
     if(!token || !isSupabaseConfigured)return;
     let active=true;

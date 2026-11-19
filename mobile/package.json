@@ -1,0 +1,1 @@
+{"name":"aru-event-pass-mobile","private":true,"version":"0.1.0","scripts":{"bundle":"node bundle.mjs","sync":"npm run bundle && cap sync"},"dependencies":{"@capacitor/android":"^8.6.2","@capacitor/cli":"^8.6.2","@capacitor/core":"^8.6.2","@capacitor/ios":"^8.6.2"},"devDependencies":{"vite":"^7.3.8"}}

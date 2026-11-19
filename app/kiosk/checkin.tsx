@@ -16,7 +16,7 @@ export function KioskCheckin({station,onExit}:{station:Station;onExit:()=>void})
   const lock=useRef(false);
   useEffect(()=>{
     let active=true;
-    setUrl(window.location.origin+'/?event='+encodeURIComponent(station.event));
+    setUrl((process.env.NEXT_PUBLIC_NATIVE_PUBLIC_SITE || window.location.origin)+'/?event='+encodeURIComponent(station.event));
     signupRpc<SignupInfo>('registration_info',{p_event:station.event}).then(data=>{if(active)setInfo(data);})
       .catch(error=>{if(active)setError(errorText(error));});
     return ()=>{active=false;};

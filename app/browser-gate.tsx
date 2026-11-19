@@ -29,7 +29,7 @@ export default function BrowserGate({children}: {children: ReactNode}) {
     const eventId=new URLSearchParams(window.location.search).get('event');
     if(address.pathname==='/' && eventId && /^[a-f0-9-]{36}$/i.test(eventId))address.searchParams.set('event',eventId);
     setAddress(address.href);
-    setAllowed(acceptsBrowser(navigator));
+    setAllowed(Boolean(process.env.NEXT_PUBLIC_NATIVE_PUBLIC_SITE) || acceptsBrowser(navigator));
   }, []);
 
   async function copyLink() {

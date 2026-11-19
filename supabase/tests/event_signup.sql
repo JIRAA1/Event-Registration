@@ -1,9 +1,11 @@
--- Run against an isolated database after migrations 001-031.
+-- Run only against an isolated database after all current migrations.
+-- Legacy online applications are seeded to verify existing receipts and corrections survive.
 begin;
 set local search_path=public,extensions,pg_temp;
 do $test$
 declare
   admin_id uuid;
+  legacy_user_id uuid;
   event_a uuid;
   event_b uuid;
   admin_token text:=encode(gen_random_bytes(32),'hex');
@@ -47,7 +49,18 @@ begin
     perform registration_apply(event_a,profile - 'prefix',proof);
     raise exception 'missing title accepted' using errcode='23505';
   exception when raise_exception then assert sqlerrm like '%กรุณาตรวจ%'; end;
-  application_id:=(registration_apply(event_a,profile,proof)->>'id')::uuid;
+  begin
+    perform registration_apply(event_a,profile,proof);
+    raise exception 'unknown online account accepted' using errcode='23505';
+  exception when raise_exception then assert sqlerrm like '%รหัสนักศึกษาไม่ถูกต้อง%'; end;
+  assert not exists(select 1 from users where student_id='06912345');
+  assert not exists(select 1 from event_pass_private.applications where event_id=event_a);
+  -- Reproduce an application saved before online account creation was disabled.
+  insert into users(student_id,full_name,password_hash,enrollment_year,study_year,birth_date,role)
+    values('06912345','QA Student',crypt('01012549',gen_salt('bf')),2568,2,'01012549','STUDENT') returning id into legacy_user_id;
+  insert into event_pass_private.applications(event_id,student_id,profile,kiosk,receipt_hash,created_user,issued)
+    values(event_a,'06912345',event_pass_private.application_profile(profile),false,encode(digest(proof,'sha256'),'hex'),legacy_user_id,true)
+    returning id into application_id;
   assert registration_account_step(event_a,'06912345')='existing';
   password:=registration_receipt(event_a,proof,null,true)->>'password';
   assert password is not distinct from '01012549';
@@ -107,8 +120,11 @@ begin
   assert (select count(*)=1 from users where student_id='06912345');
   assert (select count(*)=2 from event_registrations r join users u on u.id=r.user_id where u.student_id='06912345');
   insert into events(title,online_registration) values('Bulk QA',true) returning id into event_a;
-  application_id:=(registration_apply(event_a,profile||'{"student_id":"06912347"}',encode(gen_random_bytes(32),'hex'))->>'id')::uuid;
-  kiosk_id:=(registration_apply(event_a,profile||'{"student_id":"06912346"}',encode(gen_random_bytes(32),'hex'))->>'id')::uuid;
+  -- Pending online applications from the previous flow must remain exportable/approvable.
+  insert into event_pass_private.applications(event_id,student_id,profile,kiosk,receipt_hash)
+    values(event_a,'06912347',event_pass_private.application_profile(profile||'{"student_id":"06912347"}'),false,encode(gen_random_bytes(32),'hex')) returning id into application_id;
+  insert into event_pass_private.applications(event_id,student_id,profile,kiosk,receipt_hash)
+    values(event_a,'06912346',event_pass_private.application_profile(profile||'{"student_id":"06912346"}'),false,encode(gen_random_bytes(32),'hex')) returning id into kiosk_id;
   insert into event_passcodes(event_id,code,is_reserve) values(event_a,'QA-BULK-1',true);
   insert into event_passcodes(event_id,code,is_reserve) values(event_a,'QA-BULK-2',true);
   assert jsonb_array_length(registration_export(admin_token,event_a))=2;
