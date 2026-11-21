@@ -203,6 +203,7 @@ function EventPass() {
 
   useEffect(()=>{setStore(readStore());localStorage.removeItem('aru-user-v1');const session=sessionStorage.getItem('aru-user-v1');if(session){try{setUser(JSON.parse(session) as User)}catch{sessionStorage.removeItem('aru-user-v1')}}const token=sessionStorage.getItem('aru-session-token')||'';setSessionToken(token);if(token&&supabase){void supabase.rpc('load_workspace',{p_session_token:token}).then(({data,error})=>{if(!error&&data?.success){setWorkspaceReady(true);setStore(workspaceStore(data));setAcademicCatalog(workspaceCatalog(data));if(data.user){setUser(data.user as User);sessionStorage.setItem('aru-user-v1',JSON.stringify(data.user));}if(data.events?.[0]){setSelectedEvent(data.events[0].id);setActiveEvent(data.events[0].id);}}else if(!error&&data?.success===false)expireAdminSession(token);});}},[expireAdminSession]);
   useEffect(()=>{try{localStorage.setItem(storeKey,JSON.stringify(store));}catch{}},[store]);
+  useEffect(()=>{if(!mobileNav)return;const close=(e:KeyboardEvent)=>{if(e.key==='Escape')setMobileNav(false);};window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close);},[mobileNav]);
   useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(''),2800);return()=>clearTimeout(t)},[toast]);
   useEffect(()=>{
     const client=supabase;
@@ -649,9 +650,9 @@ return;}save({...store,codes:[...store.codes,...fresh]});setModal(null);setToast
     setToast(`ผูกรายชื่อเข้ากิจกรรมสำเร็จ ${data.enrolled_count.toLocaleString()} คน (สถานะ: รอสแกนเข้างาน โดยยังไม่ตัด Passcode)`);
   }
 
-  return <main className="canvas-grid min-h-screen px-3 pb-8 pt-3 sm:px-6 sm:pt-5 lg:px-10">
-    <header className="glass sticky top-3 z-50 mx-auto flex max-w-[1440px] items-center justify-between rounded-full border border-white/80 px-4 py-2.5 shadow-[0_12px_45px_rgba(52,61,78,.07)] sm:px-6">
-      <button className="flex items-center gap-3 text-left transition hover:opacity-90" onClick={()=>setView(user?.role==='ADMIN'?'admin':user?.role==='STAFF'?'scanner':'home')}>
+  return <main className={cx("canvas-grid app-shell min-h-screen px-3 pb-8 pt-3 sm:px-6 sm:pt-5 lg:px-10",user?.role==='STUDENT'&&'has-student-nav')}>
+    <header className="glass app-header sticky top-3 z-50 mx-auto flex max-w-[1440px] items-center justify-between rounded-full border border-white/80 px-4 py-2.5 shadow-[0_12px_45px_rgba(52,61,78,.07)] sm:px-6">
+      <button className="app-brand flex min-w-0 items-center gap-2 text-left transition hover:opacity-90" onClick={()=>setView(user?.role==='ADMIN'?'admin':user?.role==='STAFF'?'scanner':'home')}>
         <div className="relative">
           <img src="/aru-icon.jpg" alt="ARU Student Organization" className="h-11 w-11 rounded-xl border-2 border-[#d4af37] object-cover shadow-sm"/>
           <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#7c0a02] text-[7px] font-black text-amber-300">A</span>
@@ -694,7 +695,7 @@ return;}save({...store,codes:[...store.codes,...fresh]});setModal(null);setToast
       </nav>
 
       {/* Right controls: Cloud status + User Profile Pill + Logout */}
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="app-controls flex shrink-0 items-center gap-2 sm:gap-3">
         <span className={cx(
           'hidden items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-extrabold sm:flex shadow-sm',
           isSupabaseConfigured
@@ -723,8 +724,9 @@ return;}save({...store,codes:[...store.codes,...fresh]});setModal(null);setToast
             {/* Mobile menu trigger */}
             <button
               onClick={()=>setMobileNav(!mobileNav)}
-              aria-label="เปิดเมนู"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 xl:hidden"
+              aria-label={mobileNav?"ปิดเมนู":"เปิดเมนู"}
+              aria-expanded={mobileNav} aria-controls="mobile-menu"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 xl:hidden"
             >
               {mobileNav ? <X size={17}/> : <Menu size={17}/>}
             </button>
@@ -753,7 +755,7 @@ return;}save({...store,codes:[...store.codes,...fresh]});setModal(null);setToast
 
     {/* Mobile Navigation Drawer */}
     {user && mobileNav && (
-      <div className="glass mx-auto mt-2 max-w-[1440px] rounded-3xl border border-white/80 p-4 shadow-xl xl:hidden">
+      <div id="mobile-menu" role="navigation" aria-label="เมนูบัญชี" className="glass mobile-menu rounded-3xl border border-slate-200 p-4 shadow-xl xl:hidden">
         <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
           <div className="flex items-center gap-2.5">
             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#7c0a02] font-bold text-white shadow-sm">
@@ -767,7 +769,7 @@ return;}save({...store,codes:[...store.codes,...fresh]});setModal(null);setToast
               </div>
             </div>
           </div>
-          <button onClick={() => setMobileNav(false)} className="rounded-full bg-slate-100 p-2 text-slate-500 hover:bg-slate-200">
+          <button aria-label="ปิดเมนู" onClick={() => setMobileNav(false)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 p-2 text-slate-500 hover:bg-slate-200">
             <X size={16} />
           </button>
         </div>
@@ -807,6 +809,11 @@ return;}save({...store,codes:[...store.codes,...fresh]});setModal(null);setToast
       </div>
     )}
 
+    {user?.role==='STUDENT'&&<nav className="student-mobile-nav xl:hidden" aria-label="เมนูนักศึกษา">
+      <button aria-current={view==='home'||view==='event'?'page':undefined} onClick={()=>{setView('home');setMobileNav(false);}}><LayoutDashboard size={21}/><span>กิจกรรมของฉัน</span></button>
+      <button aria-current={view==='studentStats'?'page':undefined} onClick={()=>{setView('studentStats');setMobileNav(false);}}><Gauge size={21}/><span>สรุปของฉัน</span></button>
+      <button aria-expanded={mobileNav} aria-controls="mobile-menu" onClick={()=>setMobileNav(v=>!v)}><Users size={21}/><span>บัญชีและเมนู</span></button>
+    </nav>}
     <div key={view} className="page-transition mx-auto mt-6 max-w-[1440px]">
       {view==='scanner'&&user&&user.role!=='STUDENT'&&isSupabaseConfigured&&<LocationAccess gps={gps}/>}
       {secureScan.confirmation}
@@ -819,7 +826,7 @@ return;}save({...store,codes:[...store.codes,...fresh]});setModal(null);setToast
     {modal==='staff'&&<Modal submitLabel="สร้างบัญชีเจ้าหน้าที่" title="เพิ่มบัญชีเจ้าหน้าที่" subtitle="สร้างบัญชีสตาฟหรือแอดมินสำหรับเข้าระบบ" close={()=>setModal(null)}><form id="staff-admin-form" onSubmit={e=>void withLoading('กำลังสร้างบัญชี…',()=>createStaffAccount(e))} className="space-y-3"><Field label="ชื่อผู้ใช้ / รหัสเจ้าหน้าที่" name="username" required placeholder="เช่น staff-aru-01"/><Field label="ชื่อ–นามสกุล" name="full_name" required placeholder="ชื่อผู้ใช้งาน"/><label className="block text-[11px] font-semibold text-slate-600">ประเภทบัญชี<select name="role" className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800"><option value="STAFF">สตาฟ</option><option value="ADMIN">แอดมิน</option></select></label><Field label="รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)" name="password" type="password" minLength={8} required placeholder="ตั้งรหัสผ่านเริ่มต้น"/><div className="grid gap-3 sm:grid-cols-2"><Field label="หน่วยงาน / คณะ" name="faculty" placeholder="องค์การนักศึกษา"/><Field label="ฝ่าย / ตำแหน่ง" name="major" placeholder="ฝ่ายกิจกรรม"/></div><p className="rounded-xl bg-amber-50 px-3 py-2 text-[10px] leading-5 text-amber-900">ตั้งรหัสผ่านเริ่มต้นให้เจ้าหน้าที่ และแจ้งให้เปลี่ยนรหัสผ่านหลังเข้าสู่ระบบครั้งแรก</p></form></Modal>}
     {modal==='editUser'&&editingUser&&<Modal submitLabel="บันทึกข้อมูลผู้ใช้" title="แก้ไขข้อมูลผู้ใช้" subtitle={editingUser.role==='STUDENT'?'แก้ไขข้อมูลนักศึกษา':'แก้ไขข้อมูลสตาฟ'} close={()=>{setModal(null);setEditingUser(null)}}><form id="staff-admin-form" onSubmit={e=>void withLoading('กำลังบันทึกข้อมูลผู้ใช้…',()=>updateManagedUser(e,editingUser))} className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><Field label="ชื่อผู้ใช้ / รหัสนักศึกษา" name="student_id" required defaultValue={editingUser.student_id}/><Field label="ชื่อ-นามสกุล" name="full_name" required defaultValue={editingUser.full_name}/>{editingUser.role==='STUDENT'?<label className="block text-[11px] font-semibold text-slate-600">คณะ<select name="faculty" value={editingFaculty} onChange={e=>{setEditingFaculty(e.target.value);setEditingMajor(academicCatalog.find(faculty=>faculty.name===e.target.value)?.majors[0]?.name||'');}} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{editingFaculty && !academicCatalog.some(f=>f.name===editingFaculty) && <option value={editingFaculty}>{editingFaculty}</option>}{academicCatalog.map(faculty=><option key={faculty.id} value={faculty.name}>{faculty.name}</option>)}</select></label>:<Field label="คณะ / หน่วยงาน" name="faculty" defaultValue={editingUser.faculty}/>} {editingUser.role==='STUDENT'?<label className="block text-[11px] font-semibold text-slate-600">สาขาวิชา<select name="major" value={editingMajor} onChange={e=>setEditingMajor(e.target.value)} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{editingMajor && !academicCatalog.find(f=>f.name===editingFaculty)?.majors.some(m=>m.name===editingMajor) && <option value={editingMajor}>{editingMajor}</option>}{(academicCatalog.find(faculty=>faculty.name===editingFaculty)?.majors||[]).map(major=><option key={major.id} value={major.name}>{major.name}</option>)}</select></label>:<Field label="สาขา / ฝ่าย" name="major" defaultValue={editingUser.major}/>}<Field label="หมู่เรียน / กลุ่ม" name="class_group" defaultValue={editingUser.class_group}/><Field label="วันเกิด (DDMMYYYY)" name="birth_date" defaultValue={editingUser.birth_date||''} placeholder="เว้นว่างหากไม่แก้ไข"/><Field label="เบอร์โทรศัพท์" name="phone" type="tel" defaultValue={editingUser.phone||''}/>{editingUser.role==='STUDENT'&&<label className="block text-[11px] font-semibold text-slate-600">ชั้นปีที่กำลังศึกษา<select name="study_year" defaultValue={editingUser.study_year} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{Array.from({length:8},(_,index)=>index+1).map(year=><option key={year} value={year}>ปี {year}</option>)}</select></label>}<Field label="รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)" name="new_password" type="password" minLength={8} placeholder="อย่างน้อย 8 ตัวอักษร"/></div><p className="rounded-xl bg-amber-50 px-3 py-2 text-[10px] leading-5 text-amber-900">เมื่อกำหนดรหัสผ่านใหม่ ระบบจะออกจากระบบในอุปกรณ์อื่นของบัญชีนี้</p></form></Modal>}
     {(loadingMessage||saving)&&<div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/25 p-4 backdrop-blur-[2px]" role="status" aria-live="polite" aria-busy="true"><div className="flex min-w-[230px] items-center gap-3 rounded-2xl border border-white/80 bg-white/95 px-5 py-4 shadow-2xl"><Loader2 size={22} className="animate-spin text-[#7c0a02]"/><div><b className="block text-xs text-slate-900">{loadingMessage||"กำลังดำเนินการ…"}</b><span className="mt-1 block text-[10px] text-slate-500">กรุณารอสักครู่</span><span className="loading-progress mt-3 block h-1 overflow-hidden rounded-full bg-rose-100"><i className="block h-full w-2/5 rounded-full bg-[#7c0a02]"/></span></div></div></div>}
-    {toast&&<div className="fixed bottom-5 left-1/2 z-[70] -translate-x-1/2 rounded-full bg-slate-950 px-5 py-3 text-xs font-medium text-white shadow-2xl">{toast}</div>}
+    {toast&&<div className="app-toast fixed bottom-5 left-1/2 z-[70] w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-2xl bg-slate-950 px-5 py-3 text-xs font-medium text-white shadow-2xl">{toast}</div>}
   </main>;
 }
 
@@ -966,53 +973,34 @@ function NeuralNetworkCanvas(){
  return <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full opacity-80"/>;
 }
 
-function Landing({enterAs,saving,loginError}:{enterAs:()=>void;saving:boolean;loginError:string}){return <div className="space-y-5">
-  {/* — Login card first — */}
-  <section id="login-card" className="bento mx-auto max-w-md p-6 sm:p-8">
-    <div className="flex flex-col items-center text-center">
-      <img src="/aru-icon.jpg" alt="ARU" className="h-16 w-16 rounded-2xl border-2 border-[#d4af37] object-cover shadow-md"/>
-      <h2 className="mt-4 text-2xl font-extrabold text-slate-900">เข้าสู่ระบบ</h2>
-      <p className="mt-1 text-xs text-slate-500">ระบบลงทะเบียนกิจกรรม · องค์การนักศึกษา ARU</p>
+function Landing({enterAs,saving,loginError}:{enterAs:()=>void;saving:boolean;loginError:string}){
+ return <div className="login-layout">
+  <section className="login-intro">
+    <div className="login-eyebrow"><span/>องค์การนักศึกษา · ARU</div>
+    <h1>ทุกกิจกรรม<br/><span>เริ่มต้นที่นี่</span></h1>
+    <p className="login-description">ลงทะเบียน แสดงบัตร QR และติดตามการเข้าร่วมกิจกรรมของคุณ ในที่เดียว</p>
+    <div className="login-pass" aria-hidden="true">
+      <div className="flex items-center gap-3"><img src="/aru-icon.jpg" alt="" className="h-12 w-12 rounded-xl"/><div><b>ARU Event Pass</b><p className="mt-1 text-sm text-white/70">บัตรกิจกรรมนักศึกษา</p></div></div>
+      <div className="login-pass-divider"/>
+      <div className="flex items-center justify-between gap-4"><div><span className="text-sm text-amber-200">พร้อมสำหรับกิจกรรมถัดไป</span><p className="mt-2 text-xl font-bold">พบกันที่หน้างาน</p></div><QrCode size={56}/></div>
     </div>
-    <form className="mt-6 space-y-3" onSubmit={event=>{
-      event.preventDefault();
-      if (!saving) enterAs();
-    }}>
-      <Field label="รหัสนักศึกษา" name="login-id" id="login-id" autoComplete="username" required={isSupabaseConfigured} placeholder="กรอกรหัสผู้ใช้งาน"/>
-      <Field label="รหัสผ่าน" name="login-password" id="login-password" autoComplete="current-password" enterKeyHint="go" required={isSupabaseConfigured} type="password" placeholder="••••••••"/>
-      <p className="text-sm text-slate-600">รหัสผ่านเริ่มต้นของนักศึกษาคือวันเดือนปีเกิด พ.ศ. 8 หลัก เช่น 22 มิถุนายน 2549 กรอก <b>22062549</b> หากเปลี่ยนรหัสผ่านแล้วให้ใช้รหัสปัจจุบัน</p>
-      <button type="submit" disabled={saving} className="login-action group relative mt-2 flex w-full items-center justify-between overflow-hidden rounded-2xl px-5 py-4 text-sm font-extrabold text-white transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(124,10,2,.28)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300/70 disabled:translate-y-0 disabled:cursor-wait disabled:opacity-75">
-        <span className="pointer-events-none absolute inset-0 login-action-shine"/>
-        <span className="relative flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-amber-200">{saving?<Loader2 size={19} className="animate-spin"/>:<ShieldCheck size={19}/>}</span><span className="text-left"><span className="block text-[15px]">{saving?"กำลังเข้าสู่ระบบ…":"เข้าสู่ระบบ"}</span><span className="mt-0.5 block text-[9px] font-medium tracking-wide text-white/65">ARU EVENT PASS</span></span></span>
-        <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-amber-300 text-[#57100b] transition duration-300 group-hover:translate-x-1 group-hover:rotate-[-35deg]">{saving?<Loader2 size={16} className="animate-spin"/>:<ArrowRight size={17}/>}</span>
-      </button>
+    <p className="login-university">มหาวิทยาลัยราชภัฏพระนครศรีอยุธยา</p>
+  </section>
+  <section id="login-card" className="login-panel">
+    <div className="mb-6 flex items-center gap-3"><img src="/aru-icon.jpg" alt="ตราองค์การนักศึกษา ARU" className="h-12 w-12 rounded-xl border border-amber-200"/><span className="text-sm font-bold tracking-wide text-[#7c0a02]">ARU EVENT PASS</span></div>
+    <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">ยินดีต้อนรับ</h2>
+    <p className="mt-2 text-base leading-7 text-slate-500">เข้าสู่ระบบเพื่อจัดการกิจกรรมของคุณ</p>
+    <form className="mt-7 space-y-5" onSubmit={event=>{event.preventDefault();if(!saving)enterAs();}}>
+      <Field label="รหัสนักศึกษา / ชื่อผู้ใช้งาน" name="login-id" id="login-id" autoComplete="username" required={isSupabaseConfigured} placeholder="กรอกรหัสนักศึกษาหรือชื่อผู้ใช้"/>
+      <Field label="รหัสผ่าน" name="login-password" id="login-password" autoComplete="current-password" enterKeyHint="go" required={isSupabaseConfigured} type="password" placeholder="กรอกรหัสผ่านของคุณ"/>
+      {loginError&&<p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{loginError}</p>}
+      <button disabled={saving} className="login-action flex min-h-14 w-full items-center justify-center gap-3 rounded-xl px-5 py-4 text-base font-bold text-white disabled:opacity-60">{saving?<Loader2 size={20} className="animate-spin"/>:<Lock size={20}/>} {saving?'กำลังเข้าสู่ระบบ…':'เข้าสู่ระบบ'}</button>
     </form>
-    {loginError && <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{loginError}</p>}
-    <LoginHelp loginFailed={loginError.includes('รหัสผ่านไม่ถูกต้อง')}/>
+    <div className="mt-6 border-t border-slate-100 pt-2"><LoginHelp loginFailed={loginError.includes('รหัสผ่านไม่ถูกต้อง')}/></div>
+    <p className="mt-6 text-center text-sm leading-6 text-slate-500">สำหรับนักศึกษา สตาฟ และผู้ดูแลระบบ</p>
   </section>
-
-
-  {/* — Banner + info below — */}
-  <section className="maroon-gradient relative overflow-hidden rounded-[34px] p-7 text-white shadow-xl shadow-rose-950/20 sm:p-10">
-    <NeuralNetworkCanvas/>
-    <div className="absolute -right-10 -top-8 h-72 w-72 rounded-full border border-white/10"/>
-    <div className="absolute -right-2 top-1 h-56 w-56 rounded-full border border-white/10"/>
-    <div className="absolute bottom-0 right-0 h-64 w-64 rounded-full bg-rose-300/10 blur-3xl"/>
-    <div className="relative z-10 flex flex-col items-center gap-8 lg:flex-row lg:items-start lg:gap-12">
-      {/* Banner logo */}
-      <div className="flex w-full max-w-[280px] shrink-0 flex-col items-center lg:max-w-[260px]">
-        <img src="/aru-banner.jpg" alt="องค์การนักศึกษา มหาวิทยาลัยราชภัฏพระนครศรีอยุธยา" className="w-full rounded-2xl border-2 border-white/20 bg-white/95 p-4 shadow-lg"/>
-      </div>
-      {/* Info */}
-      <div className="flex-1 text-center lg:text-left">
-        <div className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-white/75 lg:justify-start"><Activity size={14}/> ARU EVENT PASS</div>
-        <h1 className="mt-4 text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-[64px]">ARU<br/><span className="text-amber-300">Event Pass</span></h1>
-        <p className="mx-auto mt-4 max-w-md text-sm leading-7 text-rose-50/80 lg:mx-0">ระบบลงทะเบียนและเช็กอินกิจกรรมมหาวิทยาลัย เชื่อมต่อด้วย QR Code พร้อมติดตามสถานะได้แบบเรียลไทม์</p>
-        <div className="mt-8 grid max-w-lg grid-cols-1 min-[400px]:grid-cols-3 gap-3 mx-auto lg:mx-0"><MetricChip icon={<QrCode size={15}/>} label="QR Check-in" value="รวดเร็ว"/><MetricChip icon={<Zap size={15}/>} label="Live Status" value="Real-time"/><MetricChip icon={<Ticket size={15}/>} label="Passcode" value="ปลอดภัย"/></div>
-      </div>
-    </div>
-  </section>
-  </div>}
+ </div>;
+}
 function MetricChip({icon,label,value}:{icon:React.ReactNode;label:string;value:string}){return <div className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur-md"><div className="flex items-center gap-1.5 text-amber-200">{icon}<span className="text-[9px] font-semibold text-white/70">{label}</span></div><b className="mt-1 block text-sm">{value}</b></div>}
 
 function StudentHome({user,events,regs,select,store,session,refresh}:{session:string;refresh:()=>Promise<void>;user:User;events:Event[];regs:Registration[];select:(id:string)=>void;store:Store}){
@@ -1134,7 +1122,7 @@ function ScanResultEffect({message,flash}:{message:{ok:boolean;title:string;deta
 
 function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,startScanner,stopScanner,deviceMode,scanMode,scanInput,setScanInput,scanPayload,scanMessage,flash,attendance,registered,reserveLeft,openWalkin,scannerLocked,toggleScannerLock}:{user:User;event:Event;events:Event[];activeEvent:string;setActiveEvent:(id:string)=>void;scannerOn:boolean;startScanner:()=>void;stopScanner:()=>void;deviceMode:Event['scan_mode'];scanMode:(mode:Event['scan_mode'])=>void;scanInput:string;setScanInput:(s:string)=>void;scanPayload:(s:string)=>Promise<void>;scanMessage:{ok:boolean;title:string;detail:string}|null;flash:string;attendance:number;registered:number;reserveLeft:number;openWalkin:()=>void;scannerLocked:boolean;toggleScannerLock:()=>void}) {
  const pct=registered?Math.round(attendance/registered*100):0;
- return <div className={cx('space-y-5 rounded-[30px] p-1 transition',flash==='success'?'scanner-flash-success':flash==='checkout'?'scanner-flash-checkout':flash==='error'?'scanner-flash-error':'')}>
+ return <div className={cx('staff-workspace space-y-5 rounded-[30px] p-1 transition',flash==='success'?'scanner-flash-success':flash==='checkout'?'scanner-flash-checkout':flash==='error'?'scanner-flash-error':'')}>
    {/* Scanner Header Bar */}
    <div className="flex flex-wrap items-end justify-between gap-3 px-2">
      <div>
@@ -1167,8 +1155,8 @@ function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,sta
    <div className="grid gap-5 xl:grid-cols-[1.15fr_.85fr]">
      <section className="bento overflow-hidden p-4 sm:p-5">
        {/* Selector + Mode Toggle with distinct colors */}
-       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-         <div className="min-w-0 max-w-full">
+       <div className="scanner-controls mb-4 grid min-w-0 gap-4 border-b border-slate-100 pb-4 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
+         <div className="min-w-0 w-full sm:w-auto max-w-full">
            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">เลือกกิจกรรมที่สแกน</span>
            <div className="mt-1 flex items-center gap-2">
              <select
@@ -1184,13 +1172,13 @@ function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,sta
 
          {/* Mode Switcher */}
          <div><span className="text-xs font-bold text-slate-600">โหมดสแกนของเครื่องนี้</span>
-         <div className="flex items-center rounded-2xl bg-slate-100 p-1 shadow-inner">
+         <div className="grid grid-cols-2 rounded-2xl bg-slate-100 p-1 shadow-inner">
            <button
              type="button"
              aria-pressed={deviceMode==='CHECKIN'}
              onClick={() => { scanMode('CHECKIN'); }}
              className={cx(
-               'flex min-h-11 items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-extrabold transition-all duration-200',
+               'flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 sm:px-3.5 py-2 text-sm font-extrabold transition-all duration-200',
                deviceMode === 'CHECKIN'
                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/20 ring-2 ring-emerald-500/20'
                  : 'text-slate-600 hover:text-emerald-700'
@@ -1205,7 +1193,7 @@ function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,sta
              aria-pressed={deviceMode==='CHECKOUT'}
              onClick={() => { scanMode('CHECKOUT'); }}
              className={cx(
-               'flex min-h-11 items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-extrabold transition-all duration-200',
+               'flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 sm:px-3.5 py-2 text-sm font-extrabold transition-all duration-200',
                deviceMode === 'CHECKOUT'
                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-950/20 ring-2 ring-amber-400/20 font-black'
                  : 'text-slate-600 hover:text-amber-800'
@@ -1269,7 +1257,7 @@ function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,sta
            </div>
            <span className="rounded-xl bg-rose-50 p-2 text-[#7c0a02]"><Gauge size={19}/></span>
          </div>
-         <div className="mt-5 flex items-center gap-5">
+         <div className="scanner-progress mt-5 flex flex-col items-center gap-4 sm:flex-row sm:gap-5">
            <div className="relative h-28 w-40 overflow-hidden">
              <div className="absolute left-1/2 top-2 h-36 w-36 -translate-x-1/2 rounded-full border-[14px] border-slate-100"/>
              <div className="absolute left-1/2 top-2 h-36 w-36 -translate-x-1/2 rounded-full border-[14px] border-[#7c0a02]" style={{clipPath:'inset(0 0 50% 0)',transform:'translateX(-50%) rotate('+(pct*1.8-90)+'deg)'}}/>
@@ -1278,7 +1266,7 @@ function ScannerView({user,event,events,activeEvent,setActiveEvent,scannerOn,sta
                <span className="block text-[8px] text-slate-400">เช็กอินแล้ว</span>
              </div>
            </div>
-           <div className="flex-1 space-y-3">
+           <div className="w-full min-w-0 flex-1 space-y-3">
              <StatLine label="ลงทะเบียนทั้งหมด" value={registered} icon={<Users size={14}/>} color="text-slate-500"/>
              <StatLine label="เช็กอินแล้ว" value={attendance} icon={<CheckCircle2 size={14}/>} color="text-emerald-600"/>
              <StatLine label="Passcode สำรอง" value={reserveLeft} icon={<Ticket size={14}/>} color="text-amber-600"/>
@@ -1526,7 +1514,7 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
       population=latest.regs.filter(reg=>reg.event_id===selectedEventId).map(reg=>({reg,person:people.get(reg.user_id)})).filter((row):row is {reg:Registration;person:User}=>Boolean(row.person));
     }
     const rows=allRegistered?population:population.filter(row=>(reportStudyYear==='ALL'||String(row.person.study_year)===reportStudyYear)&&(reportFaculty==='ALL'||row.person.faculty===reportFaculty)&&(reportMajor==='ALL'||row.person.major===reportMajor)&&(reportClassGroup==='ALL'||row.person.class_group===reportClassGroup)&&(reportStatus==='ALL'||(reportStatus==='ATTENDED'&&row.reg.status!=='REGISTERED')||(reportStatus==='NO_CHECKIN'&&row.reg.status==='REGISTERED')||(reportStatus==='NO_CHECKOUT'&&row.reg.status==='ATTENDING')));const csvRows=[['รหัสนักศึกษา','ชื่อ-นามสกุล','ชั้นปี','คณะ','สาขาวิชา','หมู่เรียน','เบอร์โทรศัพท์','สถานะ','เวลาเช็กอิน','ผู้เช็กอิน','เวลาเช็กเอาต์','สตาฟเช็กเอาต์'],...rows.map(({reg,person})=>[person.student_id,person.full_name,person.study_year,person.faculty,person.major,person.class_group,person.phone||'',({REGISTERED:'รอสแกนเข้างาน',ATTENDING:'กำลังเข้าร่วมกิจกรรม',COMPLETED:'เข้าร่วมกิจกรรมสำเร็จ'}[reg.status]),reg.checkin_at||'',reg.checkin_station?'เครื่องลงทะเบียน iPad':reg.checkin_staff_name||store.users.find(u=>u.id===reg.checked_in_by)?.full_name||'',reg.checkout_at||'',reg.checkout_staff_name||store.users.find(u=>u.id===reg.checked_out_by)?.full_name||''])];const quote=(value:string|number)=>{const text=String(value);return '"'+(/^[=+@\-\t\r\n]/.test(text)?"'":'')+text.replace(/"/g,'""')+'"';};const csv='\uFEFF'+csvRows.map(row=>row.map(quote).join(',')).join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='aru-attendance-'+(allRegistered?'registered-all':reportStatus.toLowerCase())+'-'+selectedEventId+'.csv';link.click();URL.revokeObjectURL(url);}
- return <div className="space-y-6">
+ return <div className="admin-workspace min-w-0 space-y-6">
   {correction&&<Modal title="แก้สถานะเข้าร่วมกิจกรรม" subtitle={correction.name} close={()=>{if(!correcting)setCorrection(null);}}>
     <form onSubmit={saveCorrection} className="space-y-4">
       <div className="flex items-center gap-2 text-sm">สถานะปัจจุบัน <StatusPill status={correction.reg.status}/></div>
@@ -1546,7 +1534,7 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
     <div>
       <h1 className="text-2xl font-extrabold text-slate-900 sm:text-3xl">พื้นที่ผู้ดูแลระบบ</h1>
     </div>
-    <div className="flex gap-2">
+    <div className="flex min-w-0 flex-wrap gap-2">
       <button onClick={openStaff} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white min-h-11 px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:border-[#7c0a02] hover:text-[#7c0a02]">
         <Users size={14}/>
         เพิ่มผู้ใช้
@@ -1826,7 +1814,7 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
         </div>
 
         {/* Detailed Table */}
-        <div className="overflow-x-auto">
+        <div className="max-w-full overflow-x-auto overscroll-x-contain" tabIndex={0} role="region" aria-label="ตารางรายชื่อ เลื่อนแนวนอนเพื่อดูเพิ่มเติม">
           <table className="w-full min-w-[1500px] text-left">
             <thead className="bg-slate-50 text-[9px] font-bold uppercase tracking-wider text-slate-400 border-y border-slate-100">
               <tr>
@@ -1877,7 +1865,7 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
           </div>
           <button onClick={()=>exportAttendance(true)} disabled={!reportPopulation.length} className="action-primary"><Download size={16}/>ส่งออกรายชื่อ CSV ({reportPopulation.length})</button>
         </div>
-        <div className="overflow-x-auto">
+        <div className="max-w-full overflow-x-auto overscroll-x-contain" tabIndex={0} role="region" aria-label="ตารางรายชื่อ เลื่อนแนวนอนเพื่อดูเพิ่มเติม">
           <table className="w-full min-w-[1040px] text-left">
             <thead className="bg-slate-50 text-[9px] font-bold uppercase tracking-wider text-slate-400 border-y border-slate-100">
               <tr>

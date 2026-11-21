@@ -35,7 +35,7 @@ button { cursor:pointer; }
 @keyframes scan-result-enter { 0%{opacity:0;transform:translateY(14px) scale(.86);filter:blur(5px)} 18%{opacity:1;transform:translateY(0) scale(1.03);filter:blur(0)} 30%,76%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-7px) scale(.97)} }
 @keyframes scan-halo { 0%{opacity:.7;transform:scale(.56)} 78%,100%{opacity:0;transform:scale(1.55)} }
 .page-transition { animation:pageenter .24s ease-out both; }
-@keyframes pageenter { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@keyframes pageenter { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
 @keyframes progress-sweep { from { transform:translateX(-150%); } to { transform:translateX(260%); } }
 .loading-progress i { animation:progress-sweep 1.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .page-transition,.loading-progress i,.login-action-shine,.scan-result-card,.scan-result-halo { animation:none; transition:none; } }
@@ -67,6 +67,57 @@ input:focus,select:focus { border-color:#bda150!important; box-shadow:0 0 0 3px 
 .qr-ticket { background: white; color-scheme: only light; forced-color-adjust: none; }
 .qr-ticket canvas { display: block; max-width: 100%; height: auto !important; }
 .bento { min-width: 0; }
+.app-shell .grid > *, .staff-workspace .flex > div, .admin-workspace .flex > div { min-width:0; }
+.staff-workspace select, .admin-workspace select { max-width:100%; min-width:0; }
+.staff-workspace, .admin-workspace { overflow-wrap:anywhere; }
+.app-header { gap:12px; }
+.app-brand { flex-shrink:1; }
+.app-brand img { flex-shrink:0; }
+.mobile-menu { position:fixed; top:90px; right:12px; left:12px; z-index:60; max-height:calc(100dvh - 190px); overflow-y:auto; overscroll-behavior:contain; background:rgba(255,255,255,.98); }
+.student-mobile-nav { position:fixed; z-index:55; bottom:0; left:0; right:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; border-top:1px solid #e2e8f0; background:rgba(255,255,255,.97); backdrop-filter:blur(18px); padding:8px 10px max(8px,env(safe-area-inset-bottom)); box-shadow:0 -4px 24px #26334a0a; }
+.student-mobile-nav button { display:flex; min-height:52px; align-items:center; justify-content:center; flex-direction:column; gap:5px; border-radius:12px; font-size:12px; font-weight:600; color:#64748b; }
+.student-mobile-nav button[aria-current="page"], .student-mobile-nav button[aria-expanded="true"] { color:#7c0a02; background:#fff1f0; }
+.has-student-nav { padding-bottom:calc(100px + env(safe-area-inset-bottom)); }
+.has-student-nav .app-toast { bottom:calc(90px + env(safe-area-inset-bottom)); }
+button:focus-visible, a:focus-visible, summary:focus-visible { outline:3px solid #b58a25; outline-offset:3px; }
+.login-layout { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); max-width:1120px; margin:32px auto; border-radius:32px; overflow:hidden; background:white; border:1px solid #e2e8f0; box-shadow:0 24px 80px #26334a12; }
+.login-intro { position:relative; padding:56px 44px 36px; color:white; background:radial-gradient(ellipse at 100% 0%,#b34d3b55,transparent 60%),linear-gradient(150deg,#4c0808,#82150d); }
+.login-eyebrow { display:flex; align-items:center; gap:9px; font-size:14px; color:#f8d998; }
+.login-eyebrow span { width:22px; height:2px; background:#d4af37; }
+.login-intro h1 { margin-top:28px; font-size:clamp(36px,4vw,54px); line-height:1.45; font-weight:800; letter-spacing:-.035em; }
+.login-intro h1 span { color:#f3d38b; }
+.login-description { max-width:350px; margin-top:16px; font-size:16px; line-height:1.9; color:#f1d8d5; }
+.login-pass { margin-top:36px; padding:24px; border:1px solid #ffffff35; border-radius:20px; background:linear-gradient(130deg,#ffffff15,#ffffff05); box-shadow:0 18px 35px #23000025; }
+.login-pass-divider { margin:20px 0; border-top:1px dashed #ffffff35; }
+.login-university { margin-top:32px; font-size:13px; color:#e4bdb6; }
+.login-panel { padding:48px 44px; min-width:0; scroll-margin-top:110px; }
+.login-panel label { font-size:14px; color:#334155; }
+.login-panel input { height:52px; background:#f8fafc; font-size:16px; }
+@media (min-width:1280px) { .student-mobile-nav { display:none; } .has-student-nav { padding-bottom:32px; } .has-student-nav .app-toast { bottom:20px; } }
+@media (max-width:767px) {
+  .login-layout { grid-template-columns:minmax(0,1fr); margin:12px auto; max-width:520px; border-radius:24px; }
+  .login-intro { padding:26px 24px; }
+  .login-intro h1 { margin-top:12px; font-size:32px; line-height:1.4; }
+  .login-intro h1 br { display:none; }
+  .login-intro h1 span { margin-left:8px; }
+  .login-description { margin-top:8px; font-size:14px; }
+  .login-pass,.login-university { display:none; }
+  .login-panel { padding:28px 24px; }
+}
+@media (max-width:639px) {
+  .app-header { padding:10px 12px; border-radius:22px; }
+  .app-brand img { width:36px; height:36px; }
+  .app-brand b { font-size:13px; white-space:nowrap; }
+  .app-controls { gap:4px; }
+  .app-controls > div { display:none; }
+  .admin-workspace .flex > select { flex:1 1 100%; width:100%; }
+  .admin-workspace nav button { font-size:12px; gap:6px; }
+  .admin-workspace .bento { border-radius:20px; }
+  .admin-workspace .bento > .flex { padding:16px; }
+  .staff-workspace .scanner-controls select { max-width:100%; min-height:44px; }
+  .scanner-controls > div { width:100%; }
+  .scanner-progress > div:last-child { width:100%; }
+}
 @media (max-width: 639px) {
   input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px; }
 }

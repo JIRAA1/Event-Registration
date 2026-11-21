@@ -90,7 +90,7 @@ function Confirmation({ warning: w, done }: { warning: Warning; done: (reason: s
         done(null);
       }}
       aria-labelledby="gps-warning-title"
-      className="m-auto w-[min(94vw,500px)] rounded-3xl border border-rose-200 bg-white p-0 text-slate-800 shadow-2xl backdrop:bg-slate-900/60 backdrop:backdrop-blur-sm"
+      className="m-auto max-h-[90dvh] w-[min(94vw,500px)] overflow-y-auto overscroll-contain rounded-3xl border border-rose-200 bg-white p-0 text-slate-800 shadow-2xl backdrop:bg-slate-900/60 backdrop:backdrop-blur-sm"
     >
       {/* Header */}
       <div className="bg-gradient-to-r from-rose-500 to-[#7c0a02] p-5 text-white">
@@ -108,8 +108,9 @@ function Confirmation({ warning: w, done }: { warning: Warning; done: (reason: s
           </div>
           <button
             type="button"
+            aria-label="ปิดการยืนยัน GPS"
             onClick={() => done(null)}
-            className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 text-white/80 hover:bg-white/20 active:scale-95"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white/80 hover:bg-white/20 active:scale-95"
           >
             <X size={16} />
           </button>
