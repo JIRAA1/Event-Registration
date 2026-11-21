@@ -1,4 +1,5 @@
 'use client';
+import {getDeviceSecret} from '@/lib/device-identity';
 
 import {useEffect,useRef,useState} from 'react';
 import {QRCodeCanvas} from 'qrcode.react';
@@ -154,8 +155,8 @@ export function RegistrationForm({eventId,station,onExit,correctionId}:{eventId:
       setLookup(undefined);setLookupRetry(n=>n+1);return;
     }
     if(method==='existing' && !station && !edit){
-      const data=await signupRpc<{success:boolean;already:boolean;pending?:boolean;message?:string;user:{role:string};session_token:string}>('registration_login_join',{
-        p_event:eventId,p_student_id:studentId,p_password:String(values.get('password')||''),
+      const data=await signupRpc<{success:boolean;already:boolean;pending?:boolean;message?:string;user:{role:string};session_token:string}>('registration_device_join',{
+        p_event:eventId,p_student_id:studentId,p_password:String(values.get('password')||''),p_device:getDeviceSecret(),
       });
       if(!data.success)throw new Error(data.message||'กรุณาใช้บัญชีนักศึกษา');
       sessionStorage.setItem('aru-join-feedback',data.pending?'รอยืนยันเข้าร่วมกิจกรรม':data.already?'คุณลงทะเบียนกิจกรรมนี้แล้ว':'ลงทะเบียนเข้าร่วมกิจกรรมแล้ว');

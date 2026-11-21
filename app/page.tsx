@@ -2,6 +2,10 @@
 
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
+import {getDeviceSecret} from '@/lib/device-identity';
+import {LocationAccess,useLocationAccess} from './location-access';
+import {useSecureScan} from './scan-confirmation';
+import {AttendanceSecuritySettings} from './attendance-security-settings';
 import { StudentQr } from './student-qr';
 import { RegistrationAdmin, LoginHelp } from './register/registration-admin';
 import BrowserGate from './browser-gate';
@@ -123,6 +127,8 @@ function EventPass() {
       if (saved && typeof saved === 'object') setDeviceModes(saved);
     } catch { /* A new scanner session starts with the event default. */ }
   }, []);
+  const gps=useLocationAccess(view==='scanner'&&user?.role!=='STUDENT');
+  const secureScan=useSecureScan(`${sessionToken}:${activeEvent}:${deviceModes[activeEvent]}`);
   const savedMode = deviceModes[activeEvent];
   const deviceMode = savedMode === 'CHECKIN' || savedMode === 'CHECKOUT' ? savedMode : currentEvent.scan_mode;
   const studentRegs=useMemo(()=>store.regs.filter(r=>r.user_id===user?.id),[store.regs,user?.id]);
@@ -299,8 +305,9 @@ function EventPass() {
       const studentId=(document.getElementById('login-id') as HTMLInputElement|null)?.value;
       const password=(document.getElementById('login-password') as HTMLInputElement|null)?.value;
       if(!studentId||!password){setToast('กรุณากรอกรหัสผู้ใช้และรหัสผ่าน');return;}
-      setSaving(true); const {data,error}=await supabase.rpc('login_student',{p_student_id:studentId,p_password:password}); setSaving(false);
-      if(error||!data?.success){setLoginError(data?.message||'เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบเครือข่ายแล้วลองอีกครั้ง');return;}
+      let device:string;try{device=getDeviceSecret();}catch(e){setLoginError(e instanceof Error?e.message:'ยืนยันเครื่องไม่สำเร็จ');return;}
+      setSaving(true); const {data,error}=await supabase.rpc('login_device',{p_student_id:studentId,p_password:password,p_device:device}); setSaving(false);
+      if(error||!data?.success){setLoginError(data?.message||error?.message||'เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบเครือข่ายแล้วลองอีกครั้ง');return;}
        const cloudUser=data.user as User;
       const actualRole=cloudUser.role;
        const token=String(data.session_token||'');const {data:workspace,error:workspaceError}=await supabase.rpc('load_workspace',{p_session_token:token});if(workspaceError||!workspace?.success){setToast(workspace?.message||'โหลดข้อมูลบัญชีไม่สำเร็จ');return;}setWorkspaceReady(true);setStore(workspaceStore(workspace));setAcademicCatalog(workspaceCatalog(workspace));if(workspace.events?.[0]){setSelectedEvent(workspace.events[0].id);setActiveEvent(workspace.events[0].id);}const loadedUser={...cloudUser,...workspace.user} as User;setUser(loadedUser);sessionStorage.setItem('aru-user-v1',JSON.stringify(loadedUser));sessionStorage.setItem('aru-session-token',token);setSessionToken(token);setView(actualRole==='STAFF'?'scanner':actualRole==='ADMIN'?'admin':'home');return;
@@ -328,9 +335,11 @@ function EventPass() {
       const now=Date.now();
       if (now-(cooldown.current.get(raw)||0)<2000) return;
       cooldown.current.set(raw,now);
-      const {data,error}=await supabase.rpc('redeem_device_event_qr',{
+      const response=await secureScan.scan({
         p_session_token:sessionToken,p_event_id:activeEvent,p_scan_mode:deviceMode,p_ticket:match[1],
-      });
+      },gps.read);
+      if(!response)return;
+      const {data,error}=response;
       if (error || !data?.success) {
         setScanMessage({ok:false,title:data?.message||'สแกนไม่สำเร็จ',detail:error?'ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง':'กรุณาตรวจสอบบัตรก่อนสแกนอีกครั้ง'});
         setFlash('error');soundEngine.playError();return;
@@ -799,6 +808,8 @@ return;}save({...store,codes:[...store.codes,...fresh]});setModal(null);setToast
     )}
 
     <div key={view} className="page-transition mx-auto mt-6 max-w-[1440px]">
+      {view==='scanner'&&user&&user.role!=='STUDENT'&&isSupabaseConfigured&&<LocationAccess gps={gps}/>}
+      {secureScan.confirmation}
       {!user?<Landing loginError={loginError} enterAs={()=>void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…',enterAs)} saving={saving||Boolean(loadingMessage)}/>:view==='scanner'&&user.role!=='STUDENT'?<ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={()=>setScannerLocked(value=>!value)} startScanner={()=>void withLoading('กำลังเปิดกล้อง…',startScanner)} stopScanner={()=>void withLoading('กำลังปิดกล้อง…',stopScanner)} deviceMode={deviceMode} scanMode={setScanMode} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async(raw:string)=>{await withLoading('กำลังตรวจสอบ QR…',()=>scanPayload(raw));}} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={()=>setModal('walkin')}/>:view==='admin'&&user.role==='ADMIN'?<AdminView isImportingRef={isImportingRef} deleteBatch={(kind,values)=>withLoading('กำลังลบรายการ…',()=>deleteBatch(kind,values))} sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args)=>withLoading('กำลังบันทึกคณะและสาขา…',()=>manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={()=>setModal('event')} openCodes={()=>setModal('codes')} openStaff={()=>setModal('staff')} editUser={(target:User)=>{setEditingUser(target);setEditingFaculty(target.faculty);setEditingMajor(target.major);setModal('editUser')}} deleteUser={(target:User)=>void withLoading('กำลังลบบัญชีผู้ใช้…',()=>deleteManagedUser(target))} deleteActivity={()=>void withLoading('กำลังลบกิจกรรม…',deleteActivity)} deleteRegistration={(id:string)=>void withLoading('กำลังนำรายชื่อออก…',()=>deleteRegistration(id))} importError={importError} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={roster=>void withLoading('กำลังนำเข้ารายชื่อ…',()=>importCsv(roster))} enrollRosterToEvent={()=>withLoading('กำลังผูกรายชื่อเข้ากิจกรรม…',enrollRosterToEvent)} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch:Partial<Event>)=>withLoading('กำลังบันทึกการเปลี่ยนแปลง…',()=>updateSelectedEvent(patch))} />:view==='studentStats'&&user.role==='STUDENT'?<StudentStatsView user={user} events={store.events.filter(e=>studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs}/>:view==='event'&&user.role==='STUDENT'?<EventDetail session={sessionToken} event={store.events.find(e=>e.id===activeEvent)||currentEvent} user={user} registration={studentRegs.find(r=>r.event_id===activeEvent)} back={()=>setView('home')}/>:<StudentHome session={sessionToken} refresh={refreshWorkspace} user={user} events={store.events.filter(e=>e.status==='ACTIVE'&&studentRegs.some(r=>r.event_id===e.id))} regs={studentRegs} select={(id:string)=>{setActiveEvent(id);setView('event')}} store={store}/>}
     </div>
     {user&&<div className="mx-auto mt-10 flex max-w-[1440px] items-center justify-between border-t border-slate-200/70 px-2 py-4 text-[10px] text-slate-500"><span>© 2026 ARU Student Organization · ระบบลงทะเบียนกิจกรรม</span><span className="hidden items-center gap-1 sm:flex"><ShieldCheck size={12}/>ข้อมูลกิจกรรมอัปเดตแบบเรียลไทม์</span></div>}
@@ -1586,7 +1597,7 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
       {([
         {id:'registration',title:'รับสมัครและอนุมัติรายชื่อ',detail:'เปิดรับสมัคร ตรวจรายชื่อ และส่งออก CSV',icon:UserCheck},
         {id:'passcodes',title:'จัดการ Passcode',detail:'ค้นหา ตรวจสถานะ เพิ่มและลบรหัส',icon:Ticket},
-        {id:'settings',title:'เครื่อง iPad และช่องทางติดต่อ',detail:'ตั้งค่าบัญชีเครื่องและลิงก์ติดต่อแอดมิน',icon:Settings2},
+        {id:'settings',title:'ตั้งค่าความปลอดภัยและเครื่อง iPad',detail:'รัศมี GPS เครื่องนักศึกษา และช่องทางติดต่อ',icon:Settings2},
       ] as const).map(item=><button key={item.id} type="button" aria-haspopup="dialog" onClick={()=>setManagementPanel(item.id)}
         className="flex min-h-24 items-center gap-3 rounded-2xl border border-slate-300 bg-white p-4 text-left hover:border-[#7c0a02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7c0a02]">
         <span className="rounded-xl bg-rose-50 p-3 text-[#7c0a02]"><item.icon size={22}/></span>
@@ -1594,8 +1605,9 @@ function AdminView({isImportingRef,importError,deleteBatch,sessionToken,store,ac
         <ChevronRight size={20}/>
       </button>)}
     </div>}
-  {managementPanel && <Modal wide title={managementPanel==='registration'?'รับสมัครและอนุมัติรายชื่อ':managementPanel==='settings'?'ตั้งค่าเครื่อง iPad และช่องทางติดต่อ':'จัดการ Passcode'}
+  {managementPanel && <Modal wide title={managementPanel==='registration'?'รับสมัครและอนุมัติรายชื่อ':managementPanel==='settings'?'ความปลอดภัย เครื่อง iPad และช่องทางติดต่อ':'จัดการ Passcode'}
     subtitle={selectedEvent.title} close={()=>setManagementPanel(null)}>
+    {managementPanel==='settings'&&<AttendanceSecuritySettings key={selectedEvent.id} token={sessionToken} eventId={selectedEvent.id}/>}
     {managementPanel==='passcodes'
       ? <PasscodeList key={selectedEventId} eventId={selectedEventId} store={store} openCodes={openCodes} remove={removePasscodes} token={sessionToken} refresh={refreshWorkspace}/>
       : <RegistrationAdmin key={selectedEvent.id+managementPanel} mode={managementPanel==='settings'?'settings':'queue'} token={sessionToken} eventId={selectedEvent.id} refresh={refreshWorkspace}/>}

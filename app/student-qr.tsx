@@ -2,15 +2,21 @@
 
 import {useEffect, useRef, useState} from 'react';
 import {QRCodeCanvas} from 'qrcode.react';
+import {getDeviceSecret} from '@/lib/device-identity';
+import {LocationAccess,useLocationAccess} from './location-access';
 import {supabase} from '@/lib/supabase';
 
 type Ticket = {token:string; mode:string};
 
 export function StudentQr({session,eventId}:{session:string;eventId:string}) {
+  const gps=useLocationAccess();
+  const [fallback,setFallback]=useState(false);
+  const readLocation=gps.read;
+  const allowed=gps.ready||fallback;
   const [ticket,setTicket] = useState<Ticket | null>(null);
   const [remaining,setRemaining] = useState(0);
   const [message,setMessage] = useState('กำลังโหลด QR…');
-  const [action,setAction] = useState<'retry'|'transfer'|null>(null);
+  const [action,setAction] = useState<'retry'|null>(null);
   const request = useRef<(transfer:boolean)=>void>(()=>{});
 
   useEffect(()=>{
@@ -18,7 +24,7 @@ export function StudentQr({session,eventId}:{session:string;eventId:string}) {
     let version = 0;
     let timer: ReturnType<typeof setTimeout>;
     let deadline = 0;
-    let heldCard = false;
+
     function clearCard() {
       version++;
       clearTimeout(timer);
@@ -27,22 +33,22 @@ export function StudentQr({session,eventId}:{session:string;eventId:string}) {
       setAction(null);
     }
     async function load(transfer=false) {
-      if (document.hidden || disposed) return;
+      if (document.hidden || disposed || !allowed) return;
       clearTimeout(timer);
       const current = ++version;
       const started = Date.now();
       setAction(null);
       try {
         if (!supabase || !navigator.onLine) throw new Error();
-        const {data,error} = await supabase.rpc('issue_event_qr',{
-          p_session_token:session,p_event_id:eventId,p_transfer:transfer,
+        const {data,error} = await supabase.rpc('issue_location_qr',{
+          p_session_token:session,p_event_id:eventId,p_device:getDeviceSecret(),p_location:readLocation(),
         });
         if (disposed || current!==version) return;
         if (error) throw error;
         if (!data?.success) {
           clearCard();
-          setMessage(data?.code==='OTHER_SESSION' && heldCard ? 'บัตรถูกย้ายไปอีกเบราว์เซอร์แล้ว' : data?.message || 'ออก QR ไม่สำเร็จ');
-          setAction(data?.code==='OTHER_SESSION'?'transfer':'retry');
+          setMessage(data?.message || 'ออก QR ไม่สำเร็จ');
+          setAction('retry');
           return;
         }
         deadline = started + Number(data.ttl_ms);
@@ -53,15 +59,15 @@ export function StudentQr({session,eventId}:{session:string;eventId:string}) {
           timer=setTimeout(()=>void load(),250);
           return;
         }
-        heldCard = true;
+
         setTicket({token:data.token,mode:data.mode});
         setRemaining(Math.ceil(left/1000));
         // Revalidate ownership while visible. The server reuses a still-valid ticket.
         timer=setTimeout(()=>void load(),Math.min(10000,left));
-      } catch {
+      } catch (error) {
         if (disposed || current!==version) return;
         clearCard();
-        setMessage('โหลด QR ไม่สำเร็จ ตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง');
+        setMessage(error instanceof Error ? error.message : 'โหลด QR ไม่สำเร็จ ตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง');
         setAction('retry');
       }
     }
@@ -88,10 +94,12 @@ export function StudentQr({session,eventId}:{session:string;eventId:string}) {
       window.removeEventListener('online',resume);
       window.removeEventListener('offline',resume);
     };
-  },[eventId,session]);
+  },[eventId,session,allowed,readLocation]);
 
   return <div className="my-5 text-center">
-    {ticket && remaining>0 ? <>
+    <LocationAccess gps={gps}/>
+    {gps.attempted&&!gps.ready&&!fallback&&<button type="button" className="my-2 rounded-lg border p-3" onClick={()=>setFallback(true)}>GPS ใช้ไม่ได้ — แสดง QR ให้สตาฟตรวจและยืนยัน</button>}
+    {!allowed?<p>อนุญาต GPS ก่อนแสดง QR</p>:ticket && remaining>0 ? <>
       <div className="qr-ticket flex justify-center rounded-2xl p-2">
         <QRCodeCanvas value={'ARU1:'+ticket.token} size={256} marginSize={4} level="M" fgColor="#000000" bgColor="#ffffff" role="img" aria-label="QR กิจกรรมแบบใช้ครั้งเดียว"/>
       </div>
@@ -99,8 +107,8 @@ export function StudentQr({session,eventId}:{session:string;eventId:string}) {
     </> : <div className="rounded-xl bg-slate-50 px-4 py-8">
       <p role="status" className="text-sm">{ticket?'กำลังต่ออายุบัตร…':message}</p>
       {action && <button type="button" className="mt-4 rounded-xl bg-[#7c0a02] px-5 py-3 text-sm font-bold text-white"
-        onClick={()=>{setMessage('กำลังตรวจสอบบัตร…');request.current(action==='transfer');}}>
-        {action==='transfer'?'ย้ายบัตรมาเครื่องนี้':'โหลด QR ใหม่'}
+        onClick={()=>{setMessage('กำลังตรวจสอบบัตร…');request.current(false);}}>
+        โหลด QR ใหม่
       </button>}
     </div>}
   </div>;
