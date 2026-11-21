@@ -1,17 +1,17 @@
 begin;
 
 -- No attendance rows are rewritten. Deploy the matching client with this migration.
-create table event_pass_private.device_bindings (
+create table if not exists event_pass_private.device_bindings (
   user_id uuid primary key references public.users on delete cascade,
   device_hash text not null unique,
   session_id uuid references public.app_sessions on delete set null
 );
-create table event_pass_private.scan_security (
+create table if not exists event_pass_private.scan_security (
   event_id uuid primary key references public.events on delete cascade,
   radius_m integer not null default 100 check(radius_m between 10 and 1000),
   accuracy_m integer not null default 50 check(accuracy_m between 5 and 200)
 );
-create table event_pass_private.security_audit (
+create table if not exists event_pass_private.security_audit (
   id bigint generated always as identity primary key,
   actor uuid references public.users on delete set null,
   student uuid references public.users on delete set null,
@@ -19,9 +19,9 @@ create table event_pass_private.security_audit (
   action text not null, reason text not null,
   distance_m double precision, created_at timestamptz not null default clock_timestamp()
 );
-alter table event_pass_private.qr_tickets add column location jsonb;
+alter table event_pass_private.qr_tickets add column if not exists location jsonb;
 
-create function event_pass_private.bind_device(uid uuid, sid uuid, secret text) returns void
+create or replace function event_pass_private.bind_device(uid uuid, sid uuid, secret text) returns void
 language plpgsql set search_path=public,extensions,pg_temp as $$
 declare dh text; other_id uuid; b event_pass_private.device_bindings%rowtype;
 begin
@@ -47,10 +47,16 @@ begin
     on conflict(user_id) do update set device_hash=excluded.device_hash,session_id=excluded.session_id;
 end; $$;
 
-alter function public.login_student(varchar,varchar) set schema event_pass_private;
-alter function event_pass_private.login_student(varchar,varchar) rename to login_original;
+do $$
+begin
+  if not exists (select 1 from pg_proc join pg_namespace n on n.oid = pg_proc.pronamespace where n.nspname = 'event_pass_private' and proname = 'login_original') then
+    alter function public.login_student(varchar,varchar) set schema event_pass_private;
+    alter function event_pass_private.login_student(varchar,varchar) rename to login_original;
+  end if;
+end $$;
 revoke all on function event_pass_private.login_original(varchar,varchar) from public,anon,authenticated;
-create function public.login_student(p_student_id varchar,p_password varchar) returns jsonb
+
+create or replace function public.login_student(p_student_id varchar,p_password varchar) returns jsonb
 language plpgsql security definer set search_path=public,extensions,pg_temp as $$
 declare u public.users%rowtype; auth jsonb; sid uuid; secret text;
 begin
@@ -71,20 +77,22 @@ begin
   end if;
   return auth;
 end; $$;
-create function public.login_device(p_student_id varchar,p_password varchar,p_device text) returns jsonb
+
+create or replace function public.login_device(p_student_id varchar,p_password varchar,p_device text) returns jsonb
 language plpgsql security definer set search_path=public,pg_temp as $$
 begin
   perform set_config('eventpass.device_secret',coalesce(p_device,''),true);
   return public.login_student(p_student_id,p_password);
 end; $$;
-create function public.registration_device_join(p_event uuid,p_student_id text,p_password text,p_device text) returns jsonb
+
+create or replace function public.registration_device_join(p_event uuid,p_student_id text,p_password text,p_device text) returns jsonb
 language plpgsql security definer set search_path=public,pg_temp as $$
 begin
   perform set_config('eventpass.device_secret',coalesce(p_device,''),true);
   return public.registration_login_join(p_event,p_student_id,p_password);
 end; $$;
 
-create function public.admin_scan_security(p_token text,p_event uuid,p_radius integer default null,p_accuracy integer default null) returns jsonb
+create or replace function public.admin_scan_security(p_token text,p_event uuid,p_radius integer default null,p_accuracy integer default null) returns jsonb
 language plpgsql security definer set search_path=public,pg_temp as $$
 begin
   if event_pass_private.admin_id(p_token) is null then raise exception 'สงวนสิทธิ์เฉพาะแอดมิน'; end if;
@@ -95,7 +103,8 @@ begin
   return jsonb_build_object('radius_m',coalesce((select radius_m from event_pass_private.scan_security where event_id=p_event),100),
     'accuracy_m',coalesce((select accuracy_m from event_pass_private.scan_security where event_id=p_event),50));
 end; $$;
-create function public.admin_reset_student_device(p_token text,p_student_id text,p_reason text) returns jsonb
+
+create or replace function public.admin_reset_student_device(p_token text,p_student_id text,p_reason text) returns jsonb
 language plpgsql security definer set search_path=public,extensions,pg_temp as $$
 declare actor uuid:=event_pass_private.admin_id(p_token); uid uuid;
 begin
@@ -111,13 +120,21 @@ begin
 end; $$;
 
 -- Old clients must not bypass the location gate by calling a legacy RPC.
-alter function public.issue_event_qr(text,uuid,boolean) set schema event_pass_private;
-alter function public.redeem_device_event_qr(text,uuid,text,uuid) set schema event_pass_private;
+do $$
+begin
+  if exists (select 1 from pg_proc join pg_namespace n on n.oid = pg_proc.pronamespace where n.nspname = 'public' and proname = 'issue_event_qr') then
+    alter function public.issue_event_qr(text,uuid,boolean) set schema event_pass_private;
+  end if;
+  if exists (select 1 from pg_proc join pg_namespace n on n.oid = pg_proc.pronamespace where n.nspname = 'public' and proname = 'redeem_device_event_qr') then
+    alter function public.redeem_device_event_qr(text,uuid,text,uuid) set schema event_pass_private;
+  end if;
+end $$;
+
 revoke all on function event_pass_private.issue_event_qr(text,uuid,boolean),
   event_pass_private.redeem_device_event_qr(text,uuid,text,uuid),public.redeem_event_qr(text,uuid,text,uuid),
   public.process_qr_scan(text,uuid,uuid) from public,anon,authenticated;
 
-create function event_pass_private.valid_location(loc jsonb) returns boolean
+create or replace function event_pass_private.valid_location(loc jsonb) returns boolean
 language plpgsql immutable set search_path=public,pg_temp as $$
 begin
   return coalesce(jsonb_typeof(loc)='object' and
@@ -127,7 +144,8 @@ begin
     (loc->>'timestamp')::double precision between 0 and 9999999999999,false);
 exception when others then return false;
 end; $$;
-create function public.issue_location_qr(p_session_token text,p_event_id uuid,p_device text,p_location jsonb default null) returns jsonb
+
+create or replace function public.issue_location_qr(p_session_token text,p_event_id uuid,p_device text,p_location jsonb default null) returns jsonb
 language plpgsql security definer set search_path=public,extensions,pg_temp as $$
 declare s public.app_sessions%rowtype; result jsonb; loc jsonb;
 begin
@@ -152,7 +170,7 @@ begin
   return result;
 end; $$;
 
-create function public.redeem_location_qr(p_session_token text,p_event_id uuid,p_scan_mode text,p_ticket uuid,
+create or replace function public.redeem_location_qr(p_session_token text,p_event_id uuid,p_scan_mode text,p_ticket uuid,
   p_location jsonb default null,p_confirm boolean default false,p_reason text default null) returns jsonb
 language plpgsql security definer set search_path=public,extensions,pg_temp as $$
 declare actor uuid; student uuid; ticket event_pass_private.qr_tickets%rowtype; radius integer:=100; accuracy integer:=50;
