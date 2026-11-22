@@ -982,10 +982,12 @@ function NeuralNetworkCanvas() {
 function Landing({ enterAs, saving, loginError }: { enterAs: () => void; saving: boolean; loginError: string }) {
   return <div className="login-layout">
     <section className="login-intro">
+      <div className="login-atmosphere" aria-hidden="true"><i /><i /><i /><span className="login-orbit" /><span className="login-orbit login-orbit-inner" /></div>
       <div className="login-eyebrow"><span />องค์การนักศึกษา · ARU</div>
-      <h1>ระบบ<br /><span>กิจกรรม</span></h1>
+      <h1>ทุกกิจกรรม<br /><span>เป็นส่วนหนึ่งของคุณ</span></h1>
       <p className="login-description">ลงทะเบียน แสดงบัตร QR และติดตามการเข้าร่วมกิจกรรมของคุณ ในที่เดียว</p>
       <div className="login-pass" aria-hidden="true">
+        <span className="login-pass-sheen" />
         <div className="flex items-center gap-3"><img src="/aru-icon.jpg" alt="" className="h-12 w-12 rounded-xl" /><div><b>ARU Event Pass</b><p className="mt-1 text-sm text-white/70">บัตรกิจกรรมนักศึกษา</p></div></div>
         <div className="login-pass-divider" />
         <div className="flex items-center justify-between gap-4"><div><span className="text-sm text-amber-200">พร้อมสำหรับกิจกรรมถัดไป</span><p className="mt-2 text-xl font-bold">พบกันที่หน้างาน</p></div><QrCode size={56} /></div>
@@ -994,7 +996,8 @@ function Landing({ enterAs, saving, loginError }: { enterAs: () => void; saving:
     </section>
     <section id="login-card" className="login-panel">
       <div className="mb-6 flex items-center gap-3"><img src="/aru-icon.jpg" alt="ตราองค์การนักศึกษา ARU" className="h-12 w-12 rounded-xl border border-amber-200" /><span className="text-sm font-bold tracking-wide text-[#7c0a02]">ARU EVENT PASS</span></div>
-      <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Login</h2>
+      <div className="login-welcome">WELCOME BACK</div>
+      <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">ยินดีต้อนรับกลับมา</h2>
       <p className="mt-2 text-base leading-7 text-slate-500">เข้าสู่ระบบเพื่อจัดการกิจกรรมของนักศึกษา</p>
       <form className="mt-7 space-y-5" onSubmit={event => { event.preventDefault(); if (!saving) enterAs(); }}>
         <Field label="รหัสนักศึกษา / ชื่อผู้ใช้งาน" name="login-id" id="login-id" autoComplete="username" required={isSupabaseConfigured} placeholder="กรอกรหัสนักศึกษาหรือชื่อผู้ใช้" />

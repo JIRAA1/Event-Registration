@@ -80,29 +80,59 @@ input:focus,select:focus { border-color:#bda150!important; box-shadow:0 0 0 3px 
 .has-student-nav { padding-bottom:calc(100px + env(safe-area-inset-bottom)); }
 .has-student-nav .app-toast { bottom:calc(90px + env(safe-area-inset-bottom)); }
 button:focus-visible, a:focus-visible, summary:focus-visible { outline:3px solid #b58a25; outline-offset:3px; }
-.login-layout { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); max-width:1120px; margin:32px auto; border-radius:32px; overflow:hidden; background:white; border:1px solid #e2e8f0; box-shadow:0 24px 80px #26334a12; }
-.login-intro { position:relative; padding:56px 44px 36px; color:white; background:radial-gradient(ellipse at 100% 0%,#b34d3b55,transparent 60%),linear-gradient(150deg,#4c0808,#82150d); }
-.login-eyebrow { display:flex; align-items:center; gap:9px; font-size:14px; color:#f8d998; }
-.login-eyebrow span { width:22px; height:2px; background:#d4af37; }
-.login-intro h1 { margin-top:28px; font-size:clamp(36px,4vw,54px); line-height:1.45; font-weight:800; letter-spacing:-.035em; }
-.login-intro h1 span { color:#f3d38b; }
-.login-description { max-width:350px; margin-top:16px; font-size:16px; line-height:1.9; color:#f1d8d5; }
-.login-pass { margin-top:36px; padding:24px; border:1px solid #ffffff35; border-radius:20px; background:linear-gradient(130deg,#ffffff15,#ffffff05); box-shadow:0 18px 35px #23000025; }
+/* Login effects are clipped inside their own artwork, never the form. */
+.login-layout { position:relative; isolation:isolate; display:grid; grid-template-columns:minmax(0,1.08fr) minmax(0,1fr); width:100%; max-width:1080px; margin:24px auto; border-radius:32px; overflow:hidden; background:#fff; border:1px solid #fff; box-shadow:0 28px 80px #4c080815,0 3px 12px #4c080808; animation:login-enter .65s ease-out both; }
+.login-layout > * { min-width:0; }
+.login-intro { position:relative; isolation:isolate; overflow:hidden; padding:48px 40px 32px; color:white; background:linear-gradient(145deg,#310c19,#75121b 60%,#460c15); }
+.login-intro > :not(.login-atmosphere) { position:relative; z-index:1; }
+.login-atmosphere { position:absolute; inset:0; z-index:0; pointer-events:none; overflow:hidden; background-image:radial-gradient(#f6d59065 .8px,transparent .8px); background-size:36px 36px; }
+.login-atmosphere i { position:absolute; width:300px; height:300px; border-radius:50%; filter:blur(55px); opacity:.4; background:#d37642; top:-160px; right:-100px; animation:login-glow 12s ease-in-out infinite alternate; }
+.login-atmosphere i:nth-child(2) { top:auto; bottom:-160px; left:-120px; background:#b83465; animation-delay:-6s; }
+.login-atmosphere i:nth-child(3) { width:100px; height:100px; top:48%; right:10%; background:#ffc973; opacity:.15; animation-delay:-3s; }
+.login-orbit { position:absolute; width:460px; height:460px; border:1px solid #f5d39820; border-radius:50%; right:-270px; top:30%; }
+.login-orbit::after { content:''; position:absolute; inset:-4px; border-radius:50%; border-top:2px solid #efc98870; animation:login-orbit 24s linear infinite; }
+.login-orbit-inner { width:370px; height:370px; right:-225px; top:calc(30% + 45px); }
+.login-eyebrow { display:flex; align-items:center; gap:9px; font-size:13px; color:#f8d998; }
+.login-eyebrow span { width:22px; height:2px; background:#d4af37; flex-shrink:0; }
+.login-intro h1 { margin-top:32px; font-size:clamp(30px,3.2vw,44px); line-height:1.5; font-weight:800; letter-spacing:-.035em; overflow-wrap:anywhere; }
+.login-intro h1 span { color:#f3d38b; background:linear-gradient(110deg,#e9bf79,#fff1c8,#e9bf79); background-clip:text; -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.login-description { max-width:350px; margin-top:16px; font-size:15px; line-height:1.9; color:#eed6dc; }
+.login-pass { position:relative; overflow:hidden; margin-top:32px; padding:22px; border:1px solid #ffe1b54d; border-radius:22px; background:linear-gradient(130deg,#ffffff1c,#ffffff05); box-shadow:0 18px 35px #23000030,inset 0 1px 0 #ffffff20; backdrop-filter:blur(10px); animation:login-float 7s ease-in-out infinite; }
+.login-pass > :not(.login-pass-sheen) { position:relative; }
+.login-pass-sheen { pointer-events:none; position:absolute; inset:0; background:linear-gradient(115deg,transparent 25%,#fff4dc16 45%,transparent 65%); transform:translateX(-120%); animation:login-sheen 9s ease-in-out infinite; }
 .login-pass-divider { margin:20px 0; border-top:1px dashed #ffffff35; }
-.login-university { margin-top:32px; font-size:13px; color:#e4bdb6; }
-.login-panel { padding:48px 44px; min-width:0; scroll-margin-top:110px; }
+.login-university { margin-top:28px; font-size:13px; color:#e4bdb6; line-height:1.8; }
+.login-panel { padding:40px; min-width:0; scroll-margin-top:110px; background:radial-gradient(ellipse at 100% 0%,#fff6e8,transparent 55%),#fff; }
+.login-welcome { margin-bottom:8px; font-size:11px; font-weight:700; letter-spacing:.22em; color:#a87830; }
+.login-panel h2 { font-size:clamp(24px,2.6vw,30px); line-height:1.5; }
 .login-panel label { font-size:14px; color:#334155; }
-.login-panel input { height:52px; background:#f8fafc; font-size:16px; }
+.login-panel input { height:52px; min-width:0; max-width:100%; background:#f8fafc; font-size:16px; border-color:#e2e8f0; transition:background .2s,border-color .2s,box-shadow .2s; }
+.login-panel input:focus { background:#fff; border-color:#a87830!important; box-shadow:0 0 0 4px #d4af3718; }
+.login-panel .login-action { position:relative; isolation:isolate; overflow:hidden; background:linear-gradient(110deg,#610d19,#8e1926,#610d19); transition:box-shadow .2s,transform .2s; }
+.login-panel .login-action::after { content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(110deg,transparent 20%,#ffffff22 45%,transparent 70%); transform:translateX(-120%); transition:transform .7s; }
+@media (hover:hover) { .login-panel .login-action:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 12px 28px #7c0a0230; } .login-panel .login-action:hover::after { transform:translateX(120%); } }
+@keyframes login-enter { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+@keyframes login-glow { to { transform:translate(-25px,35px) scale(1.15); opacity:.55; } }
+@keyframes login-orbit { to { transform:rotate(360deg); } }
+@keyframes login-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-6px); } }
+@keyframes login-sheen { 0%,60% { transform:translateX(-120%); } 90%,100% { transform:translateX(120%); } }
 @media (min-width:1280px) { .student-mobile-nav { display:none; } .has-student-nav { padding-bottom:32px; } .has-student-nav .app-toast { bottom:20px; } }
 @media (max-width:767px) {
-  .login-layout { grid-template-columns:minmax(0,1fr); margin:12px auto; max-width:520px; border-radius:24px; }
-  .login-intro { padding:26px 24px; }
-  .login-intro h1 { margin-top:12px; font-size:32px; line-height:1.4; }
-  .login-intro h1 br { display:none; }
-  .login-intro h1 span { margin-left:8px; }
-  .login-description { margin-top:8px; font-size:14px; }
+  .login-layout { grid-template-columns:minmax(0,1fr); margin:8px auto; max-width:480px; border-radius:24px; }
+  .login-intro { padding:22px 24px; }
+  .login-intro h1 { margin-top:12px; font-size:28px; line-height:1.45; }
+  .login-description { margin-top:8px; font-size:14px; line-height:1.7; }
   .login-pass,.login-university { display:none; }
-  .login-panel { padding:28px 24px; }
+  .login-panel { padding:26px 24px; }
+  .login-panel > div:first-child { display:none; }
+  .login-panel form { margin-top:20px; }
+  .login-orbit { top:-120px; }
+  .login-orbit-inner { top:-75px; }
+}
+@media (max-width:359px) { .login-intro,.login-panel { padding-left:18px; padding-right:18px; } .login-intro h1 { font-size:25px; } }
+@media (prefers-reduced-motion:reduce) {
+  .login-layout,.login-atmosphere i,.login-orbit::after,.login-pass,.login-pass-sheen { animation:none; }
+  .login-panel input,.login-panel .login-action,.login-panel .login-action::after { transition:none; }
 }
 @media (max-width:639px) {
   .app-header { padding:10px 12px; border-radius:22px; }
