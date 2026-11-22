@@ -1,7 +1,7 @@
 .page {
   min-height: 100svh;
   padding: clamp(12px, 4vw, 52px);
-  background: radial-gradient(ellipse at top left, #f2e5dc, transparent 65%), #f6f4f0;
+  background: radial-gradient(ellipse at top left, #f5e9e2, transparent 65%), #f6f4f0;
   color: #352c2d;
 }
 .sheet {
@@ -9,51 +9,70 @@
   margin: 0 auto;
   overflow: hidden;
   border: 1px solid #dfd5cf;
-  border-radius: 24px;
+  border-radius: 28px;
   background: white;
-  box-shadow: 0 18px 65px #47271912;
+  box-shadow: 0 20px 70px #47271914, 0 2px 10px #47271908;
 }
 .cover {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  padding: clamp(20px, 4vw, 42px);
-  background: linear-gradient(115deg, #4a1325, #791c32 70%, #8e3841);
+  padding: clamp(22px, 4vw, 44px);
+  background: linear-gradient(135deg, #2b0808 0%, #580d0d 55%, #360707 100%);
   color: white;
 }
 .cover::before {
   content: '';
   position: absolute;
   z-index: -1;
-  width: 360px;
-  height: 360px;
+  width: 400px;
+  height: 400px;
   right: -200px;
-  bottom: -230px;
+  bottom: -240px;
   border-radius: 50%;
-  box-shadow: 0 0 0 1px #e1bd793d, 0 0 0 22px #ffffff06, 0 0 0 23px #e1bd7940, 0 0 0 64px #ffffff06, 0 0 0 65px #e1bd7933;
+  box-shadow:
+    0 0 0 1px #d4af3730,
+    0 0 0 24px #ffffff06,
+    0 0 0 25px #d4af3738,
+    0 0 0 70px #ffffff05,
+    0 0 0 71px #d4af3728;
+}
+.cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(#f6d59038 0.8px, transparent 0.8px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.6;
+}
+.cover > * {
+  position: relative;
+  z-index: 1;
 }
 .brand, .event p { display: flex; align-items: center; gap: 12px; }
-.brand img { width: 52px; height: 52px; flex: none; border-radius: 14px; background: white; border: 2px solid #ebd3a4; }
+.brand img { width: 54px; height: 54px; flex: none; border-radius: 16px; background: white; border: 2px solid #d4af3760; box-shadow: 0 4px 14px #00000030; }
 .brand strong, .brand span { display: block; }
-.brand strong { font-size: 20px; }
-.brand span { font-size: 13px; color: #fae9e4; }
-.event { margin-top: clamp(22px, 4vw, 45px); }
-.event p { gap: 8px; color: #ffe3ad; font-size: 14px; font-weight: 600; }
-.event h1 { margin-top: 7px; font-size: clamp(26px, 4vw, 40px); line-height: 1.3; font-weight: 750; overflow-wrap: anywhere; }
-.event .location { margin-top: 10px; color: #f5e5e3; }
-.content { padding: clamp(20px, 4vw, 42px); min-width: 0; overflow-wrap: anywhere; }
+.brand strong { font-size: 20px; letter-spacing: -0.02em; }
+.brand span { font-size: 12px; color: #f5d4c8; margin-top: 2px; }
+.event { margin-top: clamp(24px, 4vw, 48px); }
+.event p { gap: 8px; color: #f3cf8b; font-size: 13px; font-weight: 700; letter-spacing: 0.03em; }
+.event h1 { margin-top: 10px; font-size: clamp(24px, 4vw, 38px); line-height: 1.3; font-weight: 800; overflow-wrap: anywhere; letter-spacing: -0.02em; }
+.event .location { margin-top: 10px; color: #f5e1de; font-weight: 600; }
+.content { padding: clamp(22px, 4vw, 44px); min-width: 0; overflow-wrap: anywhere; }
 .content > * + * { margin-top: 18px; }
 .content form label { min-width: 0; font-weight: 600; }
 .content input, .content select { min-height: 50px; color: #342f30; font-weight: 400; }
 .content label small { display: block; margin-top: 4px; color: #62595a; font-weight: 400; }
 .content button, .content a { min-height: 44px; }
-.content footer { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; border-top: 1px dashed #dbcec7; padding-top: 12px; }
+.content footer { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; border-top: 1px dashed #dbcec7; padding-top: 14px; margin-top: 20px; }
 .content footer > * { display: inline-flex; align-items: center; }
 .profile { display: grid; gap: 14px; }
 @media (min-width: 600px) {
   .profile { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (min-width: 900px) {
-  .sheet { display: grid; grid-template-columns: minmax(290px, 0.8fr) minmax(0, 1.3fr); }
-  .cover { min-height: 400px; }
+  .sheet { display: grid; grid-template-columns: minmax(290px, 0.85fr) minmax(0, 1.3fr); }
+  .cover { min-height: 420px; }
 }
