@@ -1263,7 +1263,7 @@ function AttendanceConfirmation({ status, eventTitle }: { status?: Status; event
   const completed = status === 'COMPLETED';
   return (
     <section role="status" aria-live="polite" className={cx('flex items-center gap-4 rounded-2xl border p-4 shadow-sm sm:p-5', completed ? 'border-emerald-200 bg-emerald-50/90' : 'border-amber-200 bg-amber-50/90')}>
-      <div className={cx('flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl text-white shadow-md', completed ? 'bg-emerald-600' : 'bg-amber-500')}>
+      <div className={cx('flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-white shadow-md', completed ? 'bg-emerald-600' : 'bg-amber-500')}>
         {completed ? <CheckCircle2 size={30} strokeWidth={2.6} /> : <Clock3 size={28} strokeWidth={2.4} />}
       </div>
       <div className="min-w-0 flex-1">
