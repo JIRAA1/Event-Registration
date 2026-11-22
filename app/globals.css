@@ -272,3 +272,44 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline:3px solid
     @apply cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500 shadow-none;
   }
 }
+
+/* Task-focused surfaces share one type scale and restrained ARU accents. */
+.canvas-grid { background-color:#f3f5f9; background-image:radial-gradient(ellipse at 0 0,#f5e8e9 0,transparent 45%); background-size:auto; }
+.bento { border-color:#e2e8f0; box-shadow:0 4px 20px #26334a06; border-radius:24px; }
+.student-identity { background:linear-gradient(115deg,#4c111a,#7c1722); box-shadow:0 6px 20px #7c0a0212; }
+.student-event-card { border:1px solid #dce2ea; border-radius:18px; padding:20px; background:#fff; }
+.student-event-card-current { border-color:#dbb973; background:linear-gradient(115deg,#fffaf0,#fff 65%); box-shadow:inset 4px 0 #b48936; }
+.student-home h1,.event-ticket h2 { letter-spacing:-.025em; }
+.student-home p,.event-ticket p { line-height:1.7; }
+.staff-workspace .text-xs,.admin-workspace .text-xs { font-size:.875rem; line-height:1.55; }
+.staff-workspace :is(input,select),.admin-workspace :is(input,select) { min-height:44px; }
+.staff-workspace .scanner-controls { padding:16px; border-radius:18px; background:#f8fafc; border:1px solid #e2e8f0; }
+.admin-workspace > nav { gap:6px; padding:8px; }
+button:disabled { cursor:not-allowed; opacity:.6; }
+summary { list-style-position:inside; }
+.attendance-table table { border-collapse:separate; border-spacing:0; }
+.attendance-table :is(th,td) { padding:16px 20px; border-bottom:1px solid #e2e8f0; min-width:145px; vertical-align:middle; }
+.attendance-table th { background:#f8fafc; color:#475569; font-weight:600; white-space:nowrap; }
+.attendance-table td { background:#fff; color:#334155; }
+.attendance-table tr:hover td { background:#f8fafc; }
+.attendance-table :is(th,td):first-child { position:sticky; left:0; z-index:1; min-width:240px; max-width:300px; box-shadow:5px 0 8px -6px #47556980; }
+.qr-presentation { position:relative; inset:auto; display:block; width:100%; max-width:none; max-height:none; margin:0; padding:0; border:0; overflow:visible; color:#1e293b; background:white; }
+.qr-presentation-expanded { position:fixed; inset:0; width:100%; height:100dvh; max-width:100vw; max-height:100dvh; margin:0; padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); overflow:auto; overscroll-behavior:contain; }
+.qr-presentation-expanded > * { max-width:680px; margin-left:auto; margin-right:auto; }
+.qr-presentation-expanded .qr-frame { width:min(100%,420px); box-shadow:none; padding:12px; }
+.qr-presentation-expanded canvas { width:100%!important; height:auto!important; }
+.qr-presentation-expanded > .max-w-sm { max-width:440px; }
+.qr-presentation::backdrop { background:#fff; }
+.event-ticket .qr-frame { max-width:100%; }
+.event-ticket canvas { max-width:100%; height:auto!important; }
+.event-ticket .qr-laser-beam { display:none; }
+.event-detail-hero { box-shadow:0 8px 28px #4c111a14; }
+@media (max-width:639px) {
+  .student-event-card { padding:16px; }
+  .event-detail-hero { min-height:0; padding:24px; border-radius:24px; }
+  .admin-workspace .grid > * { min-width:0; }
+  .staff-workspace :is(input,select,textarea),.admin-workspace :is(input,select,textarea) { font-size:1rem; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .qr-laser-beam,.student-pass-sheen,.scanner-flash-success,.scanner-flash-checkout,.scanner-flash-error { animation:none; }
+}

@@ -75,7 +75,7 @@ export function StudentQr({ session, eventId }: { session: string; eventId: stri
       } catch (error) {
         if (disposed || current !== version) return;
         clearCard();
-        setMessage(error instanceof Error ? error.message : 'โหลด QR ไม่สำเร็จ ตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง');
+        setMessage(error instanceof Error && error.message ? error.message : 'โหลด QR ไม่สำเร็จ ตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง');
         setAction('retry');
       }
     }
@@ -113,7 +113,7 @@ export function StudentQr({ session, eventId }: { session: string; eventId: stri
       {!gps.ready && !fallback && (
         <div className="my-3 rounded-2xl border border-dashed border-amber-300 bg-amber-50/60 p-3.5 text-xs text-amber-900">
           <p className="font-bold">อุปกรณ์ไม่รองรับหรือเปิด GPS ไม่ได้?</p>
-          <p className="mt-1 text-[11px] text-amber-800">
+          <p className="mt-1 text-sm text-amber-800">
             คุณสามารถใช้โหมดพิเศษเพื่อแสดง QR ได้ แต่ต้องแสดงบัตรนักศึกษาตัวจริงให้สตาฟตรวจ
           </p>
           <button
@@ -129,7 +129,7 @@ export function StudentQr({ session, eventId }: { session: string; eventId: stri
 
       {/* Fallback Active Banner */}
       {fallback && !gps.ready && (
-        <div className="my-2 rounded-xl bg-amber-100 border border-amber-300 px-3 py-1.5 text-[11px] font-bold text-amber-900 flex items-center justify-center gap-1.5">
+        <div className="my-2 rounded-xl bg-amber-100 border border-amber-300 px-3 py-1.5 text-sm font-bold text-amber-900 flex items-center justify-center gap-1.5">
           <AlertCircle size={13} className="text-amber-700" />
           <span>โหมดไม่มี GPS: โปรดเตรียมบัตรนักศึกษาให้สตาฟตรวจ</span>
         </div>
@@ -165,7 +165,8 @@ export function StudentQr({ session, eventId }: { session: string; eventId: stri
             <div className="qr-ticket flex justify-center">
               <QRCodeCanvas
                 value={'ARU1:' + ticket.token}
-                size={230}
+                size={480}
+                style={{ width: 230, height: 230 }}
                 marginSize={3}
                 level="M"
                 fgColor="#000000"
@@ -210,10 +211,10 @@ export function StudentQr({ session, eventId }: { session: string; eventId: stri
             {/* Micro Timer Bar */}
             <div className="rounded-2xl border border-slate-200 bg-slate-50/90 py-2.5 px-3.5 shadow-sm">
               <div className="flex items-center justify-between text-xs">
-                <span className="flex items-center gap-1.5 font-bold text-slate-600 text-[11px]">
+                <span className="flex items-center gap-1.5 font-bold text-slate-600 text-sm">
                   <RefreshCw
                     size={12}
-                    className={remaining <= 5 ? 'text-rose-500 animate-spin' : 'text-slate-400'}
+                    className={remaining <= 5 ? 'text-rose-500 animate-spin' : 'text-slate-500'}
                   />
                   <span>รหัสหมุนเวียนอัตโนมัติ</span>
                 </span>

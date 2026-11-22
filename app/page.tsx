@@ -15,6 +15,8 @@ import { addPasscodeBatches, matchPasscodeBatches } from '@/lib/passcode-batches
 import { importRosterInBatches } from '@/lib/import-roster';
 import { readStudentFile } from '@/lib/student-file';
 import { OpenEvents } from './register/open-events';
+import { QrPresentation } from './qr-presentation';
+import { AttendanceList } from './attendance-list';
 import { birthDateToInput } from '@/lib/birth-date';
 import { PasswordInput } from './password-input';
 import { BirthDateField } from './birth-date-field';
@@ -113,6 +115,7 @@ function EventPass() {
   const [walkinFaculty, setWalkinFaculty] = useState('');
   const [walkinMajor, setWalkinMajor] = useState('');
   const [mobileNav, setMobileNav] = useState(false);
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [view, activeEvent]);
   const scannerRef = useRef<{ clear: () => void | Promise<void>; stop: () => Promise<void> } | null>(null);
   const cooldown = useRef<Map<string, number>>(new Map());
   const loadingRef = useRef(false);
@@ -668,7 +671,7 @@ function EventPass() {
             <b className="text-[15px] tracking-tight text-slate-900 sm:text-[17px]">ARU Event Pass</b>
             {user && <span className="hidden sm:inline-block"><RoleBadge role={user.role} size="sm" /></span>}
           </div>
-          <small className="hidden text-[10px] font-medium text-slate-500 sm:block">องค์การนักศึกษา มหาวิทยาลัยราชภัฏพระนครศรีอยุธยา</small>
+          <small className="hidden text-sm font-medium text-slate-500 sm:block">องค์การนักศึกษา มหาวิทยาลัยราชภัฏพระนครศรีอยุธยา</small>
         </div>
       </button>
 
@@ -703,7 +706,7 @@ function EventPass() {
       {/* Right controls: Cloud status + User Profile Pill + Logout */}
       <div className="app-controls flex shrink-0 items-center gap-2 sm:gap-3">
         <span className={cx(
-          'hidden items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-extrabold sm:flex shadow-sm',
+          'hidden items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-extrabold sm:flex shadow-sm',
           isSupabaseConfigured
             ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
             : 'border-amber-200 bg-amber-50 text-amber-800'
@@ -716,13 +719,13 @@ function EventPass() {
           <>
             {/* User Pill */}
             <div className="flex items-center gap-2 rounded-full border border-slate-200/90 bg-white/90 py-1 pl-1 pr-3 shadow-sm">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#941108] to-[#5a0601] text-[11px] font-extrabold text-amber-200 shadow-inner">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#941108] to-[#5a0601] text-sm font-extrabold text-amber-200 shadow-inner">
                 {initials(user.full_name)}
               </span>
               <div className="hidden text-left sm:block">
-                <b className="block max-w-[130px] truncate text-[11px] font-bold leading-4 text-slate-900">{user.full_name}</b>
+                <b className="block max-w-[130px] truncate text-sm font-bold leading-4 text-slate-900">{user.full_name}</b>
                 <div className="flex items-center gap-1">
-                  <span className="font-mono text-[9px] font-semibold text-slate-400">{user.student_id}</span>
+                  <span className="font-mono text-sm font-semibold text-slate-500">{user.student_id}</span>
                 </div>
               </div>
             </div>
@@ -742,7 +745,7 @@ function EventPass() {
               onClick={() => void withLoading('กำลังออกจากระบบ…', logout)}
               title="ออกจากระบบ"
               aria-label="ออกจากระบบ"
-              className="hidden sm:flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white px-3 py-2 text-[11px] font-bold text-slate-600 shadow-sm transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
+              className="hidden sm:flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white px-3 py-2 text-sm font-bold text-slate-600 shadow-sm transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
             >
               <LogOut size={14} />
               <span>ออกจากระบบ</span>
@@ -771,7 +774,7 @@ function EventPass() {
               <b className="block text-xs font-bold text-slate-900">{user.full_name}</b>
               <div className="mt-0.5 flex items-center gap-1.5">
                 <RoleBadge role={user.role} size="sm" />
-                <span className="font-mono text-[10px] text-slate-500">{user.student_id}</span>
+                <span className="font-mono text-sm text-slate-500">{user.student_id}</span>
               </div>
             </div>
           </div>
@@ -823,15 +826,15 @@ function EventPass() {
     <div key={view} className="page-transition mx-auto mt-6 max-w-[1440px]">
       {view === 'scanner' && user && user.role !== 'STUDENT' && isSupabaseConfigured && <LocationAccess gps={gps} />}
       {secureScan.confirmation}
-      {!user ? <Landing loginError={loginError} enterAs={() => void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…', enterAs)} saving={saving || Boolean(loadingMessage)} /> : view === 'scanner' && user.role !== 'STUDENT' ? <ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={() => setScannerLocked(value => !value)} startScanner={() => void withLoading('กำลังเปิดกล้อง…', startScanner)} stopScanner={() => void withLoading('กำลังปิดกล้อง…', stopScanner)} deviceMode={deviceMode} scanMode={setScanMode} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async (raw: string) => { await withLoading('กำลังตรวจสอบ QR…', () => scanPayload(raw)); }} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={() => setModal('walkin')} /> : view === 'admin' && user.role === 'ADMIN' ? <AdminView isImportingRef={isImportingRef} deleteBatch={(kind, values) => withLoading('กำลังลบรายการ…', () => deleteBatch(kind, values))} sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args) => withLoading('กำลังบันทึกคณะและสาขา…', () => manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={() => setModal('event')} openCodes={() => setModal('codes')} openStaff={() => setModal('staff')} editUser={(target: User) => { setEditingUser(target); setEditingFaculty(target.faculty); setEditingMajor(target.major); setModal('editUser') }} deleteUser={(target: User) => void withLoading('กำลังลบบัญชีผู้ใช้…', () => deleteManagedUser(target))} deleteActivity={() => void withLoading('กำลังลบกิจกรรม…', deleteActivity)} deleteRegistration={(id: string) => void withLoading('กำลังนำรายชื่อออก…', () => deleteRegistration(id))} importError={importError} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={roster => void withLoading('กำลังนำเข้ารายชื่อ…', () => importCsv(roster))} enrollRosterToEvent={() => withLoading('กำลังผูกรายชื่อเข้ากิจกรรม…', enrollRosterToEvent)} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch: Partial<Event>) => withLoading('กำลังบันทึกการเปลี่ยนแปลง…', () => updateSelectedEvent(patch))} /> : view === 'studentStats' && user.role === 'STUDENT' ? <StudentStatsView user={user} events={store.events.filter(e => studentRegs.some(r => r.event_id === e.id))} regs={studentRegs} /> : view === 'event' && user.role === 'STUDENT' ? <EventDetail session={sessionToken} event={store.events.find(e => e.id === activeEvent) || currentEvent} user={user} registration={studentRegs.find(r => r.event_id === activeEvent)} back={() => setView('home')} /> : <StudentHome session={sessionToken} refresh={refreshWorkspace} user={user} events={store.events.filter(e => e.status === 'ACTIVE' && studentRegs.some(r => r.event_id === e.id))} regs={studentRegs} select={(id: string) => { setActiveEvent(id); setView('event') }} store={store} />}
+      {!user ? <Landing loginError={loginError} enterAs={() => void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…', enterAs)} saving={saving || Boolean(loadingMessage)} /> : view === 'scanner' && user.role !== 'STUDENT' ? <ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={() => setScannerLocked(value => !value)} startScanner={() => void withLoading('กำลังเปิดกล้อง…', startScanner)} stopScanner={() => void withLoading('กำลังปิดกล้อง…', stopScanner)} deviceMode={deviceMode} scanMode={setScanMode} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async (raw: string) => { await withLoading('กำลังตรวจสอบ QR…', () => scanPayload(raw)); }} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={() => setModal('walkin')} /> : view === 'admin' && user.role === 'ADMIN' ? <AdminView isImportingRef={isImportingRef} deleteBatch={(kind, values) => withLoading('กำลังลบรายการ…', () => deleteBatch(kind, values))} sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args) => withLoading('กำลังบันทึกคณะและสาขา…', () => manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={() => setModal('event')} openCodes={() => setModal('codes')} openStaff={() => setModal('staff')} editUser={(target: User) => { setEditingUser(target); setEditingFaculty(target.faculty); setEditingMajor(target.major); setModal('editUser') }} deleteUser={(target: User) => void withLoading('กำลังลบบัญชีผู้ใช้…', () => deleteManagedUser(target))} deleteActivity={() => void withLoading('กำลังลบกิจกรรม…', deleteActivity)} deleteRegistration={(id: string) => void withLoading('กำลังนำรายชื่อออก…', () => deleteRegistration(id))} importError={importError} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={roster => void withLoading('กำลังนำเข้ารายชื่อ…', () => importCsv(roster))} enrollRosterToEvent={() => withLoading('กำลังผูกรายชื่อเข้ากิจกรรม…', enrollRosterToEvent)} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch: Partial<Event>) => withLoading('กำลังบันทึกการเปลี่ยนแปลง…', () => updateSelectedEvent(patch))} /> : view === 'studentStats' && user.role === 'STUDENT' ? <StudentStatsView user={user} events={store.events.filter(e => studentRegs.some(r => r.event_id === e.id))} regs={studentRegs} /> : view === 'event' && user.role === 'STUDENT' ? <EventDetail session={sessionToken} event={store.events.find(e => e.id === activeEvent) || currentEvent} user={user} registration={studentRegs.find(r => r.event_id === activeEvent)} back={() => setView('home')} /> : <StudentHome session={sessionToken} refresh={refreshWorkspace} user={user} events={store.events.filter(e => studentRegs.some(r => r.event_id === e.id))} regs={studentRegs} select={(id: string) => { setActiveEvent(id); setView('event') }} store={store} />}
     </div>
-    {user && <div className="mx-auto mt-10 flex max-w-[1440px] items-center justify-between border-t border-slate-200/70 px-2 py-4 text-[10px] text-slate-500"><span>© 2026 ARU Student Organization · ระบบลงทะเบียนกิจกรรม</span><span className="hidden items-center gap-1 sm:flex"><ShieldCheck size={12} />ข้อมูลกิจกรรมอัปเดตแบบเรียลไทม์</span></div>}
-    {modal === 'walkin' && <Modal submitLabel="บันทึกรายชื่อหน้างาน" title="ลงทะเบียนหน้างาน" subtitle="เพิ่มนักศึกษาและผูกสิทธิ์กิจกรรม" close={() => setModal(null)}><form id="staff-admin-form" onSubmit={e => void withLoading('กำลังบันทึกรายชื่อ…', () => addWalkin(e))} className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><Field label="รหัสนักศึกษา" name="student_id" required placeholder="เช่น 69123456" /><label className="text-sm">คำนำหน้า<select name="prefix" required defaultValue="" className="mt-1 block h-11 w-full rounded-xl border px-3"><option value="">เลือกคำนำหน้า</option><option>นาย</option><option>นางสาว</option></select></label><Field label="ชื่อ–นามสกุล" name="full_name" required placeholder="ชื่อ นามสกุล" /><label className="block text-[11px] font-semibold text-slate-600">คณะ<select name="faculty" value={walkinFaculty} required onChange={e => { setWalkinFaculty(e.target.value); setWalkinMajor('') }} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800"><option value="">เลือกคณะ</option>{academicCatalog.map(faculty => <option key={faculty.id} value={faculty.name}>{faculty.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">สาขาวิชา<select name="major" value={walkinMajor} required disabled={!walkinFaculty} onChange={e => setWalkinMajor(e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 disabled:opacity-50"><option value="">เลือกสาขา</option>{(academicCatalog.find(faculty => faculty.name === walkinFaculty)?.majors || []).map(major => <option key={major.id} value={major.name}>{major.name}</option>)}</select></label><label className="block text-[11px] font-semibold text-slate-600">ชั้นปีที่กำลังศึกษา<select name="study_year" value={walkinStudyYear} onChange={e => setWalkinStudyYear(Number(e.target.value))} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{Array.from({ length: 8 }, (_, i) => i + 1).map(year => <option key={year} value={year}>ปี {year}</option>)}</select></label><label className="text-sm">หมู่เรียน<select name="class_group" required defaultValue="" className="mt-1 block h-11 w-full rounded-xl border px-3"><option value="">เลือกหมู่เรียน</option>{[1, 2, 3, 4].map(n => <option key={n}>{n}</option>)}</select></label><BirthDateField /><Field label="เบอร์โทรศัพท์" name="phone" placeholder="08X-XXX-XXXX" /></div><div className={cx('flex items-center justify-between rounded-2xl px-4 py-3 text-xs', reserveLeft ? 'bg-amber-50 text-amber-900' : 'bg-rose-50 text-rose-700')}><span className="flex items-center gap-2"><Ticket size={15} />Passcode สำรองคงเหลือ</span><b>{reserveLeft} รหัส</b></div><p className="text-center text-[10px] leading-5 text-slate-400">นักศึกษาชั้นปี 2 ขึ้นไปจะได้รับ Passcode หลังเช็กเอาต์ · ปี 1 ใช้ QR Check-in/Check-out</p></form></Modal>}
-    {modal === 'event' && <Modal submitLabel="สร้างกิจกรรม" title="สร้างกิจกรรมใหม่" subtitle="ตั้งค่ากิจกรรมสำหรับการลงทะเบียน" close={() => setModal(null)}><form id="staff-admin-form" onSubmit={e => void withLoading('กำลังสร้างกิจกรรม…', () => createEvent(e))} className="space-y-3"><Field label="ชื่อกิจกรรม" name="title" required placeholder="เช่น ปฐมนิเทศนักศึกษาใหม่" /><Field label="สถานที่จัดกิจกรรม" name="location" required placeholder="หอประชุมมหาวิทยาลัย" /><Field label="URL สำหรับนักศึกษาปี 1 หลังเช็กอิน" name="redirect" type="url" placeholder="https://..." /><Field label="URL ภาพแบนเนอร์กิจกรรม" name="banner_url" type="url" placeholder="https://..." /><p className="-mt-1 text-[9px] leading-4 text-slate-400">วางลิงก์รูปภาพโดยตรง ระบบจะแสดงภาพจาง ๆ เป็นพื้นหลังของกิจกรรม</p><Field label="ชั่วโมงกิจกรรม" name="hours" type="number" min="1" defaultValue="4" /></form></Modal>}
-    {modal === 'codes' && <Modal submitLabel="เพิ่มรหัสสำรอง" title="เติม Passcode สำรอง" subtitle={`เพิ่มรหัสสำรองสำหรับ ${selected.title}`} close={() => setModal(null)}><form id="staff-admin-form" onSubmit={e => void withLoading('กำลังเพิ่ม Passcode…', () => addCodes(e))} className="space-y-3"><p className="text-sm">รองรับ 500 รหัสขึ้นไป ระบบเพิ่มทีละ 50 รหัส แล้วจับคู่ผู้เข้างานจริงทีละ 25 คน</p>{passcodeError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{passcodeError}</p>}<label className="block text-xs font-semibold text-slate-700">รายการ Passcode <textarea name="codes" required rows={6} placeholder={'ARU-R-3001\nARU-R-3002\nARU-R-3003'} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-amber-400" /></label><p className="text-[10px] text-slate-500">ใส่หนึ่งรหัสต่อบรรทัด ระบบจะข้ามรหัสที่ซ้ำโดยอัตโนมัติ</p></form></Modal>}
-    {modal === 'staff' && <Modal submitLabel="สร้างบัญชีเจ้าหน้าที่" title="เพิ่มบัญชีเจ้าหน้าที่" subtitle="สร้างบัญชีสตาฟหรือแอดมินสำหรับเข้าระบบ" close={() => setModal(null)}><form id="staff-admin-form" onSubmit={e => void withLoading('กำลังสร้างบัญชี…', () => createStaffAccount(e))} className="space-y-3"><Field label="ชื่อผู้ใช้ / รหัสเจ้าหน้าที่" name="username" required placeholder="เช่น staff-aru-01" /><Field label="ชื่อ–นามสกุล" name="full_name" required placeholder="ชื่อผู้ใช้งาน" /><label className="block text-[11px] font-semibold text-slate-600">ประเภทบัญชี<select name="role" className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800"><option value="STAFF">สตาฟ</option><option value="ADMIN">แอดมิน</option></select></label><Field label="รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)" name="password" type="password" minLength={8} required placeholder="ตั้งรหัสผ่านเริ่มต้น" /><div className="grid gap-3 sm:grid-cols-2"><Field label="หน่วยงาน / คณะ" name="faculty" placeholder="องค์การนักศึกษา" /><Field label="ฝ่าย / ตำแหน่ง" name="major" placeholder="ฝ่ายกิจกรรม" /></div><p className="rounded-xl bg-amber-50 px-3 py-2 text-[10px] leading-5 text-amber-900">ตั้งรหัสผ่านเริ่มต้นให้เจ้าหน้าที่ และแจ้งให้เปลี่ยนรหัสผ่านหลังเข้าสู่ระบบครั้งแรก</p></form></Modal>}
-    {modal === 'editUser' && editingUser && <Modal submitLabel="บันทึกข้อมูลผู้ใช้" title="แก้ไขข้อมูลผู้ใช้" subtitle={editingUser.role === 'STUDENT' ? 'แก้ไขข้อมูลนักศึกษา' : 'แก้ไขข้อมูลสตาฟ'} close={() => { setModal(null); setEditingUser(null) }}><form id="staff-admin-form" onSubmit={e => void withLoading('กำลังบันทึกข้อมูลผู้ใช้…', () => updateManagedUser(e, editingUser))} className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><Field label="ชื่อผู้ใช้ / รหัสนักศึกษา" name="student_id" required defaultValue={editingUser.student_id} /><Field label="ชื่อ-นามสกุล" name="full_name" required defaultValue={editingUser.full_name} />{editingUser.role === 'STUDENT' ? <label className="block text-[11px] font-semibold text-slate-600">คณะ<select name="faculty" value={editingFaculty} onChange={e => { setEditingFaculty(e.target.value); setEditingMajor(academicCatalog.find(faculty => faculty.name === e.target.value)?.majors[0]?.name || ''); }} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{editingFaculty && !academicCatalog.some(f => f.name === editingFaculty) && <option value={editingFaculty}>{editingFaculty}</option>}{academicCatalog.map(faculty => <option key={faculty.id} value={faculty.name}>{faculty.name}</option>)}</select></label> : <Field label="คณะ / หน่วยงาน" name="faculty" defaultValue={editingUser.faculty} />} {editingUser.role === 'STUDENT' ? <label className="block text-[11px] font-semibold text-slate-600">สาขาวิชา<select name="major" value={editingMajor} onChange={e => setEditingMajor(e.target.value)} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{editingMajor && !academicCatalog.find(f => f.name === editingFaculty)?.majors.some(m => m.name === editingMajor) && <option value={editingMajor}>{editingMajor}</option>}{(academicCatalog.find(faculty => faculty.name === editingFaculty)?.majors || []).map(major => <option key={major.id} value={major.name}>{major.name}</option>)}</select></label> : <Field label="สาขา / ฝ่าย" name="major" defaultValue={editingUser.major} />}<Field label="หมู่เรียน / กลุ่ม" name="class_group" defaultValue={editingUser.class_group} /><Field label="วันเกิด (DDMMYYYY)" name="birth_date" defaultValue={editingUser.birth_date || ''} placeholder="เว้นว่างหากไม่แก้ไข" /><Field label="เบอร์โทรศัพท์" name="phone" type="tel" defaultValue={editingUser.phone || ''} />{editingUser.role === 'STUDENT' && <label className="block text-[11px] font-semibold text-slate-600">ชั้นปีที่กำลังศึกษา<select name="study_year" defaultValue={editingUser.study_year} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{Array.from({ length: 8 }, (_, index) => index + 1).map(year => <option key={year} value={year}>ปี {year}</option>)}</select></label>}<Field label="รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)" name="new_password" type="password" minLength={8} placeholder="อย่างน้อย 8 ตัวอักษร" /></div><p className="rounded-xl bg-amber-50 px-3 py-2 text-[10px] leading-5 text-amber-900">เมื่อกำหนดรหัสผ่านใหม่ ระบบจะออกจากระบบในอุปกรณ์อื่นของบัญชีนี้</p></form></Modal>}
-    {(loadingMessage || saving) && <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/25 p-4 backdrop-blur-[2px]" role="status" aria-live="polite" aria-busy="true"><div className="flex min-w-[230px] items-center gap-3 rounded-2xl border border-white/80 bg-white/95 px-5 py-4 shadow-2xl"><Loader2 size={22} className="animate-spin text-[#7c0a02]" /><div><b className="block text-xs text-slate-900">{loadingMessage || "กำลังดำเนินการ…"}</b><span className="mt-1 block text-[10px] text-slate-500">กรุณารอสักครู่</span><span className="loading-progress mt-3 block h-1 overflow-hidden rounded-full bg-rose-100"><i className="block h-full w-2/5 rounded-full bg-[#7c0a02]" /></span></div></div></div>}
+    {user && <div className="mx-auto mt-10 flex max-w-[1440px] items-center justify-between border-t border-slate-200/70 px-2 py-4 text-sm text-slate-500"><span>© 2026 ARU Student Organization · ระบบลงทะเบียนกิจกรรม</span><span className="hidden items-center gap-1 sm:flex"><ShieldCheck size={12} />ข้อมูลกิจกรรมอัปเดตแบบเรียลไทม์</span></div>}
+    {modal === 'walkin' && <Modal submitLabel="บันทึกรายชื่อหน้างาน" title="ลงทะเบียนหน้างาน" subtitle="เพิ่มนักศึกษาและผูกสิทธิ์กิจกรรม" close={() => setModal(null)}><form id="staff-admin-form" onSubmit={e => void withLoading('กำลังบันทึกรายชื่อ…', () => addWalkin(e))} className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><Field label="รหัสนักศึกษา" name="student_id" required placeholder="เช่น 69123456" /><label className="text-sm">คำนำหน้า<select name="prefix" required defaultValue="" className="mt-1 block h-11 w-full rounded-xl border px-3"><option value="">เลือกคำนำหน้า</option><option>นาย</option><option>นางสาว</option></select></label><Field label="ชื่อ–นามสกุล" name="full_name" required placeholder="ชื่อ นามสกุล" /><label className="block text-sm font-semibold text-slate-600">คณะ<select name="faculty" value={walkinFaculty} required onChange={e => { setWalkinFaculty(e.target.value); setWalkinMajor('') }} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800"><option value="">เลือกคณะ</option>{academicCatalog.map(faculty => <option key={faculty.id} value={faculty.name}>{faculty.name}</option>)}</select></label><label className="block text-sm font-semibold text-slate-600">สาขาวิชา<select name="major" value={walkinMajor} required disabled={!walkinFaculty} onChange={e => setWalkinMajor(e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 disabled:opacity-50"><option value="">เลือกสาขา</option>{(academicCatalog.find(faculty => faculty.name === walkinFaculty)?.majors || []).map(major => <option key={major.id} value={major.name}>{major.name}</option>)}</select></label><label className="block text-sm font-semibold text-slate-600">ชั้นปีที่กำลังศึกษา<select name="study_year" value={walkinStudyYear} onChange={e => setWalkinStudyYear(Number(e.target.value))} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{Array.from({ length: 8 }, (_, i) => i + 1).map(year => <option key={year} value={year}>ปี {year}</option>)}</select></label><label className="text-sm">หมู่เรียน<select name="class_group" required defaultValue="" className="mt-1 block h-11 w-full rounded-xl border px-3"><option value="">เลือกหมู่เรียน</option>{[1, 2, 3, 4].map(n => <option key={n}>{n}</option>)}</select></label><BirthDateField /><Field label="เบอร์โทรศัพท์" name="phone" placeholder="08X-XXX-XXXX" /></div><div className={cx('flex items-center justify-between rounded-2xl px-4 py-3 text-xs', reserveLeft ? 'bg-amber-50 text-amber-900' : 'bg-rose-50 text-rose-700')}><span className="flex items-center gap-2"><Ticket size={15} />Passcode สำรองคงเหลือ</span><b>{reserveLeft} รหัส</b></div><p className="text-center text-sm leading-5 text-slate-500">นักศึกษาชั้นปี 2 ขึ้นไปจะได้รับ Passcode หลังเช็กเอาต์ · ปี 1 ใช้ QR Check-in/Check-out</p></form></Modal>}
+    {modal === 'event' && <Modal submitLabel="สร้างกิจกรรม" title="สร้างกิจกรรมใหม่" subtitle="ตั้งค่ากิจกรรมสำหรับการลงทะเบียน" close={() => setModal(null)}><form id="staff-admin-form" onSubmit={e => void withLoading('กำลังสร้างกิจกรรม…', () => createEvent(e))} className="space-y-3"><Field label="ชื่อกิจกรรม" name="title" required placeholder="เช่น ปฐมนิเทศนักศึกษาใหม่" /><Field label="สถานที่จัดกิจกรรม" name="location" required placeholder="หอประชุมมหาวิทยาลัย" /><Field label="URL สำหรับนักศึกษาปี 1 หลังเช็กอิน" name="redirect" type="url" placeholder="https://..." /><Field label="URL ภาพแบนเนอร์กิจกรรม" name="banner_url" type="url" placeholder="https://..." /><p className="-mt-1 text-sm leading-4 text-slate-500">วางลิงก์รูปภาพโดยตรง ระบบจะแสดงภาพจาง ๆ เป็นพื้นหลังของกิจกรรม</p><Field label="ชั่วโมงกิจกรรม" name="hours" type="number" min="1" defaultValue="4" /></form></Modal>}
+    {modal === 'codes' && <Modal submitLabel="เพิ่มรหัสสำรอง" title="เติม Passcode สำรอง" subtitle={`เพิ่มรหัสสำรองสำหรับ ${selected.title}`} close={() => setModal(null)}><form id="staff-admin-form" onSubmit={e => void withLoading('กำลังเพิ่ม Passcode…', () => addCodes(e))} className="space-y-3"><p className="text-sm">รองรับ 500 รหัสขึ้นไป ระบบเพิ่มทีละ 50 รหัส แล้วจับคู่ผู้เข้างานจริงทีละ 25 คน</p>{passcodeError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{passcodeError}</p>}<label className="block text-xs font-semibold text-slate-700">รายการ Passcode <textarea name="codes" required rows={6} placeholder={'ARU-R-3001\nARU-R-3002\nARU-R-3003'} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-amber-400" /></label><p className="text-sm text-slate-500">ใส่หนึ่งรหัสต่อบรรทัด ระบบจะข้ามรหัสที่ซ้ำโดยอัตโนมัติ</p></form></Modal>}
+    {modal === 'staff' && <Modal submitLabel="สร้างบัญชีเจ้าหน้าที่" title="เพิ่มบัญชีเจ้าหน้าที่" subtitle="สร้างบัญชีสตาฟหรือแอดมินสำหรับเข้าระบบ" close={() => setModal(null)}><form id="staff-admin-form" onSubmit={e => void withLoading('กำลังสร้างบัญชี…', () => createStaffAccount(e))} className="space-y-3"><Field label="ชื่อผู้ใช้ / รหัสเจ้าหน้าที่" name="username" required placeholder="เช่น staff-aru-01" /><Field label="ชื่อ–นามสกุล" name="full_name" required placeholder="ชื่อผู้ใช้งาน" /><label className="block text-sm font-semibold text-slate-600">ประเภทบัญชี<select name="role" className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800"><option value="STAFF">สตาฟ</option><option value="ADMIN">แอดมิน</option></select></label><Field label="รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)" name="password" type="password" minLength={8} required placeholder="ตั้งรหัสผ่านเริ่มต้น" /><div className="grid gap-3 sm:grid-cols-2"><Field label="หน่วยงาน / คณะ" name="faculty" placeholder="องค์การนักศึกษา" /><Field label="ฝ่าย / ตำแหน่ง" name="major" placeholder="ฝ่ายกิจกรรม" /></div><p className="rounded-xl bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-900">ตั้งรหัสผ่านเริ่มต้นให้เจ้าหน้าที่ และแจ้งให้เปลี่ยนรหัสผ่านหลังเข้าสู่ระบบครั้งแรก</p></form></Modal>}
+    {modal === 'editUser' && editingUser && <Modal submitLabel="บันทึกข้อมูลผู้ใช้" title="แก้ไขข้อมูลผู้ใช้" subtitle={editingUser.role === 'STUDENT' ? 'แก้ไขข้อมูลนักศึกษา' : 'แก้ไขข้อมูลสตาฟ'} close={() => { setModal(null); setEditingUser(null) }}><form id="staff-admin-form" onSubmit={e => void withLoading('กำลังบันทึกข้อมูลผู้ใช้…', () => updateManagedUser(e, editingUser))} className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><Field label="ชื่อผู้ใช้ / รหัสนักศึกษา" name="student_id" required defaultValue={editingUser.student_id} /><Field label="ชื่อ-นามสกุล" name="full_name" required defaultValue={editingUser.full_name} />{editingUser.role === 'STUDENT' ? <label className="block text-sm font-semibold text-slate-600">คณะ<select name="faculty" value={editingFaculty} onChange={e => { setEditingFaculty(e.target.value); setEditingMajor(academicCatalog.find(faculty => faculty.name === e.target.value)?.majors[0]?.name || ''); }} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{editingFaculty && !academicCatalog.some(f => f.name === editingFaculty) && <option value={editingFaculty}>{editingFaculty}</option>}{academicCatalog.map(faculty => <option key={faculty.id} value={faculty.name}>{faculty.name}</option>)}</select></label> : <Field label="คณะ / หน่วยงาน" name="faculty" defaultValue={editingUser.faculty} />} {editingUser.role === 'STUDENT' ? <label className="block text-sm font-semibold text-slate-600">สาขาวิชา<select name="major" value={editingMajor} onChange={e => setEditingMajor(e.target.value)} required className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{editingMajor && !academicCatalog.find(f => f.name === editingFaculty)?.majors.some(m => m.name === editingMajor) && <option value={editingMajor}>{editingMajor}</option>}{(academicCatalog.find(faculty => faculty.name === editingFaculty)?.majors || []).map(major => <option key={major.id} value={major.name}>{major.name}</option>)}</select></label> : <Field label="สาขา / ฝ่าย" name="major" defaultValue={editingUser.major} />}<Field label="หมู่เรียน / กลุ่ม" name="class_group" defaultValue={editingUser.class_group} /><Field label="วันเกิด (DDMMYYYY)" name="birth_date" defaultValue={editingUser.birth_date || ''} placeholder="เว้นว่างหากไม่แก้ไข" /><Field label="เบอร์โทรศัพท์" name="phone" type="tel" defaultValue={editingUser.phone || ''} />{editingUser.role === 'STUDENT' && <label className="block text-sm font-semibold text-slate-600">ชั้นปีที่กำลังศึกษา<select name="study_year" defaultValue={editingUser.study_year} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800">{Array.from({ length: 8 }, (_, index) => index + 1).map(year => <option key={year} value={year}>ปี {year}</option>)}</select></label>}<Field label="รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)" name="new_password" type="password" minLength={8} placeholder="อย่างน้อย 8 ตัวอักษร" /></div><p className="rounded-xl bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-900">เมื่อกำหนดรหัสผ่านใหม่ ระบบจะออกจากระบบในอุปกรณ์อื่นของบัญชีนี้</p></form></Modal>}
+    {(loadingMessage || saving) && <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/25 p-4 backdrop-blur-[2px]" role="status" aria-live="polite" aria-busy="true"><div className="flex min-w-[230px] items-center gap-3 rounded-2xl border border-white/80 bg-white/95 px-5 py-4 shadow-2xl"><Loader2 size={22} className="animate-spin text-[#7c0a02]" /><div><b className="block text-xs text-slate-900">{loadingMessage || "กำลังดำเนินการ…"}</b><span className="mt-1 block text-sm text-slate-500">กรุณารอสักครู่</span><span className="loading-progress mt-3 block h-1 overflow-hidden rounded-full bg-rose-100"><i className="block h-full w-2/5 rounded-full bg-[#7c0a02]" /></span></div></div></div>}
     {toast && <div className="app-toast fixed bottom-5 left-1/2 z-[70] w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-2xl bg-slate-950 px-5 py-3 text-xs font-medium text-white shadow-2xl">{toast}</div>}
   </main>;
 }
@@ -840,22 +843,22 @@ function roleName(role: Role) { return role === 'STUDENT' ? 'นักศึก�
 
 function RoleBadge({ role, size = 'sm' }: { role: Role; size?: 'sm' | 'md' }) {
   if (role === 'ADMIN') {
-    return <span className={cx('inline-flex items-center gap-1 rounded-full border border-rose-300/80 bg-rose-50 font-extrabold text-[#7c0a02] shadow-sm', size === 'sm' ? 'px-2 py-0.5 text-[9px]' : 'px-3 py-1 text-[11px]')}><ShieldCheck size={size === 'sm' ? 11 : 13} />ผู้ดูแลระบบ</span>;
+    return <span className={cx('inline-flex items-center gap-1 rounded-full border border-rose-300/80 bg-rose-50 font-extrabold text-[#7c0a02] shadow-sm', size === 'sm' ? 'px-2 py-0.5 text-sm' : 'px-3 py-1 text-sm')}><ShieldCheck size={size === 'sm' ? 11 : 13} />ผู้ดูแลระบบ</span>;
   }
   if (role === 'STAFF') {
-    return <span className={cx('inline-flex items-center gap-1 rounded-full border border-amber-300/80 bg-amber-50 font-extrabold text-amber-900 shadow-sm', size === 'sm' ? 'px-2 py-0.5 text-[9px]' : 'px-3 py-1 text-[11px]')}><ScanLine size={size === 'sm' ? 11 : 13} />สตาฟกิจกรรม</span>;
+    return <span className={cx('inline-flex items-center gap-1 rounded-full border border-amber-300/80 bg-amber-50 font-extrabold text-amber-900 shadow-sm', size === 'sm' ? 'px-2 py-0.5 text-sm' : 'px-3 py-1 text-sm')}><ScanLine size={size === 'sm' ? 11 : 13} />สตาฟกิจกรรม</span>;
   }
-  return <span className={cx('inline-flex items-center gap-1 rounded-full border border-emerald-300/80 bg-emerald-50 font-extrabold text-emerald-800 shadow-sm', size === 'sm' ? 'px-2 py-0.5 text-[9px]' : 'px-3 py-1 text-[11px]')}><GraduationCap size={size === 'sm' ? 11 : 13} />นักศึกษา</span>;
+  return <span className={cx('inline-flex items-center gap-1 rounded-full border border-emerald-300/80 bg-emerald-50 font-extrabold text-emerald-800 shadow-sm', size === 'sm' ? 'px-2 py-0.5 text-sm' : 'px-3 py-1 text-sm')}><GraduationCap size={size === 'sm' ? 11 : 13} />นักศึกษา</span>;
 }
 
 function EventStatusPill({ status }: { status: Event['status'] }) {
   if (status === 'ACTIVE') {
-    return <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[9px] font-extrabold text-emerald-700 shadow-sm"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />เปิดใช้งาน</span>;
+    return <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-sm font-extrabold text-emerald-700 shadow-sm"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />เปิดใช้งาน</span>;
   }
   if (status === 'UPCOMING') {
-    return <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[9px] font-extrabold text-sky-700 shadow-sm"><Calendar size={11} />เร็วๆ นี้</span>;
+    return <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-sm font-extrabold text-sky-700 shadow-sm"><Calendar size={11} />เร็วๆ นี้</span>;
   }
-  return <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-[9px] font-bold text-slate-500">ปิดกิจกรรม</span>;
+  return <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-sm font-bold text-slate-500">ปิดกิจกรรม</span>;
 }
 
 function NavButton({
@@ -903,7 +906,7 @@ function NavButton({
       <span>{children}</span>
       {badge !== undefined && (
         <span className={cx(
-          'ml-0.5 rounded-full px-1.5 py-0.2 text-[9px] font-extrabold',
+          'ml-0.5 rounded-full px-1.5 py-0.2 text-sm font-extrabold',
           active ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-700'
         )}>
           {badge}
@@ -912,7 +915,7 @@ function NavButton({
     </button>
   );
 }
-function Field({ label, ...props }: { label: string; name: string; id?: string; type?: string; required?: boolean; placeholder?: string; defaultValue?: string | number; min?: string | number; max?: string | number; minLength?: number; maxLength?: number; step?: string | number; autoComplete?: string; enterKeyHint?: "go" | "next" }) { const Input = props.type === 'password' ? PasswordInput : 'input'; return <label className="block text-[11px] font-semibold text-slate-600">{label}<Input {...props} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 placeholder:text-slate-300" /></label> }
+function Field({ label, ...props }: { label: string; name: string; id?: string; type?: string; required?: boolean; placeholder?: string; defaultValue?: string | number; min?: string | number; max?: string | number; minLength?: number; maxLength?: number; step?: string | number; autoComplete?: string; enterKeyHint?: "go" | "next" }) { const Input = props.type === 'password' ? PasswordInput : 'input'; return <label className="block text-sm font-semibold text-slate-600">{label}<Input {...props} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-800 placeholder:text-slate-300" /></label> }
 function Modal({ title, subtitle, close, children, submitLabel, submitDisabled = false, wide = false }: {
   title: string; subtitle: string; close: () => void; children: React.ReactNode; submitLabel?: string; submitDisabled?: boolean; wide?: boolean;
 }) {
@@ -1010,7 +1013,7 @@ function Landing({ enterAs, saving, loginError }: { enterAs: () => void; saving:
     </section>
   </div>;
 }
-function MetricChip({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) { return <div className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur-md"><div className="flex items-center gap-1.5 text-amber-200">{icon}<span className="text-[9px] font-semibold text-white/70">{label}</span></div><b className="mt-1 block text-sm">{value}</b></div> }
+function MetricChip({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) { return <div className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur-md"><div className="flex items-center gap-1.5 text-amber-200">{icon}<span className="text-sm font-semibold text-white/70">{label}</span></div><b className="mt-1 block text-sm">{value}</b></div> }
 
 function StudentPassCard({ user, events, regs }: { user: User; events: Event[]; regs: Registration[] }) {
   const completedEvents = regs.filter(r => r.status === 'COMPLETED');
@@ -1032,15 +1035,15 @@ function StudentPassCard({ user, events, regs }: { user: User; events: Event[]; 
             <Award size={18} strokeWidth={2.4} />
           </div>
           <div>
-            <span className="block text-[10px] font-extrabold tracking-[0.16em] uppercase text-amber-300">
+            <span className="block text-sm font-extrabold tracking-[0.16em] uppercase text-amber-300">
               ARU DIGITAL PASS
             </span>
-            <span className="block text-[11px] font-semibold text-rose-100/80">
+            <span className="block text-sm font-semibold text-rose-100/80">
               มหาวิทยาลัยราชภัฏพระนครศรีอยุธยา
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2.5 py-1 text-[10px] font-extrabold text-emerald-300">
+        <div className="flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2.5 py-1 text-sm font-extrabold text-emerald-300">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
           <span>สถานะปกติ</span>
         </div>
@@ -1054,7 +1057,7 @@ function StudentPassCard({ user, events, regs }: { user: User; events: Event[]; 
               {user.full_name}
             </h2>
             {user.study_year > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-lg border border-amber-300/30 bg-amber-400/20 px-2 py-0.5 text-[11px] font-bold text-amber-200">
+              <span className="inline-flex items-center gap-1 rounded-lg border border-amber-300/30 bg-amber-400/20 px-2 py-0.5 text-sm font-bold text-amber-200">
                 <GraduationCap size={13} />
                 <span>ชั้นปีที่ {user.study_year}</span>
               </span>
@@ -1074,19 +1077,19 @@ function StudentPassCard({ user, events, regs }: { user: User; events: Event[]; 
       {/* Metrics Row */}
       <div className="relative z-10 mt-6 grid grid-cols-3 gap-2.5 pt-4 border-t border-white/10">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-sm text-center">
-          <span className="text-[10px] font-semibold text-rose-200/70 block">ลงทะเบียน</span>
+          <span className="text-sm font-semibold text-rose-200/70 block">ลงทะเบียน</span>
           <b className="mt-0.5 text-lg font-black text-white block">{events.length}</b>
-          <span className="text-[9px] text-rose-200/60 block">กิจกรรม</span>
+          <span className="text-sm text-rose-200/60 block">กิจกรรม</span>
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-sm text-center">
-          <span className="text-[10px] font-semibold text-emerald-200/80 block">ผ่านกิจกรรม</span>
+          <span className="text-sm font-semibold text-emerald-200/80 block">ผ่านกิจกรรม</span>
           <b className="mt-0.5 text-lg font-black text-emerald-300 block">{completedEvents.length}</b>
-          <span className="text-[9px] text-emerald-200/60 block">สำเร็จ</span>
+          <span className="text-sm text-emerald-200/60 block">สำเร็จ</span>
         </div>
         <div className="rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3 backdrop-blur-sm text-center">
-          <span className="text-[10px] font-semibold text-amber-200 block">ชั่วโมงสะสม</span>
+          <span className="text-sm font-semibold text-amber-200 block">ชั่วโมงสะสม</span>
           <b className="mt-0.5 text-lg font-black text-amber-300 block">{totalEarnedHours}</b>
-          <span className="text-[9px] text-amber-200/70 block">ชั่วโมง</span>
+          <span className="text-sm text-amber-200/70 block">ชั่วโมง</span>
         </div>
       </div>
     </section>
@@ -1094,123 +1097,48 @@ function StudentPassCard({ user, events, regs }: { user: User; events: Event[]; 
 }
 
 function StudentHome({ user, events, regs, select, store, session, refresh }: { session: string; refresh: () => Promise<void>; user: User; events: Event[]; regs: Registration[]; select: (id: string) => void; store: Store }) {
-  const latestConfirmed = [...regs].filter(r => r.status === 'ATTENDING' || r.status === 'COMPLETED').sort((a, b) => Date.parse(b.checkout_at || b.checkin_at || '') - Date.parse(a.checkout_at || a.checkin_at || ''))[0];
-  const latestEvent = latestConfirmed ? store.events.find(e => e.id === latestConfirmed.event_id) : undefined;
-
-  return (
-    <div className="space-y-5">
-      <header className="px-2">
-        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.15em] text-slate-400">
-          <span>{formatThaiDate()}</span>
-          <span className="h-1 w-1 rounded-full bg-[#d4af37]" />
-          <span>Student Portal</span>
-        </div>
-        <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">กิจกรรมที่กำลังเปิด</h1>
-        <p className="mt-1 text-xs text-slate-500">เลือกกิจกรรมเพื่อดูรายละเอียดและ QR Code ของคุณ</p>
-      </header>
-
-      {/* Digital Student Pass */}
-      <StudentPassCard user={user} events={events} regs={regs} />
-
-      {/* Attendance Status Banner */}
-      <AttendanceConfirmation status={latestConfirmed?.status} eventTitle={latestEvent?.title} />
-
-      {/* Registered Events */}
-      <section className="bento p-4 sm:p-6">
-        <div className="flex items-baseline justify-between gap-2 border-b border-slate-100 pb-3">
-          <h2 className="text-base font-extrabold text-slate-900">กิจกรรมที่ฉันลงทะเบียน</h2>
-          <span className="shrink-0 text-xs text-slate-500 font-semibold">{events.length + (store.applications?.length || 0)} กิจกรรม</span>
-        </div>
-
-        <div className="mt-4 space-y-3">
-          {store.applications?.map(a => (
-            <article key={a.id} className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm">
-              <strong className="block text-slate-900">{a.title}</strong>
-              <p className="mt-1 text-xs text-amber-900">
-                {a.status === 'CORRECT' ? (a.online ? 'แอดมินขอให้แก้ไขใบสมัคร' : 'กรุณาแก้ไขที่จุดลงทะเบียนหน้างาน') + ' · ' + a.note : 'รอยืนยันเข้าร่วมกิจกรรม'}
-              </p>
-              {a.status === 'CORRECT' && a.online && (
-                <a className="action-primary mt-3 inline-flex text-xs" href={'/register/' + a.event_id + '?correct=' + a.id}>
-                  เปิดใบสมัครเพื่อแก้ไข
-                </a>
-              )}
-            </article>
-          ))}
-
-          {events.map(event => {
-            const registration = regs.find(reg => reg.event_id === event.id);
-            if (!registration) return null;
-            const completed = registration.status === 'COMPLETED';
-            const attending = registration.status === 'ATTENDING';
-            const actionText = completed ? 'ดูผลการเข้าร่วม' : attending ? 'เปิด QR สแกนออก' : 'เปิด QR สแกนเข้า';
-
-            return (
-              <div
-                key={event.id}
-                onClick={() => select(event.id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') select(event.id); }}
-                className="ticket-pass group cursor-pointer overflow-hidden p-4 sm:p-5 text-left"
-                style={event.banner_url ? { backgroundImage: `linear-gradient(90deg,rgba(255,255,255,.97),rgba(255,255,255,.88)),url("${event.banner_url}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <StatusPill status={registration.status} />
-                      {event.status === 'ACTIVE' && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700 border border-emerald-200">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          เปิดรอบสแกน
-                        </span>
-                      )}
-                    </div>
-                    <strong className="mt-2 block break-words text-base font-extrabold text-slate-900 group-hover:text-[#7c0a02] transition-colors">
-                      {event.title}
-                    </strong>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
-                      <span className="inline-flex items-center gap-1">
-                        <MapPin size={13} className="text-[#7c0a02]" />
-                        <span>{event.location}</span>
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <Clock3 size={13} className="text-amber-600" />
-                        <span>{event.activity_hours} ชั่วโมงกิจกรรม</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="shrink-0">
-                    <button
-                      type="button"
-                      aria-label={actionText + ' · ' + event.title}
-                      className={cx(
-                        'inline-flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 rounded-xl px-4 text-xs font-bold transition-all shadow-sm',
-                        completed
-                          ? 'border border-slate-300 bg-white text-slate-700 group-hover:bg-slate-100'
-                          : 'btn-gold-action text-white shadow-md'
-                      )}
-                    >
-                      {completed ? <CheckCircle2 size={15} className="text-emerald-600" /> : attending ? <ScanLine size={15} /> : <QrCode size={15} />}
-                      <span>{actionText}</span>
-                      <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          {events.length === 0 && !store.applications?.length && (
-            <Empty message="ยังไม่มีกิจกรรมที่เปิดและลงทะเบียนไว้" />
-          )}
-        </div>
-      </section>
-
-      {user.role === 'STUDENT' && <OpenEvents token={session} refresh={refresh} />}
-      <UserProfileSummary user={user} />
-    </div>
-  );
+  const registered = events.flatMap(event => {
+    const registration = regs.find(reg => reg.event_id === event.id);
+    return registration ? [{ event, registration }] : [];
+  });
+  const priority = { ATTENDING: 0, REGISTERED: 1, COMPLETED: 2 };
+  const active = registered.filter(row => row.registration.status !== 'COMPLETED').sort((a, b) => priority[a.registration.status] - priority[b.registration.status]);
+  const completed = registered.filter(row => row.registration.status === 'COMPLETED').sort((a, b) => (Date.parse(b.registration.checkout_at || '') || 0) - (Date.parse(a.registration.checkout_at || '') || 0));
+  function eventCard({ event, registration }: typeof registered[number]) {
+    const attending = registration.status === 'ATTENDING';
+    const done = registration.status === 'COMPLETED';
+    const canScan = event.status === 'ACTIVE' && !done;
+    const action = done ? 'ดูผลการเข้าร่วม' : !canScan ? 'ดูรายละเอียดกิจกรรม' : attending ? 'เปิด QR สแกนออก' : 'เปิด QR สแกนเข้า';
+    return <article key={event.id} className={cx('student-event-card', attending && 'student-event-card-current')}>
+      <div className="flex flex-wrap items-center gap-2"><StatusPill status={registration.status} />{event.status === 'ACTIVE' && !done && <span className="text-sm font-medium text-emerald-700">เปิดรอบสแกน</span>}</div>
+      <h3 className="mt-3 text-lg font-bold text-slate-900">{event.title}</h3>
+      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600"><span className="inline-flex items-center gap-2"><MapPin size={16} />{event.location}</span><span className="inline-flex items-center gap-2"><Clock3 size={16} />{event.activity_hours} ชั่วโมงกิจกรรม</span></div>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/80 pt-4">
+        <p className="text-sm text-slate-600">{done ? 'บันทึกผลการเข้าร่วมแล้ว' : attending ? 'ก่อนกลับ อย่าลืมให้เจ้าหน้าที่สแกนออก' : canScan ? 'แสดง QR ให้เจ้าหน้าที่เมื่อถึงหน้างาน' : 'รอเปิดรอบสแกนจากผู้จัดกิจกรรม'}</p>
+        <button type="button" className={cx(done || !canScan ? 'action-secondary' : 'action-primary', 'w-full sm:w-auto')} onClick={() => select(event.id)} aria-label={action + ' · ' + event.title}>{done ? <CheckCircle2 size={20} /> : <QrCode size={20} />}{action}</button>
+      </div>
+    </article>;
+  }
+  return <div className="student-home space-y-5">
+    <header className="flex flex-wrap items-end justify-between gap-3 px-1">
+      <div><p className="text-sm font-medium text-[#7c0a02]">ARU EVENT PASS</p><h1 className="mt-1 text-2xl font-extrabold text-slate-900 sm:text-3xl">กิจกรรมของฉัน</h1><p className="mt-2 text-base text-slate-600">พร้อมเข้างาน เปิด QR แล้วให้เจ้าหน้าที่สแกนได้เลย</p></div>
+      <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600">{formatThaiDate()}</span>
+    </header>
+    <section className="student-identity flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4 text-white sm:px-5" aria-label="บัตรนักศึกษาดิจิทัล">
+      <div className="flex min-w-0 items-center gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/10 text-amber-200"><GraduationCap size={24} /></div><div className="min-w-0"><p className="font-bold">{user.full_name}</p><p className="mt-1 text-sm text-rose-100">{user.student_id} · ชั้นปีที่ {user.study_year}</p></div></div>
+      <span className="rounded-xl border border-white/20 px-3 py-2 text-sm text-amber-100">สำเร็จแล้ว <b>{completed.length}</b> กิจกรรม</span>
+    </section>
+    <section className="bento p-4 sm:p-6" aria-label="กิจกรรมที่ต้องทำต่อ">
+      <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-lg font-bold">กิจกรรมที่ต้องทำต่อ</h2><span className="rounded-full bg-rose-50 px-3 py-1 text-sm font-bold text-[#7c0a02]">{active.length} กิจกรรม</span></div>
+      <div className="space-y-4">{active.map(eventCard)}
+        {store.applications?.map(a => <article key={a.id} className="rounded-2xl border border-amber-200 bg-amber-50 p-4"><h3 className="font-bold">{a.title}</h3><p className="mt-2 text-sm text-amber-900">{a.status === 'CORRECT' ? (a.online ? 'แอดมินขอให้แก้ไขใบสมัคร' : 'กรุณาแก้ไขที่จุดลงทะเบียนหน้างาน') + ' · ' + a.note : 'รอยืนยันเข้าร่วมกิจกรรม'}</p>{a.status === 'CORRECT' && a.online && <a className="action-primary mt-3" href={'/register/' + a.event_id + '?correct=' + a.id}>เปิดใบสมัครเพื่อแก้ไข</a>}</article>)}
+        {!active.length && !store.applications?.length && <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-7 text-center"><Calendar size={28} className="mx-auto text-[#7c0a02]" /><p className="mt-3 font-semibold">ยังไม่มีกิจกรรมที่ต้องทำต่อ</p><p className="mt-1 text-sm text-slate-600">เลือกสมัครกิจกรรมที่เปิดรับด้านล่างได้เลย</p></div>}
+      </div>
+    </section>
+    {user.role === 'STUDENT' && <OpenEvents token={session} refresh={refresh} select={select} events={store.events} />}
+    {completed.length > 0 && <details className="bento p-4 sm:p-6"><summary className="min-h-11 cursor-pointer py-2 text-base font-bold text-slate-700">ประวัติการเข้าร่วมสำเร็จ · {completed.length} กิจกรรม</summary><div className="mt-4 space-y-3">{completed.map(eventCard)}</div></details>}
+    <details className="bento p-4 sm:p-6"><summary className="min-h-11 cursor-pointer py-2 font-semibold text-slate-700">ข้อมูลบัญชีนักศึกษา</summary><div className="mt-3"><UserProfileSummary user={user} /></div></details>
+  </div>;
 }
 
 function StudentStatsView({ user, events, regs }: { user: User; events: Event[]; regs: Registration[] }) {
@@ -1218,7 +1146,7 @@ function StudentStatsView({ user, events, regs }: { user: User; events: Event[];
   return (
     <div className="space-y-5">
       <header className="px-2">
-        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.15em] text-slate-400">
+        <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-[.15em] text-slate-500">
           <span>{formatThaiDate()}</span>
           <span className="h-1 w-1 rounded-full bg-[#d4af37]" />
           <span>Student Portal</span>
@@ -1230,28 +1158,28 @@ function StudentStatsView({ user, events, regs }: { user: User; events: Event[];
         <div className="student-pass-card relative overflow-hidden rounded-[28px] p-5 text-white">
           <div className="student-pass-sheen" />
           <div className="pointer-events-none absolute -right-4 -top-8 h-32 w-32 rounded-full bg-amber-500/15 blur-2xl" />
-          <span className="relative text-[10px] font-semibold text-rose-200/80">กิจกรรมที่ลงทะเบียน</span>
+          <span className="relative text-sm font-semibold text-rose-200/80">กิจกรรมที่ลงทะเบียน</span>
           <div className="relative mt-2 flex items-end justify-between">
             <strong className="text-4xl font-black">{events.length.toString().padStart(2, '0')}</strong>
             <Activity size={20} className="text-amber-300" />
           </div>
-          <span className="relative mt-1 block text-[10px] text-rose-200/70">กิจกรรมที่คุณมีสิทธิ์</span>
+          <span className="relative mt-1 block text-sm text-rose-200/70">กิจกรรมที่คุณมีสิทธิ์</span>
         </div>
         <div className="bento p-5">
-          <span className="text-[10px] font-semibold text-slate-500">เข้าร่วมสำเร็จ</span>
+          <span className="text-sm font-semibold text-slate-500">เข้าร่วมสำเร็จ</span>
           <div className="mt-2 flex items-end justify-between">
             <strong className="text-4xl text-slate-900 font-black">{completed.toString().padStart(2, '0')}</strong>
             <CheckCircle2 size={20} className="text-emerald-600" />
           </div>
-          <span className="mt-1 block text-[10px] text-slate-400">รับชั่วโมงกิจกรรมครบแล้ว</span>
+          <span className="mt-1 block text-sm text-slate-500">รับชั่วโมงกิจกรรมครบแล้ว</span>
         </div>
         <div className="bento p-5">
-          <span className="text-[10px] font-semibold text-slate-500">ระดับชั้นปี</span>
+          <span className="text-sm font-semibold text-slate-500">ระดับชั้นปี</span>
           <div className="mt-2 flex items-end justify-between">
             <strong className="text-4xl text-slate-900 font-black">{user.study_year > 0 ? `ปี ${user.study_year}` : '—'}</strong>
             <GraduationCap size={20} className="text-amber-600" />
           </div>
-          <span className="mt-1 block text-[10px] text-slate-400">ชั้นปีปัจจุบันตามข้อมูลนักศึกษา</span>
+          <span className="mt-1 block text-sm text-slate-500">ชั้นปีปัจจุบันตามข้อมูลนักศึกษา</span>
         </div>
       </div>
     </div>
@@ -1274,7 +1202,7 @@ function AttendanceConfirmation({ status, eventTitle }: { status?: Status; event
           {completed ? 'เช็กเอาต์เรียบร้อยแล้ว' : 'เช็กอินแล้ว · รอเช็กเอาต์'}{eventTitle ? ` · ${eventTitle}` : ''}
         </p>
       </div>
-      <span className={cx('hidden rounded-full px-3 py-1.5 text-[10px] font-extrabold sm:inline-flex items-center gap-1.5', completed ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200')}>
+      <span className={cx('hidden rounded-full px-3 py-1.5 text-sm font-extrabold sm:inline-flex items-center gap-1.5', completed ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200')}>
         {completed ? (
           <>
             <CheckCircle2 size={12} strokeWidth={2.5} />
@@ -1296,7 +1224,7 @@ function StatusPill({ status }: { status: Status }) {
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-bold',
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-bold',
         status === 'REGISTERED'
           ? 'bg-slate-100 text-slate-600 border border-slate-200'
           : status === 'ATTENDING'
@@ -1318,7 +1246,7 @@ function StatusPill({ status }: { status: Status }) {
 
 function Empty({ message }: { message: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-200 py-10 text-center text-xs text-slate-400">
+    <div className="rounded-2xl border border-dashed border-slate-200 py-10 text-center text-xs text-slate-500">
       <Calendar size={28} className="mx-auto mb-2 text-slate-300" />
       <span>{message}</span>
     </div>
@@ -1341,53 +1269,15 @@ function EventDetail({ event, user, registration, back, session }: { session: st
         <span>กลับหน้ากิจกรรม</span>
       </button>
 
-      <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-        {/* Left: Event Hero Card */}
-        <section
-          className="relative min-h-[280px] overflow-hidden rounded-[30px] p-7 sm:p-9 text-white shadow-xl flex flex-col justify-between"
-          style={{
-            background: event.banner_url
-              ? `linear-gradient(135deg, rgba(43,8,8,0.95) 0%, rgba(88,13,13,0.88) 55%, rgba(43,8,8,0.75) 100%), url("${event.banner_url}") center/cover`
-              : 'linear-gradient(135deg, #2b0808 0%, #580d0d 50%, #360707 100%)',
-          }}
-        >
-          <div className="relative z-10 flex items-center justify-between gap-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/30 bg-amber-400/20 px-3 py-1 text-[10px] font-extrabold text-amber-200">
-              <Award size={13} />
-              <span>กิจกรรมมหาวิทยาลัย ARU</span>
-            </span>
-            <EventStatusPill status={event.status} />
-          </div>
-
-          <div className="relative z-10 my-6">
-            <h1 className="text-2xl sm:text-3xl font-extrabold leading-snug tracking-tight">
-              {event.title}
-            </h1>
-            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-rose-100">
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin size={14} className="text-amber-300" />
-                <span>{event.location}</span>
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <Clock3 size={14} className="text-amber-300" />
-                <span>{event.activity_hours} ชั่วโมงกิจกรรม</span>
-              </span>
-            </div>
-          </div>
-
-          <div className="relative z-10 border-t border-white/10 pt-4 flex items-center justify-between text-xs text-rose-200/80">
-            <span>ผู้เข้าร่วม: {user.full_name} ({user.student_id})</span>
-            {user.study_year > 0 && <span>ปี {user.study_year}</span>}
-          </div>
-        </section>
-
+      <div className="grid items-start gap-5 lg:grid-cols-[1.05fr_0.95fr]">
         {/* Right: Ticket & QR / Passcode Card */}
-        <section className="bento p-6 sm:p-7 shadow-xl">
-          <AttendanceConfirmation status={registration?.status} eventTitle={event.title} />
+        <section className="bento event-ticket p-4 sm:p-6">
+          <QrPresentation title={event.title}>
+          <p className="mt-2 text-sm text-slate-600">{user.full_name} · {user.student_id}</p>
 
           <div className="flex items-center justify-between border-b border-slate-100 pb-4 mt-2">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">สถานะการเข้าร่วม</span>
+              <span className="text-sm font-bold uppercase tracking-wider text-slate-500">สถานะการเข้าร่วม</span>
               <div className="mt-1.5">
                 <StatusPill status={registration?.status || 'REGISTERED'} />
               </div>
@@ -1426,7 +1316,8 @@ function EventDetail({ event, user, registration, back, session }: { session: st
                 <div className="qr-laser-beam" />
                 <QRCodeCanvas
                   value={JSON.stringify({ e: event.id, u: user.id })}
-                  size={220}
+                  size={480}
+                  style={{ width: 220, height: 220 }}
                   marginSize={3}
                   level="M"
                   fgColor="#000000"
@@ -1435,8 +1326,8 @@ function EventDetail({ event, user, registration, back, session }: { session: st
                   aria-label="QR สำหรับสแกนเข้าและออกจากกิจกรรม"
                 />
               </div>
-              <p className="mt-3 text-center text-[11px] leading-5 text-slate-500">
-                แสดง QR Code นี้ให้เจ้าหน้าที่สแกนเมื่อเข้างาน<br />ระบบจะแจ้งสถานะใหม่ให้อัตโนมัติ
+              <p className="mt-3 text-center text-sm leading-5 text-slate-500">
+                {registration?.status === 'ATTENDING' ? 'แสดง QR Code นี้ให้เจ้าหน้าที่สแกนออกจากงาน' : 'แสดง QR Code นี้ให้เจ้าหน้าที่สแกนเมื่อเข้างาน'}<br />ระบบจะแจ้งสถานะใหม่ให้อัตโนมัติ
               </p>
             </div>
           )}
@@ -1456,7 +1347,7 @@ function EventDetail({ event, user, registration, back, session }: { session: st
             <div className="mt-5 rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50/60 p-5 text-center shadow-sm">
               <div className="flex items-center justify-center gap-1.5 text-amber-800">
                 <Sparkles size={14} className="text-amber-600" />
-                <span className="text-[10px] font-extrabold uppercase tracking-widest">
+                <span className="text-sm font-extrabold uppercase tracking-widest">
                   PASSCODE ปลดล็อกแล้ว
                 </span>
               </div>
@@ -1477,7 +1368,7 @@ function EventDetail({ event, user, registration, back, session }: { session: st
                   {done ? <Check size={18} className="text-emerald-600" /> : <Clipboard size={18} />}
                 </button>
               </div>
-              <span className="mt-2 block text-[10px] font-semibold text-amber-800">
+              <span className="mt-2 block text-sm font-semibold text-amber-800">
                 {done ? 'คัดลอกรหัสเรียบร้อยแล้ว' : 'คัดลอกรหัสเพื่อนำไปยืนยันสิทธิ์'}
               </span>
             </div>
@@ -1492,6 +1383,45 @@ function EventDetail({ event, user, registration, back, session }: { session: st
               <ExternalLink size={14} />
             </a>
           )}
+          </QrPresentation>
+        </section>
+        {/* Left: Event Hero Card */}
+        <section
+          className="event-detail-hero relative min-h-[280px] overflow-hidden rounded-[30px] p-7 sm:p-9 text-white shadow-xl flex flex-col justify-between"
+          style={{
+            background: event.banner_url
+              ? `linear-gradient(135deg, rgba(43,8,8,0.95) 0%, rgba(88,13,13,0.88) 55%, rgba(43,8,8,0.75) 100%), url("${event.banner_url}") center/cover`
+              : 'linear-gradient(135deg, #2b0808 0%, #580d0d 50%, #360707 100%)',
+          }}
+        >
+          <div className="relative z-10 flex items-center justify-between gap-3">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/30 bg-amber-400/20 px-3 py-1 text-sm font-extrabold text-amber-200">
+              <Award size={13} />
+              <span>กิจกรรมมหาวิทยาลัย ARU</span>
+            </span>
+            <EventStatusPill status={event.status} />
+          </div>
+
+          <div className="relative z-10 my-6">
+            <h1 className="text-2xl sm:text-3xl font-extrabold leading-snug tracking-tight">
+              {event.title}
+            </h1>
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-rose-100">
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin size={14} className="text-amber-300" />
+                <span>{event.location}</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Clock3 size={14} className="text-amber-300" />
+                <span>{event.activity_hours} ชั่วโมงกิจกรรม</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="relative z-10 border-t border-white/10 pt-4 flex items-center justify-between text-xs text-rose-200/80">
+            <span>ผู้เข้าร่วม: {user.full_name} ({user.student_id})</span>
+            {user.study_year > 0 && <span>ปี {user.study_year}</span>}
+          </div>
         </section>
       </div>
     </div>
@@ -1519,9 +1449,9 @@ function ScanResultEffect({ message, flash }: { message: { ok: boolean; title: s
           {success ? <Check size={30} strokeWidth={3} /> : <X size={28} strokeWidth={3} />}
         </span>
       </div>
-      <span className={cx('inline-flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-[.2em]', flash === 'checkout' ? 'text-amber-300' : success ? 'text-emerald-300' : 'text-rose-300')}><CheckCircle2 size={12} />{flash === 'checkout' ? 'CHECK-OUT' : success ? 'CHECK-IN COMPLETE' : 'SCAN ERROR'}</span>
+      <span className={cx('inline-flex items-center gap-1 text-sm font-extrabold uppercase tracking-[.2em]', flash === 'checkout' ? 'text-amber-300' : success ? 'text-emerald-300' : 'text-rose-300')}><CheckCircle2 size={12} />{flash === 'checkout' ? 'CHECK-OUT' : success ? 'CHECK-IN COMPLETE' : 'SCAN ERROR'}</span>
       <b className="mt-1 block truncate text-base font-extrabold text-white">{message.title}</b>
-      <span className="mt-1 block truncate text-[10px] text-slate-300">{message.detail}</span>
+      <span className="mt-1 block truncate text-sm text-slate-300">{message.detail}</span>
     </div>
 
   </div>;
@@ -1538,15 +1468,15 @@ function ScannerView({ user, event, events, activeEvent, setActiveEvent, scanner
       <div className="flex flex-wrap items-center gap-2">
         <EventStatusPill status={event.status} />
         <div className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-left shadow-sm">
-          <b className="block truncate text-[10px] font-bold text-slate-800">{user.full_name}</b>
-          <small className="block truncate text-[9px] text-slate-400">{user.student_id} · {user.faculty}</small>
+          <b className="block truncate text-sm font-bold text-slate-800">{user.full_name}</b>
+          <small className="block truncate text-sm text-slate-500">{user.student_id} · {user.faculty}</small>
         </div>
         <button
           type="button"
           onClick={toggleScannerLock}
           aria-pressed={scannerLocked}
           className={cx(
-            'flex items-center gap-2 rounded-full border px-4 py-2 text-[11px] font-extrabold transition shadow-sm',
+            'flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-extrabold transition shadow-sm',
             scannerLocked
               ? 'border-amber-400 bg-amber-300 text-slate-950 ring-2 ring-amber-400/30'
               : 'border-slate-300 bg-white text-slate-700 hover:border-amber-400 hover:bg-amber-50 hover:text-amber-900'
@@ -1564,7 +1494,7 @@ function ScannerView({ user, event, events, activeEvent, setActiveEvent, scanner
         {/* Selector + Mode Toggle with distinct colors */}
         <div className="scanner-controls mb-4 grid min-w-0 gap-4 border-b border-slate-100 pb-4 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
           <div className="min-w-0 w-full sm:w-auto max-w-full">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">เลือกกิจกรรมที่สแกน</span>
+            <span className="text-sm font-bold uppercase tracking-wider text-slate-500">เลือกกิจกรรมที่สแกน</span>
             <div className="mt-1 flex items-center gap-2">
               <select
                 aria-label="กิจกรรมที่สแกน"
@@ -1623,7 +1553,7 @@ function ScannerView({ user, event, events, activeEvent, setActiveEvent, scanner
         {/* Camera Viewport */}
         <div className="relative flex min-h-[240px] sm:min-h-[320px] items-center justify-center overflow-hidden rounded-[24px] bg-slate-950">
           <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(#94a3b8 1px,transparent 1px)', backgroundSize: '20px 20px' }} />
-          <div className="absolute left-5 top-5 z-10 flex items-center gap-2 rounded-full bg-slate-900/80 px-3 py-2 text-[9px] font-semibold text-white">
+          <div className="absolute left-5 top-5 z-10 flex items-center gap-2 rounded-full bg-slate-900/80 px-3 py-2 text-sm font-semibold text-white">
             <span className={cx('h-2 w-2 rounded-full', scannerOn ? 'animate-pulse bg-emerald-400' : 'bg-slate-500')} />
             {scannerOn ? 'กล้องเปิดอยู่' : 'กล้องปิดอยู่'}
           </div>
@@ -1633,7 +1563,7 @@ function ScannerView({ user, event, events, activeEvent, setActiveEvent, scanner
               <ScanLine size={32} />
             </div>
             <b className="text-sm text-white">พร้อมสแกน QR Code</b>
-            <span className="mt-1 max-w-xs text-[10px] leading-5 text-slate-400">แตะ “เปิดกล้องสแกน QR” แล้วให้นักศึกษาแสดง QR</span>
+            <span className="mt-1 max-w-xs text-sm leading-5 text-slate-500">แตะ “เปิดกล้องสแกน QR” แล้วให้นักศึกษาแสดง QR</span>
             <div className="pointer-events-none absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-[28px] border-2 border-amber-300/70" />
           </div>}
           {scannerOn && <div className="pointer-events-none absolute left-1/2 top-1/2 z-[2] h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-[28px] border-2 border-amber-300/80" />}
@@ -1648,8 +1578,8 @@ function ScannerView({ user, event, events, activeEvent, setActiveEvent, scanner
 
         <details className="mt-3"><summary className="cursor-pointer py-2 text-sm text-slate-600">ทดสอบด้วยข้อมูล QR</summary>
           <form className="mt-3 flex gap-2" onSubmit={e => { e.preventDefault(); void scanPayload(scanInput); setScanInput('') }}>
-            <input value={scanInput} onChange={e => setScanInput(e.target.value)} placeholder={isSupabaseConfigured ? 'วางข้อมูล QR จากบัตรกิจกรรม' : 'ทดสอบ QR Code · {"e":"event_id","u":"user_id"}'} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[10px]" />
-            <button className="rounded-xl bg-slate-900 px-4 text-[10px] font-bold text-white">ทดสอบ</button>
+            <input value={scanInput} onChange={e => setScanInput(e.target.value)} placeholder={isSupabaseConfigured ? 'วางข้อมูล QR จากบัตรกิจกรรม' : 'ทดสอบ QR Code · {"e":"event_id","u":"user_id"}'} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" />
+            <button className="rounded-xl bg-slate-900 px-4 text-sm font-bold text-white">ทดสอบ</button>
           </form>
         </details>
       </section>
@@ -1670,7 +1600,7 @@ function ScannerView({ user, event, events, activeEvent, setActiveEvent, scanner
               <div className="absolute left-1/2 top-2 h-36 w-36 -translate-x-1/2 rounded-full border-[14px] border-[#7c0a02]" style={{ clipPath: 'inset(0 0 50% 0)', transform: 'translateX(-50%) rotate(' + (pct * 1.8 - 90) + 'deg)' }} />
               <div className="absolute inset-x-0 bottom-0 text-center">
                 <b className="text-3xl text-slate-900">{pct}<small className="text-sm">%</small></b>
-                <span className="block text-[8px] text-slate-400">เช็กอินแล้ว</span>
+                <span className="block text-sm text-slate-500">เช็กอินแล้ว</span>
               </div>
             </div>
             <div className="w-full min-w-0 flex-1 space-y-3">
@@ -1702,7 +1632,7 @@ function ScannerView({ user, event, events, activeEvent, setActiveEvent, scanner
     </div>}
   </div>;
 }
-function StatLine({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color: string }) { return <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-1.5 text-[9px] text-slate-500"><span className={color}>{icon}</span>{label}</span><b className="text-xs text-slate-800">{value}</b></div> }
+function StatLine({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color: string }) { return <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-1.5 text-sm text-slate-500"><span className={color}>{icon}</span>{label}</span><b className="text-xs text-slate-800">{value}</b></div> }
 
 function UserProfileSummary({ user }: { user: User }) {
   return <section className="bento relative overflow-hidden p-5 shadow-sm" aria-label="ข้อมูลบัญชีผู้ใช้">
@@ -1723,7 +1653,7 @@ function UserProfileSummary({ user }: { user: User }) {
             <b className="text-sm font-extrabold text-slate-900">{user.full_name}</b>
             <RoleBadge role={user.role} size="sm" />
           </div>
-          <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+          <div className="mt-1 flex items-center gap-2 text-sm text-slate-500">
             <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono font-bold text-slate-700">
               {user.student_id}
             </span>
@@ -1739,25 +1669,25 @@ function UserProfileSummary({ user }: { user: User }) {
       {/* Meta Chips with category icons */}
       <div className="flex flex-wrap items-center gap-2 text-xs">
         {user.faculty && (
-          <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-[11px] font-semibold text-slate-700">
+          <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-sm font-semibold text-slate-700">
             <Building2 size={13} className="text-[#7c0a02]" />
-            <span className="text-slate-400">คณะ:</span> {user.faculty}
+            <span className="text-slate-500">คณะ:</span> {user.faculty}
           </span>
         )}
         {user.major && (
-          <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-[11px] font-semibold text-slate-700">
+          <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-sm font-semibold text-slate-700">
             <BookOpen size={13} className="text-amber-600" />
-            <span className="text-slate-400">สาขา:</span> {user.major}
+            <span className="text-slate-500">สาขา:</span> {user.major}
           </span>
         )}
         {user.class_group && (
-          <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-[11px] font-semibold text-slate-700">
+          <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-sm font-semibold text-slate-700">
             <Layers size={13} className="text-sky-600" />
-            <span className="text-slate-400">หมู่เรียน:</span> {user.class_group}
+            <span className="text-slate-500">หมู่เรียน:</span> {user.class_group}
           </span>
         )}
         {user.phone && (
-          <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-[11px] font-semibold text-slate-700">
+          <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-sm font-semibold text-slate-700">
             <Phone size={13} className="text-emerald-600" />
             {user.phone}
           </span>
@@ -2013,10 +1943,10 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
       <section className="bento p-5 sm:p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
-            <h2 className="text-base font-extrabold text-slate-900">แดชบอร์ดกิจกรรมแบบเรียลไทม์</h2>
-            <p className="mt-0.5 text-[10px] text-slate-500">จำนวนผู้เข้าร่วมและผู้ใช้งานออนไลน์ แยกตามกิจกรรม · อัปเดตผ่าน Supabase Realtime</p>
+            <h2 className="text-lg font-extrabold text-slate-900">แดชบอร์ดกิจกรรมแบบเรียลไทม์</h2>
+            <p className="mt-0.5 text-sm text-slate-500">จำนวนผู้เข้าร่วมและผู้ใช้งานออนไลน์ แยกตามกิจกรรม · อัปเดตผ่าน Supabase Realtime</p>
           </div>
-          <span className={cx('flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[9px] font-extrabold shadow-sm', dashboardLive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-800 border border-amber-200')}>
+          <span className={cx('flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-extrabold shadow-sm', dashboardLive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-800 border border-amber-200')}>
             <i className={cx('h-1.5 w-1.5 rounded-full', dashboardLive ? 'animate-pulse bg-emerald-500' : 'bg-amber-500')} />
             {dashboardLive ? 'LIVE REALTIME' : 'RECONNECTING'}
           </span>
@@ -2028,7 +1958,7 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
                 <b className="block truncate text-xs font-extrabold text-slate-900">{row.title}</b>
                 <div className="mt-1 flex items-center gap-1.5">
                   <EventStatusPill status={row.status} />
-                  <span className="text-[9px] text-slate-400 font-semibold">{row.registered_count} รายชื่อ</span>
+                  <span className="text-sm text-slate-500 font-semibold">{row.registered_count} รายชื่อ</span>
                 </div>
               </div>
               <Activity size={16} className="shrink-0 text-[#7c0a02]" />
@@ -2040,7 +1970,7 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
               <DashboardCount icon={<ScanLine size={14} />} label="สตาฟออนไลน์" value={row.online_staff} tone="text-rose-800 bg-rose-50" />
             </div>
           </article>)}
-          {dashboardRows.length === 0 && <p className="col-span-full rounded-xl bg-slate-50 p-6 text-center text-xs text-slate-400">กำลังโหลดข้อมูลกิจกรรม…</p>}
+          {dashboardRows.length === 0 && <p className="col-span-full rounded-xl bg-slate-50 p-6 text-center text-xs text-slate-500">กำลังโหลดข้อมูลกิจกรรม…</p>}
         </div>
       </section>
     )}
@@ -2051,8 +1981,8 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
         <section className="bento p-5 sm:p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
-              <h2 className="text-base font-extrabold text-slate-900">การจัดการกิจกรรม</h2>
-              <p className="mt-0.5 text-[10px] text-slate-500">เลือกและตั้งค่าการลงทะเบียนของแต่ละกิจกรรม</p>
+              <h2 className="text-lg font-extrabold text-slate-900">การจัดการกิจกรรม</h2>
+              <p className="mt-0.5 text-sm text-slate-500">เลือกและตั้งค่าการลงทะเบียนของแต่ละกิจกรรม</p>
             </div>
 
           </div>
@@ -2061,7 +1991,7 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
               <div>
                 <EventStatusPill status={selectedEvent.status} />
                 <h3 className="mt-2 text-sm font-extrabold text-slate-900">{selectedEvent.title}</h3>
-                <p className="mt-1 text-[10px] text-slate-500">{selectedEvent.location} · {selectedEvent.activity_hours} ชั่วโมง</p>
+                <p className="mt-1 text-sm text-slate-500">{selectedEvent.location} · {selectedEvent.activity_hours} ชั่วโมง</p>
               </div>
               <span className="rounded-xl bg-rose-50 p-2 text-[#7c0a02]"><BookOpen size={18} /></span>
             </div>
@@ -2079,14 +2009,14 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
             </form>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="text-[10px] font-semibold text-slate-500">URL Redirect · รุ่นปี 1</label>
+                <label className="text-sm font-semibold text-slate-500">URL Redirect · รุ่นปี 1</label>
                 <div className="mt-1 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
-                  <input type="url" value={redirectDraft} onChange={e => setRedirectDraft(e.target.value)} placeholder="https://..." className="h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 text-[10px]" />
+                  <input type="url" value={redirectDraft} onChange={e => setRedirectDraft(e.target.value)} placeholder="https://..." className="h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm" />
                   <button type="button" onClick={() => void updateEvent({ redirect_url_year1: redirectDraft })} className="action-primary"><Save size={16} />บันทึกลิงก์</button>
                 </div>
               </div>
-              <label className="text-[10px] font-semibold text-slate-500">สถานะกิจกรรม
-                <select value={selectedEvent.status} onChange={e => updateEvent({ status: e.target.value as Event['status'] })} className="mt-1 block h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-[10px]">
+              <label className="text-sm font-semibold text-slate-500">สถานะกิจกรรม
+                <select value={selectedEvent.status} onChange={e => updateEvent({ status: e.target.value as Event['status'] })} className="mt-1 block h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm">
                   <option value="ACTIVE">เปิดใช้งาน (Active)</option>
                   <option value="UPCOMING">กำลังจะมาถึง (Upcoming)</option>
                   <option value="CLOSED">ปิดกิจกรรม (Closed)</option>
@@ -2094,8 +2024,8 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
               </label>
             </div>
             <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
-              <label className="text-[10px] font-semibold text-slate-500">ภาพแบนเนอร์กิจกรรม
-                <input type="url" value={bannerDraft} onChange={e => setBannerDraft(e.target.value)} placeholder="วาง URL รูปภาพโดยตรง เช่น https://..." className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-[10px]" />
+              <label className="text-sm font-semibold text-slate-500">ภาพแบนเนอร์กิจกรรม
+                <input type="url" value={bannerDraft} onChange={e => setBannerDraft(e.target.value)} placeholder="วาง URL รูปภาพโดยตรง เช่น https://..." className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm" />
               </label>
               <button type="button" onClick={() => void updateEvent({ banner_url: bannerDraft })} className="action-primary self-end"><Save size={16} />บันทึกแบนเนอร์</button>
             </div>
@@ -2108,7 +2038,7 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
                 <Ticket size={13} />
                 เติม Passcode สำรอง
               </button>
-              <span className="rounded-lg bg-slate-100 px-3 py-2 text-[9px] text-slate-600 font-medium">เหลือ <b className="text-slate-900 font-bold">{remaining}</b> / {reserves.length} รหัสสำรอง</span>
+              <span className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-600 font-medium">เหลือ <b className="text-slate-900 font-bold">{remaining}</b> / {reserves.length} รหัสสำรอง</span>
             </div>
           </div>
 
@@ -2117,12 +2047,12 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xs font-extrabold text-slate-900">นำเข้ารายชื่อนักศึกษาผ่าน CSV</h3>
-                <p className="mt-0.5 text-[9px] text-slate-500">student_id, full_name, faculty, major, class_group, study_year, birth_date, phone</p>
-                <p className="mt-0.5 text-[9px] text-slate-400">รองรับหัวตารางภาษาไทยหรืออังกฤษ · ชั้นปีปัจจุบัน 1–8</p>
+                <p className="mt-0.5 text-sm text-slate-500">student_id, full_name, faculty, major, class_group, study_year, birth_date, phone</p>
+                <p className="mt-0.5 text-sm text-slate-500">รองรับหัวตารางภาษาไทยหรืออังกฤษ · ชั้นปีปัจจุบัน 1–8</p>
               </div>
-              <FileUp size={17} className="text-slate-400" />
+              <FileUp size={17} className="text-slate-500" />
             </div>
-            <label className="mt-3 flex cursor-pointer focus-within:outline focus-within:outline-2 focus-within:outline-sky-700 items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-[10px] text-slate-500 hover:border-amber-400 hover:bg-amber-50/50 transition">
+            <label className="mt-3 flex cursor-pointer focus-within:outline focus-within:outline-2 focus-within:outline-sky-700 items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500 hover:border-amber-400 hover:bg-amber-50/50 transition">
               <Download size={15} />
               {csvFile ? csvFile.name : 'เลือกไฟล์ CSV'}
               <input type="file" accept=".csv,text/csv" className="sr-only" onChange={e => setCsvFile(e.target.files?.[0] || null)} />
@@ -2135,7 +2065,7 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
                 <b className="block text-xs font-bold text-amber-950">
                   มีบัญชีนักศึกษาในระบบที่ยังไม่ได้ผูกกับกิจกรรมนี้ {unenrolledRosterCount.toLocaleString()} คน
                 </b>
-                <p className="mt-1 text-[10px] text-amber-800 leading-relaxed">
+                <p className="mt-1 text-sm text-amber-800 leading-relaxed">
                   ผูกรายชื่อทั้งหมดเข้ากิจกรรมนี้ในสถานะ “รอสแกนเข้างาน” ได้ในคลิกเดียว นักศึกษาจะเห็นบัตร QR พร้อมสแกนเข้างานทันที และระบบจะไม่ตัด Passcode จนกว่าจะสแกนเข้าจริง
                 </p>
                 <button
@@ -2154,13 +2084,13 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
         <div className="space-y-5">
 
           <div className="bento p-5 shadow-sm">
-            <h2 className="text-sm font-extrabold text-slate-900">กิจกรรมทั้งหมดในระบบ</h2>
+            <h2 className="text-lg font-extrabold text-slate-900">กิจกรรมทั้งหมดในระบบ</h2>
             <div className="mt-3 space-y-2">
               {store.events.map((e, i) => <button key={e.id} onClick={() => setSelectedEvent(e.id)} style={e.banner_url ? { backgroundImage: `linear-gradient(90deg,rgba(255,255,255,.96),rgba(255,255,255,.76)),url("${e.banner_url}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined} className={cx('flex w-full items-center gap-3 rounded-xl p-3 text-left transition', e.id === selectedEventId ? 'bg-rose-50 border border-rose-200 shadow-sm' : 'bg-slate-50 hover:bg-slate-100')}>
-                <span className={cx('flex h-8 w-8 items-center justify-center rounded-lg text-[9px] font-bold', i === 0 ? 'bg-[#7c0a02] text-white' : 'bg-white text-slate-600 shadow-sm')}>0{i + 1}</span>
+                <span className={cx('flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold', i === 0 ? 'bg-[#7c0a02] text-white' : 'bg-white text-slate-600 shadow-sm')}>0{i + 1}</span>
                 <span className="min-w-0 flex-1">
-                  <b className="block truncate text-[11px] font-bold text-slate-800">{e.title}</b>
-                  <small className="text-[9px] text-slate-400">{store.regs.filter(r => r.event_id === e.id).length} ลงทะเบียน</small>
+                  <b className="block truncate text-sm font-bold text-slate-800">{e.title}</b>
+                  <small className="text-sm text-slate-500">{store.regs.filter(r => r.event_id === e.id).length} ลงทะเบียน</small>
                 </span>
                 <EventStatusPill status={e.status} />
               </button>)}
@@ -2176,31 +2106,31 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
         <section className="bento overflow-hidden shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3 p-5 border-b border-slate-100">
             <div>
-              <h2 className="text-sm font-extrabold text-slate-900">รายงานผู้เข้าร่วมกิจกรรม</h2>
-              <p className="mt-0.5 text-[9px] text-slate-500">
+              <h2 className="text-lg font-extrabold text-slate-900">รายงานผู้เข้าร่วมกิจกรรม</h2>
+              <p className="mt-0.5 text-sm text-slate-500">
                 {reportStatus === 'NO_CHECKIN' ? 'ลงทะเบียนแล้วแต่ไม่เช็กอิน · ไม่เข้าร่วม' : reportStatus === 'NO_CHECKOUT' ? 'เช็กอินแล้วแต่ยังไม่เช็กเอาต์' : reportStatus === 'ALL' ? 'รายชื่อทั้งหมดและสถานะ' : 'รายชื่อผู้เช็กอินแล้ว'} · {selectedEvent.title}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <select value={reportStatus} onChange={e => setReportStatus(e.target.value as typeof reportStatus)} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-bold shadow-sm">
+              <select aria-label="กรองสถานะการเข้าร่วม" value={reportStatus} onChange={e => setReportStatus(e.target.value as typeof reportStatus)} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold shadow-sm">
                 <option value="ALL">ทุกรายชื่อ ({reportPopulation.length})</option>
                 <option value="ATTENDED">เช็กอินแล้ว ({attendedCount})</option>
                 <option value="NO_CHECKIN">ไม่เช็กอิน / ไม่เข้าร่วม ({noCheckinCount})</option>
                 <option value="NO_CHECKOUT">ยังไม่เช็กเอาต์ ({noCheckoutCount})</option>
               </select>
-              <select value={reportStudyYear} onChange={e => { setReportStudyYear(e.target.value); setReportMajor('ALL'); setReportClassGroup('ALL') }} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px]">
+              <select aria-label="กรองชั้นปี" value={reportStudyYear} onChange={e => { setReportStudyYear(e.target.value); setReportMajor('ALL'); setReportClassGroup('ALL') }} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
                 <option value="ALL">ทุกชั้นปี</option>
                 {reportStudyYears.map(year => <option key={year} value={year}>ปี {year}</option>)}
               </select>
-              <select value={reportFaculty} onChange={e => { setReportFaculty(e.target.value); setReportMajor('ALL'); setReportClassGroup('ALL') }} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px]">
+              <select aria-label="กรองคณะ" value={reportFaculty} onChange={e => { setReportFaculty(e.target.value); setReportMajor('ALL'); setReportClassGroup('ALL') }} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
                 <option value="ALL">ทุกคณะ</option>
                 {reportFaculties.map(f => <option key={f}>{f}</option>)}
               </select>
-              <select value={reportMajor} onChange={e => { setReportMajor(e.target.value); setReportClassGroup('ALL') }} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px]">
+              <select aria-label="กรองสาขา" value={reportMajor} onChange={e => { setReportMajor(e.target.value); setReportClassGroup('ALL') }} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
                 <option value="ALL">ทุกสาขา</option>
                 {reportMajors.map(m => <option key={m}>{m}</option>)}
               </select>
-              <select value={reportClassGroup} onChange={e => setReportClassGroup(e.target.value)} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px]">
+              <select aria-label="กรองหมู่เรียน" value={reportClassGroup} onChange={e => setReportClassGroup(e.target.value)} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
                 <option value="ALL">ทุกหมู่เรียน</option>
                 {reportClassGroups.map(group => <option key={group}>{group}</option>)}
               </select>
@@ -2212,101 +2142,33 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
           </div>
 
           {/* Breakdown by Faculty & Major */}
-          <div className="grid gap-2 px-5 py-4 sm:grid-cols-2 lg:grid-cols-4 bg-slate-50/50">
+          <div className={cx("grid gap-2 px-5 sm:grid-cols-2 lg:grid-cols-4 bg-slate-50/50", groupedCounts.length > 0 && "py-4")}>
             {groupedCounts.map(item => <div key={item.faculty + item.major} className="rounded-xl border border-slate-200/70 bg-white px-3.5 py-2.5 shadow-xs">
-              <span className="block truncate text-[8px] font-semibold text-slate-400">{item.faculty}</span>
-              <b className="block truncate text-[10px] text-slate-800">{item.major}</b>
-              <span className="mt-1 block text-[11px] font-extrabold text-[#7c0a02]">{item.count} คน</span>
+              <span className="block truncate text-sm font-semibold text-slate-500">{item.faculty}</span>
+              <b className="block truncate text-sm text-slate-800">{item.major}</b>
+              <span className="mt-1 block text-sm font-extrabold text-[#7c0a02]">{item.count} คน</span>
             </div>)}
-            {groupedCounts.length === 0 && <p className="col-span-full rounded-xl bg-white p-4 text-center text-xs text-slate-400">ไม่มีรายชื่อตรงกับตัวกรองนี้</p>}
           </div>
 
           {/* Detailed Table */}
-          <div className="max-w-full overflow-x-auto overscroll-x-contain" tabIndex={0} role="region" aria-label="ตารางรายชื่อ เลื่อนแนวนอนเพื่อดูเพิ่มเติม">
-            <table className="w-full min-w-[1500px] text-left">
-              <thead className="bg-slate-50 text-[9px] font-bold uppercase tracking-wider text-slate-400 border-y border-slate-100">
-                <tr>
-                  <th className="px-4 py-3">ผู้เข้าร่วม</th>
-                  <th className="px-4 py-3">ชั้นปี</th>
-                  <th className="px-4 py-3">คณะ</th>
-                  <th className="px-4 py-3">สาขาวิชา</th>
-                  <th className="px-4 py-3">หมู่เรียน</th>
-                  <th className="px-4 py-3">เบอร์โทร</th>
-                  <th className="px-4 py-3">สถานะ</th>
-                  <th className="px-4 py-3">เวลาเช็กอิน</th>
-                  <th className="px-4 py-3">สตาฟเช็กอิน</th>
-                  <th className="px-4 py-3">เวลาเช็กเอาต์</th>
-                  <th className="px-4 py-3">สตาฟเช็กเอาต์</th>
-                  <th className="px-4 py-3">จัดการ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {selectedReportRows.map(({ reg, person }) => {
-                  const checkinStaff = reg.checkin_staff_name || store.users.find(u => u.id === reg.checked_in_by)?.full_name;
-                  const checkoutStaff = reg.checkout_staff_name || store.users.find(u => u.id === reg.checked_out_by)?.full_name;
-                  return <tr key={reg.user_id} className="text-[10px] hover:bg-slate-50/80 transition">
-                    <td className="px-5 py-3"><b className="block text-slate-800 font-bold">{person.full_name}</b><small className="font-mono text-[9px] text-slate-400">{person.student_id}</small></td>
-                    <td className="px-4 py-3 text-slate-600 font-semibold">ปี {person.study_year || '—'}</td>
-                    <td className="px-4 py-3 text-slate-600">{person.faculty}</td>
-                    <td className="px-4 py-3 text-slate-600">{person.major}</td>
-                    <td className="px-4 py-3 text-slate-600">{person.class_group || '—'}</td>
-                    <td className="px-4 py-3 text-slate-600 font-mono">{person.phone || '—'}</td>
-                    <td className="px-4 py-3"><StatusPill status={reg.status} /></td>
-                    <td className="px-4 py-3 text-slate-600 font-mono">{reg.checkin_at ? new Date(reg.checkin_at).toLocaleString('th-TH') : '—'}</td>
-                    <td className="px-4 py-3 text-slate-600">{checkinStaff || '—'}</td>
-                    <td className="px-4 py-3 text-slate-600 font-mono">{reg.checkout_at ? new Date(reg.checkout_at).toLocaleString('th-TH') : '—'}</td>
-                    <td className="px-4 py-3 text-slate-600">{checkoutStaff || '—'}</td>
-                    <td className="px-4 py-3"><div className="flex flex-wrap gap-2"><button className="action-secondary" onClick={() => { setCorrection({ reg, name: person.full_name + " · " + person.student_id }); setNextStatus(reg.status); setCorrectionReason(''); setCorrectionError(''); }}>แก้สถานะ</button><button onClick={() => deleteRegistration(reg.user_id)} title="ลบการลงทะเบียนกิจกรรม" aria-label="ลบการลงทะเบียนกิจกรรม" className="action-danger" ><Trash2 size={14} /></button></div></td>
-                  </tr>;
-                })}
-                {selectedReportRows.length === 0 && <tr><td colSpan={12} className="p-8 text-center text-xs text-slate-400">ไม่มีรายชื่อในหมวดนี้</td></tr>}
-              </tbody>
-            </table>
-          </div>
+          <AttendanceList rows={selectedReportRows} users={store.users} status={reg => <StatusPill status={reg.status} />} actions={(reg, person) => <>
+            <button className="action-secondary" onClick={() => { setCorrection({ reg, name: person.full_name + ' · ' + person.student_id }); setNextStatus(reg.status); setCorrectionReason(''); setCorrectionError(''); }}>แก้สถานะ</button>
+            <button type="button" onClick={() => deleteRegistration(reg.user_id)} aria-label={'ลบการลงทะเบียนของ ' + person.full_name} className="action-danger"><Trash2 size={16} /></button>
+          </>} />
         </section>
 
         <section className="bento overflow-hidden shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3 p-5 border-b border-slate-100">
             <div>
-              <h2 className="text-sm font-extrabold text-slate-900">รายชื่อนักศึกษาที่ลงทะเบียนกิจกรรมนี้</h2>
-              <p className="mt-0.5 text-[9px] text-slate-500">{selectedEvent.title}</p>
+              <h2 className="text-lg font-extrabold text-slate-900">รายชื่อนักศึกษาที่ลงทะเบียนกิจกรรมนี้</h2>
+              <p className="mt-0.5 text-sm text-slate-500">{selectedEvent.title}</p>
             </div>
             <button onClick={() => exportAttendance(true)} disabled={!reportPopulation.length} className="action-primary"><Download size={16} />ส่งออกรายชื่อ CSV ({reportPopulation.length})</button>
           </div>
-          <div className="max-w-full overflow-x-auto overscroll-x-contain" tabIndex={0} role="region" aria-label="ตารางรายชื่อ เลื่อนแนวนอนเพื่อดูเพิ่มเติม">
-            <table className="w-full min-w-[1040px] text-left">
-              <thead className="bg-slate-50 text-[9px] font-bold uppercase tracking-wider text-slate-400 border-y border-slate-100">
-                <tr>
-                  <th className="px-4 py-3">นักศึกษา</th>
-                  <th className="px-4 py-3">ชั้นปี</th>
-                  <th className="px-4 py-3">คณะ</th>
-                  <th className="px-4 py-3">สาขาวิชา</th>
-                  <th className="px-4 py-3">หมู่เรียน</th>
-                  <th className="px-4 py-3">สถานะ</th>
-                  <th className="px-4 py-3">Passcode</th>
-                  <th className="px-4 py-3">จัดการ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {regs.map(reg => {
-                  const p = store.users.find(u => u.id === reg.user_id);
-                  if (!p) return null;
-                  const assignedPasscode = reg.passcode || store.codes.find(code => code.event_id === selectedEventId && code.assigned_to === p.id)?.code;
-                  return <tr key={reg.user_id} className="text-[10px] hover:bg-slate-50/80 transition">
-                    <td className="px-5 py-3"><b className="block text-slate-800 font-bold">{p.full_name}</b><small className="font-mono text-[9px] text-slate-400">{p.student_id}</small></td>
-                    <td className="px-4 py-3 text-slate-600 font-semibold">{p.study_year > 0 ? `ปี ${p.study_year}` : '—'}</td>
-                    <td className="px-4 py-3 text-slate-600">{p.faculty}</td>
-                    <td className="px-4 py-3 text-slate-600">{p.major}</td>
-                    <td className="px-4 py-3 text-slate-600">{p.class_group || '—'}</td>
-                    <td className="px-4 py-3"><StatusPill status={reg.status} /></td>
-                    <td className="px-4 py-3 font-mono text-slate-600 font-bold">{p.study_year > 1 ? (assignedPasscode || 'รอจ่ายรหัส') : 'ไม่ใช้'}</td>
-                    <td className="px-4 py-3"><div className="flex flex-wrap gap-2"><button className="action-secondary" onClick={() => { setCorrection({ reg, name: p.full_name + " · " + p.student_id }); setNextStatus(reg.status); setCorrectionReason(''); setCorrectionError(''); }}>แก้สถานะ</button><button onClick={() => deleteRegistration(reg.user_id)} title="ลบการลงทะเบียนกิจกรรม" aria-label="ลบการลงทะเบียนกิจกรรม" className="action-danger" ><Trash2 size={14} /></button></div></td>
-                  </tr>;
-                })}
-                {regs.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-xs text-slate-400">ยังไม่มีผู้ลงทะเบียน</td></tr>}
-              </tbody>
-            </table>
-          </div>
+          <AttendanceList rows={reportPopulation} users={store.users} status={reg => <StatusPill status={reg.status} />} actions={(reg, person) => <>
+            <button className="action-secondary" onClick={() => { setCorrection({ reg, name: person.full_name + ' · ' + person.student_id }); setNextStatus(reg.status); setCorrectionReason(''); setCorrectionError(''); }}>แก้สถานะ</button>
+            <button type="button" onClick={() => deleteRegistration(reg.user_id)} aria-label={'ลบการลงทะเบียนของ ' + person.full_name} className="action-danger"><Trash2 size={16} /></button>
+          </>} />
         </section>
       </div>
     )}
@@ -2317,14 +2179,14 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
       <section className="bento overflow-hidden shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 p-5 border-b border-slate-100">
           <div>
-            <h2 className="text-sm font-extrabold text-slate-900">จัดการบัญชีผู้ใช้งานในระบบ</h2>
-            <p className="mt-0.5 text-[9px] text-slate-500">แก้ไขข้อมูล รีเซ็ตรหัสผ่าน หรือลบบัญชีนักศึกษาและสตาฟ</p>
+            <h2 className="text-lg font-extrabold text-slate-900">จัดการบัญชีผู้ใช้งานในระบบ</h2>
+            <p className="mt-0.5 text-sm text-slate-500">แก้ไขข้อมูล รีเซ็ตรหัสผ่าน หรือลบบัญชีนักศึกษาและสตาฟ</p>
           </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1.5 text-[9px] font-bold text-slate-700">{managedUsers.length} บัญชี</span>
+          <span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-bold text-slate-700">{managedUsers.length} บัญชี</span>
         </div>
         <div className="p-5 pb-3 bg-slate-50/50">
           <div className="relative">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
             <input
               value={userQuery}
               onChange={e => { setStudentIds([]); setUserQuery(e.target.value); }}
@@ -2354,10 +2216,10 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
                 <b className="truncate text-xs font-bold text-slate-900">{account.full_name}</b>
                 <RoleBadge role={account.role} size="sm" />
               </div>
-              <small className="mt-1 block truncate font-mono text-[10px] font-bold text-slate-600">
+              <small className="mt-1 block truncate font-mono text-sm font-bold text-slate-600">
                 {account.student_id} {account.role === 'STUDENT' ? `· ปี ${account.study_year}` : ''}
               </small>
-              <small className="block truncate text-[9px] text-slate-400">
+              <small className="block truncate text-sm text-slate-500">
                 {account.faculty} · {account.major} · {account.class_group || '—'}{attendingIds.has(account.id) && ' · กำลังเข้าร่วมกิจกรรม'}
               </small>
             </div>
@@ -2370,7 +2232,7 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
               </button>
             </div>
           </article>)}
-          {managedUsers.length === 0 && <p className="col-span-full rounded-xl bg-slate-50 p-6 text-center text-xs text-slate-400">ไม่พบบัญชีที่ตรงกับตัวกรองและคำค้น</p>}
+          {managedUsers.length === 0 && <p className="col-span-full rounded-xl bg-slate-50 p-6 text-center text-xs text-slate-500">ไม่พบบัญชีที่ตรงกับตัวกรองและคำค้น</p>}
           {totalUserPages > 1 && (
             <nav aria-label="หน้ารายชื่อบัญชีผู้ใช้" className="col-span-full flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3">
               <button type="button" className="action-secondary" disabled={userPage === 0} onClick={() => setUserPage(p => p - 1)}>ก่อนหน้า</button>
@@ -2389,10 +2251,10 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
       <section className="bento overflow-hidden shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 p-5 border-b border-slate-100">
           <div>
-            <h2 className="text-sm font-extrabold text-slate-900">จัดการคณะและสาขาวิชา</h2>
-            <p className="mt-0.5 text-[9px] text-slate-500">เพิ่ม แก้ไข หรือลบรายการที่ใช้ในแบบฟอร์มลงทะเบียนและการจัดหมวดหมู่นักศึกษา</p>
+            <h2 className="text-lg font-extrabold text-slate-900">จัดการคณะและสาขาวิชา</h2>
+            <p className="mt-0.5 text-sm text-slate-500">เพิ่ม แก้ไข หรือลบรายการที่ใช้ในแบบฟอร์มลงทะเบียนและการจัดหมวดหมู่นักศึกษา</p>
           </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1.5 text-[9px] font-bold text-slate-700">{academicCatalog.length} คณะ · {academicCatalog.reduce((count, item) => count + item.majors.length, 0)} สาขา</span>
+          <span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-bold text-slate-700">{academicCatalog.length} คณะ · {academicCatalog.reduce((count, item) => count + item.majors.length, 0)} สาขา</span>
         </div>
         <form onSubmit={e => { e.preventDefault(); const name = newFaculty.trim(); if (name) { void manageAcademicCatalog('ADD_FACULTY', '', name, '', ''); setNewFaculty(''); } }} className="flex gap-2 p-5 pb-3 bg-slate-50/50">
           <input value={newFaculty} onChange={e => setNewFaculty(e.target.value)} maxLength={150} placeholder="พิมพ์ชื่อคณะใหม่ที่ต้องการเพิ่ม..." aria-label="ชื่อคณะใหม่" className="h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-medium shadow-xs" />
@@ -2416,7 +2278,7 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
             <div className="mt-3 space-y-2">
               {faculty.majors.map(major => <div key={major.id} className="flex flex-wrap items-center gap-2 pl-2 sm:pl-6">
                 <span className="text-slate-300">↳</span>
-                <input value={majorDrafts[major.id] ?? major.name} onChange={e => setMajorDrafts(old => ({ ...old, [major.id]: e.target.value }))} maxLength={150} aria-label={`ชื่อสาขา ${major.name}`} className="h-9 min-w-0 basis-full sm:basis-44 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-[11px]" />
+                <input value={majorDrafts[major.id] ?? major.name} onChange={e => setMajorDrafts(old => ({ ...old, [major.id]: e.target.value }))} maxLength={150} aria-label={`ชื่อสาขา ${major.name}`} className="h-9 min-w-0 basis-full sm:basis-44 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm" />
                 <button type="button" onClick={() => { const name = (majorDrafts[major.id] ?? major.name).trim(); if (name) { void manageAcademicCatalog('UPDATE_MAJOR', faculty.id, faculty.name, major.id, name); setMajorDrafts(old => ({ ...old, [major.id]: name })); } }} disabled={!(majorDrafts[major.id] || '').trim() || majorDrafts[major.id].trim() === major.name} className="action-primary">
                   <Save size={16} />บันทึกสาขา
                 </button>
@@ -2425,7 +2287,7 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
                 </button>
               </div>)}
               <form onSubmit={e => { e.preventDefault(); const name = (newMajor[faculty.id] || '').trim(); if (name) { void manageAcademicCatalog('ADD_MAJOR', faculty.id, faculty.name, '', name); setNewMajor(old => ({ ...old, [faculty.id]: '' })); } }} className="flex flex-wrap gap-2 pl-2 sm:pl-6 pt-1">
-                <input value={newMajor[faculty.id] || ''} onChange={e => setNewMajor(old => ({ ...old, [faculty.id]: e.target.value }))} maxLength={150} placeholder={`+ เพิ่มสาขาใหม่ใน ${faculty.name}...`} aria-label={`เพิ่มสาขาใน${faculty.name}`} className="h-9 min-w-0 basis-full sm:basis-44 flex-1 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 text-[11px]" />
+                <input value={newMajor[faculty.id] || ''} onChange={e => setNewMajor(old => ({ ...old, [faculty.id]: e.target.value }))} maxLength={150} placeholder={`+ เพิ่มสาขาใหม่ใน ${faculty.name}...`} aria-label={`เพิ่มสาขาใน${faculty.name}`} className="h-9 min-w-0 basis-full sm:basis-44 flex-1 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 text-sm" />
                 <button disabled={!newMajor[faculty.id]?.trim()} className="action-primary">
                   <Plus size={12} />
                   เพิ่มสาขา
@@ -2433,7 +2295,7 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
               </form>
             </div>
           </article>)}
-          {academicCatalog.length === 0 && <p className="rounded-xl bg-slate-50 p-6 text-center text-xs text-slate-400">ยังไม่มีคณะในระบบ</p>}
+          {academicCatalog.length === 0 && <p className="rounded-xl bg-slate-50 p-6 text-center text-xs text-slate-500">ยังไม่มีคณะในระบบ</p>}
         </div>
       </section>
     )}
@@ -2451,7 +2313,7 @@ function BulkActions({ eligible, selected, setSelection, label, remove }: {
         onChange={() => setSelection(all ? [] : eligible)} />เลือกทั้งหมดที่ลบได้ ({eligible.length})
     </label>
     <button type="button" disabled={!selected.length} onClick={remove}
-      className="action-danger disabled:cursor-not-allowed disabled:text-slate-400"><Trash2 size={16} />{label} ({selected.length})</button>
+      className="action-danger disabled:cursor-not-allowed disabled:text-slate-500"><Trash2 size={16} />{label} ({selected.length})</button>
   </div>;
 }
 
@@ -2535,7 +2397,7 @@ const PasscodeList = memo(function PasscodeList({ eventId, store, openCodes, rem
             สแกนเข้างานจริงแล้ว (ปี 2+ รอ Passcode): <span className="text-[#7c0a02] font-black">{waitingAttended}</span> คน
           </p>
           {waitingUnchecked > 0 && (
-            <p className="text-[11px] text-slate-500">
+            <p className="text-sm text-slate-500">
               ลงทะเบียนแต่ยังไม่สแกนเข้า: {waitingUnchecked} คน (ระบบจะไม่ตัด Passcode ให้จนกว่าจะสแกนเข้างาน)
             </p>
           )}
@@ -2548,7 +2410,7 @@ const PasscodeList = memo(function PasscodeList({ eventId, store, openCodes, rem
           {matching ? 'กำลังจับคู่…' : `จับคู่รหัสให้ผู้เข้างานจริง (${waitingAttended} คน)`}
         </button>
       </div>
-      <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-slate-600">
+      <p className="flex items-start gap-1.5 text-sm leading-relaxed text-slate-600">
         <Sparkles size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
         <span><b>เกณฑ์การจัดสรร Passcode:</b> รหัสสำรองจะถูกจับคู่ให้เฉพาะนักศึกษาปี 2 ขึ้นไปที่ <b>สแกนเข้างานจริงแล้ว</b> (กำลังเข้าร่วม หรือ เช็กเอาต์แล้ว) โดยเรียงลำดับจากคนที่เช็กเอาต์ก่อน และตามลำดับเวลาที่สแกนเข้างาน</span>
       </p>
@@ -2592,11 +2454,11 @@ function AdminMetric({ label, value, note, icon, tone }: { label: string; value:
   const current = styles[tone] || styles.rose;
   return <div className={cx('bento border p-5 shadow-sm transition-all hover:shadow-md', current.bg, current.border)}>
     <div className="flex items-start justify-between">
-      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</span>
+      <span className="text-sm font-bold uppercase tracking-wider text-slate-500">{label}</span>
       <span className={cx('rounded-xl p-2 shadow-sm', current.iconBg)}>{icon}</span>
     </div>
     <b className={cx('mt-3 block text-3xl font-extrabold sm:text-4xl', current.text)}>{value}</b>
-    <span className="mt-1 block truncate text-[10px] font-semibold text-slate-400">{note}</span>
+    <span className="mt-1 block truncate text-sm font-semibold text-slate-500">{note}</span>
   </div>;
 }
-function DashboardCount({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: number; tone: string }) { return <div className="flex items-center justify-between gap-2 rounded-xl bg-white px-2.5 py-2"><span className="flex min-w-0 items-center gap-1.5 text-[8px] text-slate-500"><span className={cx('rounded-lg p-1.5', tone)}>{icon}</span><span className="truncate">{label}</span></span><b className="text-sm text-slate-900">{value}</b></div> }
+function DashboardCount({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: number; tone: string }) { return <div className="flex items-center justify-between gap-2 rounded-xl bg-white px-2.5 py-2"><span className="flex min-w-0 items-center gap-1.5 text-sm text-slate-500"><span className={cx('rounded-lg p-1.5', tone)}>{icon}</span><span className="truncate">{label}</span></span><b className="text-sm text-slate-900">{value}</b></div> }
