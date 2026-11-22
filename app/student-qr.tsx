@@ -5,7 +5,11 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { getDeviceSecret } from '@/lib/device-identity';
 import { LocationAccess, useLocationAccess } from './location-access';
 import { supabase } from '@/lib/supabase';
-import { MapPin, Navigation, ShieldAlert, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
+import { MapPin, ShieldAlert, RefreshCw, AlertCircle, ScanLine, LogOut, CheckCircle2 } from 'lucide-react';
+
+function cx(...classes: (string | false | undefined | null)[]) {
+  return classes.filter(Boolean).join(' ');
+}
 
 type Ticket = { token: string; mode: string };
 
@@ -150,26 +154,85 @@ export function StudentQr({ session, eventId }: { session: string; eventId: stri
           </div>
         </div>
       ) : ticket && remaining > 0 ? (
-        <div className="space-y-3">
-          <div className="qr-ticket flex justify-center rounded-3xl bg-white p-4 shadow-md border border-slate-100">
-            <QRCodeCanvas
-              value={'ARU1:' + ticket.token}
-              size={240}
-              marginSize={4}
-              level="M"
-              fgColor="#000000"
-              bgColor="#ffffff"
-              role="img"
-              aria-label="QR กิจกรรมแบบใช้ครั้งเดียว"
-            />
+        <div className="space-y-4">
+          {/* Laser Scan Frame & Corners */}
+          <div className="qr-frame relative mx-auto inline-block p-4 sm:p-5 rounded-3xl bg-white shadow-xl border border-amber-200/60">
+            <div className="corner-reticle corner-tl" />
+            <div className="corner-reticle corner-tr" />
+            <div className="corner-reticle corner-bl" />
+            <div className="corner-reticle corner-br" />
+            <div className="qr-laser-beam" />
+            <div className="qr-ticket flex justify-center">
+              <QRCodeCanvas
+                value={'ARU1:' + ticket.token}
+                size={230}
+                marginSize={3}
+                level="M"
+                fgColor="#000000"
+                bgColor="#ffffff"
+                role="img"
+                aria-label="QR กิจกรรมแบบใช้ครั้งเดียว"
+              />
+            </div>
           </div>
-          <div className="rounded-2xl bg-slate-100/90 py-2 px-3 border border-slate-200">
-            <p className="text-xs font-extrabold text-slate-800">
-              {ticket.mode === 'CHECKIN' ? '🟢 บัตรสแกนเข้า (Check-in)' : '🔵 บัตรสแกนออก (Check-out)'}
-            </p>
-            <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
-              รหัสหมุนเวียนอัตโนมัติ · เหลือเวลาอีก <span className="font-bold text-[#7c0a02] font-mono text-xs">{remaining}</span> วินาที
-            </p>
+
+          {/* Mode Pill & Countdown Tracker */}
+          <div className="space-y-2">
+            <div>
+              <span
+                className={cx(
+                  'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-extrabold shadow-sm',
+                  ticket.mode === 'CHECKIN'
+                    ? 'border border-emerald-300 bg-emerald-50 text-emerald-800'
+                    : 'border border-sky-300 bg-sky-50 text-sky-800'
+                )}
+              >
+                <span
+                  className={cx(
+                    'h-2 w-2 rounded-full animate-pulse',
+                    ticket.mode === 'CHECKIN' ? 'bg-emerald-500' : 'bg-sky-500'
+                  )}
+                />
+                {ticket.mode === 'CHECKIN' ? (
+                  <span className="flex items-center gap-1">
+                    <ScanLine size={13} />
+                    <span>บัตรสแกนเข้า (Check-in)</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1">
+                    <LogOut size={13} />
+                    <span>บัตรสแกนออก (Check-out)</span>
+                  </span>
+                )}
+              </span>
+            </div>
+
+            {/* Micro Timer Bar */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/90 py-2.5 px-3.5 shadow-sm">
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 font-bold text-slate-600 text-[11px]">
+                  <RefreshCw
+                    size={12}
+                    className={remaining <= 5 ? 'text-rose-500 animate-spin' : 'text-slate-400'}
+                  />
+                  <span>รหัสหมุนเวียนอัตโนมัติ</span>
+                </span>
+                <span className="font-mono text-xs font-black text-[#7c0a02]">
+                  {remaining} วินาที
+                </span>
+              </div>
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className={cx(
+                    'h-full rounded-full transition-all duration-300',
+                    remaining <= 5
+                      ? 'bg-rose-500'
+                      : 'bg-gradient-to-r from-amber-500 to-[#7c0a02]'
+                  )}
+                  style={{ width: `${Math.max(0, Math.min(100, (remaining / 30) * 100))}%` }}
+                />
+              </div>
+            </div>
           </div>
         </div>
       ) : (

@@ -146,7 +146,7 @@ export function LocationAccess({ gps, compact = false }: { gps: ReturnType<typeo
           <p className="font-bold">{gps.permissionDenied ? 'ยังไม่ได้รับอนุญาตพิกัด GPS' : 'ยังไม่สามารถรับสัญญาณ GPS ได้'}</p>
           <p className="mt-0.5 text-[11px] text-amber-800 leading-relaxed">
             {gps.permissionDenied
-              ? 'กรุณากดไอคอนแม่กุญแจ 🔒 ที่แถบ URL ของเบราว์เซอร์ → เลือก "สิทธิ์/Permissions" → เปิด "ตำแหน่ง/Location"'
+              ? 'กรุณากดไอคอนแม่กุญแจที่แถบ URL ของเบราว์เซอร์ → เลือก "สิทธิ์/Permissions" → เปิด "ตำแหน่ง/Location"'
               : gps.message}
           </p>
           <div className="mt-2.5 flex flex-wrap gap-2">

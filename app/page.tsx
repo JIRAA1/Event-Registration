@@ -18,7 +18,7 @@ import { OpenEvents } from './register/open-events';
 import { birthDateToInput } from '@/lib/birth-date';
 import { PasswordInput } from './password-input';
 import { BirthDateField } from './birth-date-field';
-import { Camera, CameraOff, Save, Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Clipboard, Clock3, Download, ExternalLink, Eye, FileSpreadsheet, FileUp, Filter, Gauge, GraduationCap, Layers, LayoutDashboard, Loader2, Lock, LogOut, MapPin, Menu, Phone, Plus, QrCode, RefreshCw, ScanLine, Search, Settings2, ShieldCheck, Sparkles, Ticket, Trash2, Unlock, UserCheck, Users, UserX, X, Zap } from 'lucide-react';
+import { Camera, CameraOff, Save, Activity, ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, Award, Bell, BookOpen, Building2, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Clipboard, Clock3, Download, ExternalLink, Eye, FileSpreadsheet, FileUp, Filter, Gauge, GraduationCap, Layers, LayoutDashboard, Loader2, Lock, LogOut, MapPin, Menu, Phone, Plus, QrCode, RefreshCw, ScanLine, Search, Settings2, ShieldCheck, Sparkles, Ticket, Trash2, Unlock, UserCheck, Users, UserX, X, Zap } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { soundEngine } from '@/lib/sound';
 import { ARU_CATALOG } from '@/lib/aru-catalog';
@@ -1012,92 +1012,490 @@ function Landing({ enterAs, saving, loginError }: { enterAs: () => void; saving:
 }
 function MetricChip({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) { return <div className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur-md"><div className="flex items-center gap-1.5 text-amber-200">{icon}<span className="text-[9px] font-semibold text-white/70">{label}</span></div><b className="mt-1 block text-sm">{value}</b></div> }
 
+function StudentPassCard({ user, events, regs }: { user: User; events: Event[]; regs: Registration[] }) {
+  const completedEvents = regs.filter(r => r.status === 'COMPLETED');
+  const totalEarnedHours = completedEvents.reduce((acc, r) => {
+    const ev = events.find(e => e.id === r.event_id);
+    return acc + (ev?.activity_hours || 0);
+  }, 0);
+
+  return (
+    <section className="student-pass-card relative p-6 sm:p-7 text-white shadow-2xl overflow-hidden" aria-label="บัตรนักศึกษาดิจิทัล">
+      <div className="student-pass-sheen" />
+      <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-amber-500/15 blur-3xl" />
+      <div className="pointer-events-none absolute -left-10 -bottom-10 h-44 w-44 rounded-full bg-rose-700/25 blur-3xl" />
+
+      {/* Top Header */}
+      <div className="relative z-10 flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 shadow-md">
+            <Award size={18} strokeWidth={2.4} />
+          </div>
+          <div>
+            <span className="block text-[10px] font-extrabold tracking-[0.16em] uppercase text-amber-300">
+              ARU DIGITAL PASS
+            </span>
+            <span className="block text-[11px] font-semibold text-rose-100/80">
+              มหาวิทยาลัยราชภัฏพระนครศรีอยุธยา
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2.5 py-1 text-[10px] font-extrabold text-emerald-300">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span>สถานะปกติ</span>
+        </div>
+      </div>
+
+      {/* Identity Info */}
+      <div className="relative z-10 mt-5 flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl text-white">
+              {user.full_name}
+            </h2>
+            {user.study_year > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-lg border border-amber-300/30 bg-amber-400/20 px-2 py-0.5 text-[11px] font-bold text-amber-200">
+                <GraduationCap size={13} />
+                <span>ชั้นปีที่ {user.study_year}</span>
+              </span>
+            )}
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-rose-100/90">
+            <span className="font-mono font-bold tracking-wider text-amber-300 bg-black/30 px-2 py-0.5 rounded-md border border-white/10">
+              {user.student_id}
+            </span>
+            {user.faculty && <span>{user.faculty}</span>}
+            {user.major && <span>· {user.major}</span>}
+            {user.class_group && <span className="text-rose-200/70">({user.class_group})</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Metrics Row */}
+      <div className="relative z-10 mt-6 grid grid-cols-3 gap-2.5 pt-4 border-t border-white/10">
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-sm text-center">
+          <span className="text-[10px] font-semibold text-rose-200/70 block">ลงทะเบียน</span>
+          <b className="mt-0.5 text-lg font-black text-white block">{events.length}</b>
+          <span className="text-[9px] text-rose-200/60 block">กิจกรรม</span>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-sm text-center">
+          <span className="text-[10px] font-semibold text-emerald-200/80 block">ผ่านกิจกรรม</span>
+          <b className="mt-0.5 text-lg font-black text-emerald-300 block">{completedEvents.length}</b>
+          <span className="text-[9px] text-emerald-200/60 block">สำเร็จ</span>
+        </div>
+        <div className="rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3 backdrop-blur-sm text-center">
+          <span className="text-[10px] font-semibold text-amber-200 block">ชั่วโมงสะสม</span>
+          <b className="mt-0.5 text-lg font-black text-amber-300 block">{totalEarnedHours}</b>
+          <span className="text-[9px] text-amber-200/70 block">ชั่วโมง</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function StudentHome({ user, events, regs, select, store, session, refresh }: { session: string; refresh: () => Promise<void>; user: User; events: Event[]; regs: Registration[]; select: (id: string) => void; store: Store }) {
   const latestConfirmed = [...regs].filter(r => r.status === 'ATTENDING' || r.status === 'COMPLETED').sort((a, b) => Date.parse(b.checkout_at || b.checkin_at || '') - Date.parse(a.checkout_at || a.checkin_at || ''))[0];
   const latestEvent = latestConfirmed ? store.events.find(e => e.id === latestConfirmed.event_id) : undefined;
-  return <div className="space-y-5">
-    <header className="px-2"><div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.15em] text-slate-400"><span>{formatThaiDate()}</span><span className="h-1 w-1 rounded-full bg-[#d4af37]" />Student Portal</div><h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">กิจกรรมที่กำลังเปิด</h1><p className="mt-1 text-xs text-slate-500">เลือกกิจกรรมเพื่อดูรายละเอียดและ QR Code ของคุณ</p></header>
-    <AttendanceConfirmation status={latestConfirmed?.status} eventTitle={latestEvent?.title} />
-    <section className="bento p-4 sm:p-6">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-base font-extrabold text-slate-900">กิจกรรมที่ฉันลงทะเบียน</h2>
-        <span className="shrink-0 text-xs text-slate-600">{events.length + (store.applications?.length || 0)} กิจกรรม</span>
-      </div>
-      <div className="mt-4 space-y-3">
-        {store.applications?.map(a => <article key={a.id} className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <b>{a.title}</b><p className="mt-1 text-sm">{a.status === 'CORRECT' ? (a.online ? 'แอดมินขอให้แก้ไขใบสมัคร' : 'กรุณาแก้ไขที่จุดลงทะเบียนหน้างาน') + ' · ' + a.note : 'รอยืนยันเข้าร่วมกิจกรรม'}</p>
-          {a.status === 'CORRECT' && a.online && <a className="action-primary mt-3" href={'/register/' + a.event_id + '?correct=' + a.id}>เปิดใบสมัครเพื่อแก้ไข</a>}
-        </article>)}
-        {events.map(event => {
-          const registration = regs.find(reg => reg.event_id === event.id);
-          if (!registration) return null;
-          const completed = registration.status === 'COMPLETED';
-          const action = completed ? 'ดูผลการเข้าร่วม' : registration.status === 'ATTENDING' ? 'เปิด QR สแกนออก' : 'เปิด QR สแกนเข้า';
-          return <button key={event.id} type="button" onClick={() => select(event.id)} aria-label={action + ' · ' + event.title}
-            style={event.banner_url ? { backgroundImage: `linear-gradient(90deg,rgba(255,255,255,.97),rgba(255,255,255,.87)),url("${event.banner_url}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
-            className="group grid w-full gap-4 rounded-2xl border border-slate-300 bg-white p-4 text-left shadow-sm transition hover:border-[#7c0a02] hover:shadow-md active:bg-rose-50 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-            <span className="min-w-0">
-              <StatusPill status={registration.status} />
-              <strong className="mt-2 block break-words text-base text-slate-900">{event.title}</strong>
-              <span className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
-                <span className="flex items-center gap-1"><MapPin size={14} />{event.location}</span>
-                <span className="flex items-center gap-1"><Clock3 size={14} />{event.activity_hours} ชั่วโมง</span>
-              </span>
-            </span>
-            <span className={cx('inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold',
-              completed ? 'border border-slate-300 bg-white text-slate-700 group-hover:bg-slate-100' : 'bg-[#7c0a02] text-white group-hover:bg-[#620701]')}>
-              {completed ? <CheckCircle2 size={16} /> : <QrCode size={16} />}{action}<ArrowRight size={16} />
-            </span>
-          </button>;
-        })}
-        {events.length === 0 && !store.applications?.length && <Empty message="ยังไม่มีกิจกรรมที่เปิดและลงทะเบียนไว้" />}
-      </div>
-    </section>
-    {user.role === 'STUDENT' && <OpenEvents token={session} refresh={refresh} />}
-    <UserProfileSummary user={user} />
-  </div>;
+
+  return (
+    <div className="space-y-5">
+      <header className="px-2">
+        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.15em] text-slate-400">
+          <span>{formatThaiDate()}</span>
+          <span className="h-1 w-1 rounded-full bg-[#d4af37]" />
+          <span>Student Portal</span>
+        </div>
+        <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">กิจกรรมที่กำลังเปิด</h1>
+        <p className="mt-1 text-xs text-slate-500">เลือกกิจกรรมเพื่อดูรายละเอียดและ QR Code ของคุณ</p>
+      </header>
+
+      {/* Digital Student Pass */}
+      <StudentPassCard user={user} events={events} regs={regs} />
+
+      {/* Attendance Status Banner */}
+      <AttendanceConfirmation status={latestConfirmed?.status} eventTitle={latestEvent?.title} />
+
+      {/* Registered Events */}
+      <section className="bento p-4 sm:p-6">
+        <div className="flex items-baseline justify-between gap-2 border-b border-slate-100 pb-3">
+          <h2 className="text-base font-extrabold text-slate-900">กิจกรรมที่ฉันลงทะเบียน</h2>
+          <span className="shrink-0 text-xs text-slate-500 font-semibold">{events.length + (store.applications?.length || 0)} กิจกรรม</span>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          {store.applications?.map(a => (
+            <article key={a.id} className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm">
+              <strong className="block text-slate-900">{a.title}</strong>
+              <p className="mt-1 text-xs text-amber-900">
+                {a.status === 'CORRECT' ? (a.online ? 'แอดมินขอให้แก้ไขใบสมัคร' : 'กรุณาแก้ไขที่จุดลงทะเบียนหน้างาน') + ' · ' + a.note : 'รอยืนยันเข้าร่วมกิจกรรม'}
+              </p>
+              {a.status === 'CORRECT' && a.online && (
+                <a className="action-primary mt-3 inline-flex text-xs" href={'/register/' + a.event_id + '?correct=' + a.id}>
+                  เปิดใบสมัครเพื่อแก้ไข
+                </a>
+              )}
+            </article>
+          ))}
+
+          {events.map(event => {
+            const registration = regs.find(reg => reg.event_id === event.id);
+            if (!registration) return null;
+            const completed = registration.status === 'COMPLETED';
+            const attending = registration.status === 'ATTENDING';
+            const actionText = completed ? 'ดูผลการเข้าร่วม' : attending ? 'เปิด QR สแกนออก' : 'เปิด QR สแกนเข้า';
+
+            return (
+              <div
+                key={event.id}
+                onClick={() => select(event.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') select(event.id); }}
+                className="ticket-pass group cursor-pointer overflow-hidden p-4 sm:p-5 text-left"
+                style={event.banner_url ? { backgroundImage: `linear-gradient(90deg,rgba(255,255,255,.97),rgba(255,255,255,.88)),url("${event.banner_url}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <StatusPill status={registration.status} />
+                      {event.status === 'ACTIVE' && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700 border border-emerald-200">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          เปิดรอบสแกน
+                        </span>
+                      )}
+                    </div>
+                    <strong className="mt-2 block break-words text-base font-extrabold text-slate-900 group-hover:text-[#7c0a02] transition-colors">
+                      {event.title}
+                    </strong>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin size={13} className="text-[#7c0a02]" />
+                        <span>{event.location}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <Clock3 size={13} className="text-amber-600" />
+                        <span>{event.activity_hours} ชั่วโมงกิจกรรม</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0">
+                    <button
+                      type="button"
+                      aria-label={actionText + ' · ' + event.title}
+                      className={cx(
+                        'inline-flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 rounded-xl px-4 text-xs font-bold transition-all shadow-sm',
+                        completed
+                          ? 'border border-slate-300 bg-white text-slate-700 group-hover:bg-slate-100'
+                          : 'btn-gold-action text-white shadow-md'
+                      )}
+                    >
+                      {completed ? <CheckCircle2 size={15} className="text-emerald-600" /> : attending ? <ScanLine size={15} /> : <QrCode size={15} />}
+                      <span>{actionText}</span>
+                      <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {events.length === 0 && !store.applications?.length && (
+            <Empty message="ยังไม่มีกิจกรรมที่เปิดและลงทะเบียนไว้" />
+          )}
+        </div>
+      </section>
+
+      {user.role === 'STUDENT' && <OpenEvents token={session} refresh={refresh} />}
+      <UserProfileSummary user={user} />
+    </div>
+  );
 }
 
 function StudentStatsView({ user, events, regs }: { user: User; events: Event[]; regs: Registration[] }) {
   const completed = regs.filter(r => r.status === 'COMPLETED').length;
-  return <div className="space-y-5"><header className="px-2"><div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.15em] text-slate-400"><span>{formatThaiDate()}</span><span className="h-1 w-1 rounded-full bg-[#d4af37]" />Student Portal</div><h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">ภาพรวมของฉัน</h1><p className="mt-1 text-xs text-slate-500">สรุปกิจกรรมและข้อมูลชั้นปีของคุณ</p></header><div className="grid gap-4 md:grid-cols-3"><div className="maroon-gradient relative overflow-hidden rounded-[28px] p-5 text-white"><div className="absolute -right-4 -top-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" /><span className="relative text-[10px] font-semibold text-rose-100">กิจกรรมที่ลงทะเบียน</span><div className="relative mt-2 flex items-end justify-between"><strong className="text-4xl">{events.length.toString().padStart(2, '0')}</strong><Activity size={18} /></div><span className="relative mt-1 block text-[10px] text-rose-100/80">กิจกรรมที่คุณมีสิทธิ์</span></div><div className="bento p-5"><span className="text-[10px] font-semibold text-slate-500">เข้าร่วมสำเร็จ</span><div className="mt-2 flex items-end justify-between"><strong className="text-4xl text-slate-900">{completed.toString().padStart(2, '0')}</strong><CheckCircle2 size={18} className="text-emerald-600" /></div><span className="mt-1 block text-[10px] text-slate-400">รับชั่วโมงกิจกรรมครบแล้ว</span></div><div className="bento p-5"><span className="text-[10px] font-semibold text-slate-500">ระดับชั้นปี</span><div className="mt-2 flex items-end justify-between"><strong className="text-4xl text-slate-900">{user.study_year > 0 ? `ปี ${user.study_year}` : '—'}</strong><GraduationCap size={18} className="text-amber-600" /></div><span className="mt-1 block text-[10px] text-slate-400">ใช้ชั้นปีปัจจุบันที่ระบุในข้อมูลนักศึกษา</span></div></div></div>;
+  return (
+    <div className="space-y-5">
+      <header className="px-2">
+        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.15em] text-slate-400">
+          <span>{formatThaiDate()}</span>
+          <span className="h-1 w-1 rounded-full bg-[#d4af37]" />
+          <span>Student Portal</span>
+        </div>
+        <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">ภาพรวมของฉัน</h1>
+        <p className="mt-1 text-xs text-slate-500">สรุปกิจกรรมและข้อมูลชั้นปีของคุณ</p>
+      </header>
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="student-pass-card relative overflow-hidden rounded-[28px] p-5 text-white">
+          <div className="student-pass-sheen" />
+          <div className="pointer-events-none absolute -right-4 -top-8 h-32 w-32 rounded-full bg-amber-500/15 blur-2xl" />
+          <span className="relative text-[10px] font-semibold text-rose-200/80">กิจกรรมที่ลงทะเบียน</span>
+          <div className="relative mt-2 flex items-end justify-between">
+            <strong className="text-4xl font-black">{events.length.toString().padStart(2, '0')}</strong>
+            <Activity size={20} className="text-amber-300" />
+          </div>
+          <span className="relative mt-1 block text-[10px] text-rose-200/70">กิจกรรมที่คุณมีสิทธิ์</span>
+        </div>
+        <div className="bento p-5">
+          <span className="text-[10px] font-semibold text-slate-500">เข้าร่วมสำเร็จ</span>
+          <div className="mt-2 flex items-end justify-between">
+            <strong className="text-4xl text-slate-900 font-black">{completed.toString().padStart(2, '0')}</strong>
+            <CheckCircle2 size={20} className="text-emerald-600" />
+          </div>
+          <span className="mt-1 block text-[10px] text-slate-400">รับชั่วโมงกิจกรรมครบแล้ว</span>
+        </div>
+        <div className="bento p-5">
+          <span className="text-[10px] font-semibold text-slate-500">ระดับชั้นปี</span>
+          <div className="mt-2 flex items-end justify-between">
+            <strong className="text-4xl text-slate-900 font-black">{user.study_year > 0 ? `ปี ${user.study_year}` : '—'}</strong>
+            <GraduationCap size={20} className="text-amber-600" />
+          </div>
+          <span className="mt-1 block text-[10px] text-slate-400">ชั้นปีปัจจุบันตามข้อมูลนักศึกษา</span>
+        </div>
+      </div>
+    </div>
+  );
 }
+
 function AttendanceConfirmation({ status, eventTitle }: { status?: Status; eventTitle?: string }) {
   if (!status || status === 'REGISTERED') return null;
   const completed = status === 'COMPLETED';
-  return <section role="status" aria-live="polite" className={cx('flex items-center gap-4 rounded-2xl border p-4 shadow-sm sm:p-5', completed ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50')}>
-    <div className={cx('flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-white shadow-md', completed ? 'bg-emerald-600' : 'bg-amber-500')}>{completed ? <CheckCircle2 size={34} strokeWidth={2.7} /> : <Clock3 size={32} strokeWidth={2.5} />}</div>
-    <div className="min-w-0 flex-1"><p className={cx('text-base font-extrabold sm:text-lg', completed ? 'text-emerald-900' : 'text-amber-900')}>{completed ? 'เข้าร่วมกิจกรรมสำเร็จ' : 'กำลังเข้าร่วมกิจกรรม'}</p><p className={cx('mt-0.5 text-xs font-semibold sm:text-sm', completed ? 'text-emerald-800' : 'text-amber-800')}>{completed ? 'เช็กเอาต์เรียบร้อยแล้ว' : 'เช็กอินแล้ว · รอเช็กเอาต์'}{eventTitle ? ` · ${eventTitle}` : ''}</p></div>
-    <span className={cx('hidden rounded-full px-3 py-1.5 text-[10px] font-extrabold sm:inline-flex', completed ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800')}>{completed ? '✓ สำเร็จ' : '● กำลังเข้าร่วม'}</span>
-  </section>;
+  return (
+    <section role="status" aria-live="polite" className={cx('flex items-center gap-4 rounded-2xl border p-4 shadow-sm sm:p-5', completed ? 'border-emerald-200 bg-emerald-50/90' : 'border-amber-200 bg-amber-50/90')}>
+      <div className={cx('flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl text-white shadow-md', completed ? 'bg-emerald-600' : 'bg-amber-500')}>
+        {completed ? <CheckCircle2 size={30} strokeWidth={2.6} /> : <Clock3 size={28} strokeWidth={2.4} />}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className={cx('text-base font-extrabold sm:text-lg', completed ? 'text-emerald-950' : 'text-amber-950')}>
+          {completed ? 'เข้าร่วมกิจกรรมสำเร็จ' : 'กำลังเข้าร่วมกิจกรรม'}
+        </p>
+        <p className={cx('mt-0.5 text-xs font-semibold sm:text-sm', completed ? 'text-emerald-800' : 'text-amber-800')}>
+          {completed ? 'เช็กเอาต์เรียบร้อยแล้ว' : 'เช็กอินแล้ว · รอเช็กเอาต์'}{eventTitle ? ` · ${eventTitle}` : ''}
+        </p>
+      </div>
+      <span className={cx('hidden rounded-full px-3 py-1.5 text-[10px] font-extrabold sm:inline-flex items-center gap-1.5', completed ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200')}>
+        {completed ? (
+          <>
+            <CheckCircle2 size={12} strokeWidth={2.5} />
+            <span>สำเร็จ</span>
+          </>
+        ) : (
+          <>
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+            <span>กำลังเข้าร่วม</span>
+          </>
+        )}
+      </span>
+    </section>
+  );
 }
 
-function StatusPill({ status }: { status: Status }) { const label = status === 'REGISTERED' ? 'รอสแกนเข้างาน' : status === 'ATTENDING' ? 'กำลังเข้าร่วมกิจกรรม' : 'เข้าร่วมกิจกรรมสำเร็จ'; return <span className={cx('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[8px] font-bold', status === 'REGISTERED' ? 'bg-slate-100 text-slate-500' : status === 'ATTENDING' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800')}>{status === 'ATTENDING' ? <Clock3 size={12} strokeWidth={2.5} /> : status === 'COMPLETED' ? <CheckCircle2 size={12} strokeWidth={3} /> : null}<span>{label}</span></span> }
-function Empty({ message }: { message: string }) { return <div className="rounded-2xl border border-dashed border-slate-200 py-10 text-center text-xs text-slate-400">{message}</div> }
+function StatusPill({ status }: { status: Status }) {
+  const label = status === 'REGISTERED' ? 'รอสแกนเข้างาน' : status === 'ATTENDING' ? 'กำลังเข้าร่วมกิจกรรม' : 'เข้าร่วมกิจกรรมสำเร็จ';
+  return (
+    <span
+      className={cx(
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-bold',
+        status === 'REGISTERED'
+          ? 'bg-slate-100 text-slate-600 border border-slate-200'
+          : status === 'ATTENDING'
+          ? 'bg-amber-50 text-amber-800 border border-amber-300'
+          : 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+      )}
+    >
+      {status === 'REGISTERED' ? (
+        <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+      ) : status === 'ATTENDING' ? (
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+      ) : (
+        <CheckCircle2 size={12} strokeWidth={2.5} />
+      )}
+      <span>{label}</span>
+    </span>
+  );
+}
+
+function Empty({ message }: { message: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-200 py-10 text-center text-xs text-slate-400">
+      <Calendar size={28} className="mx-auto mb-2 text-slate-300" />
+      <span>{message}</span>
+    </div>
+  );
+}
 
 function EventDetail({ event, user, registration, back, session }: { session: string; event: Event; user: User; registration?: Registration; back: () => void }) {
   const [done, setDone] = useState(false);
   const passcode = registration?.status === 'COMPLETED' && user.study_year > 1 ? registration.passcode : undefined;
   const yearOneRedirect = user.study_year === 1 && registration && registration.status !== 'REGISTERED' && event.redirect_url_year1;
-  return <div className="mx-auto max-w-5xl">
-    <button onClick={back} className="mb-4 inline-flex min-h-11 items-center gap-1 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:border-[#7c0a02] hover:text-[#7c0a02]">← กลับหน้ากิจกรรม</button>
-    <div className="grid gap-5 lg:grid-cols-[1.2fr_.8fr]">
-      <section className="maroon-gradient relative min-h-[270px] overflow-hidden rounded-[32px] p-7 text-white sm:p-9" style={event.banner_url ? { backgroundImage: `linear-gradient(105deg,rgba(91,8,4,.94) 0%,rgba(124,10,2,.86) 55%,rgba(91,8,4,.68) 100%),url("${event.banner_url}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}><span className="rounded-full bg-white/15 px-3 py-1 text-[9px] font-bold">กิจกรรม ARU</span><h1 className="mt-8 max-w-xl text-3xl font-extrabold leading-tight">{event.title}</h1><p className="mt-3 flex items-center gap-1.5 text-xs text-rose-100"><MapPin size={14} />{event.location} <span className="mx-1">·</span><Clock3 size={14} />{event.activity_hours} ชั่วโมง</p><div className="absolute -bottom-12 -right-10 h-48 w-48 rounded-full border-[28px] border-white/5" /></section>
-      <section className="bento p-6">
-        <AttendanceConfirmation status={registration?.status} eventTitle={event.title} />
-        <div className="flex items-center justify-between"><div><span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">สถานะการเข้าร่วม</span><div className="mt-2"><StatusPill status={registration?.status || 'REGISTERED'} /></div></div><div className="rounded-2xl bg-amber-50 p-3 text-amber-600"><QrCode size={22} /></div></div>
-        {isSupabaseConfigured ? registration && registration.status !== 'COMPLETED' && event.status === 'ACTIVE' &&
-          <StudentQr key={event.id + ':' + session + ':' + registration.status} session={session} eventId={event.id} />
-          : <><div className="qr-ticket my-5 flex justify-center rounded-2xl p-2">
-            <QRCodeCanvas value={JSON.stringify({ e: event.id, u: user.id })} size={256} marginSize={4} level="M" fgColor="#000000" bgColor="#ffffff" role="img" aria-label="QR สำหรับสแกนเข้าและออกจากกิจกรรม" />
+  const completed = registration?.status === 'COMPLETED';
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-4">
+      <button
+        onClick={back}
+        className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:border-[#7c0a02] hover:text-[#7c0a02] shadow-sm transition-all"
+      >
+        <ArrowLeft size={14} />
+        <span>กลับหน้ากิจกรรม</span>
+      </button>
+
+      <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+        {/* Left: Event Hero Card */}
+        <section
+          className="relative min-h-[280px] overflow-hidden rounded-[30px] p-7 sm:p-9 text-white shadow-xl flex flex-col justify-between"
+          style={{
+            background: event.banner_url
+              ? `linear-gradient(135deg, rgba(43,8,8,0.95) 0%, rgba(88,13,13,0.88) 55%, rgba(43,8,8,0.75) 100%), url("${event.banner_url}") center/cover`
+              : 'linear-gradient(135deg, #2b0808 0%, #580d0d 50%, #360707 100%)',
+          }}
+        >
+          <div className="relative z-10 flex items-center justify-between gap-3">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/30 bg-amber-400/20 px-3 py-1 text-[10px] font-extrabold text-amber-200">
+              <Award size={13} />
+              <span>กิจกรรมมหาวิทยาลัย ARU</span>
+            </span>
+            <EventStatusPill status={event.status} />
           </div>
-            <p className="text-center text-[10px] leading-5 text-slate-500">แสดง QR Code นี้ให้เจ้าหน้าที่สแกนเมื่อเข้างาน<br />ระบบจะแจ้งสถานะใหม่ให้โดยอัตโนมัติ</p></>}
-        {registration?.status === 'COMPLETED' && user.study_year > 1 && !passcode && <p role="status" className="mt-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">เข้าร่วมกิจกรรมสำเร็จแล้ว · รอแอดมินจัดสรร Passcode ระบบจะแสดงรหัสเมื่อจับคู่เรียบร้อย</p>}
-        {passcode && <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center"><span className="text-[9px] font-bold uppercase tracking-wider text-amber-800">Passcode ปลดล็อกแล้ว</span><div className="mt-1 flex items-center justify-center gap-2"><b className="text-xl tracking-[.18em] text-[#7c0a02]">{passcode}</b><button className="rounded-lg bg-white p-2 text-[#7c0a02]" onClick={() => { navigator.clipboard?.writeText(passcode); setDone(true); setTimeout(() => setDone(false), 1800) }}>{done ? <Check size={15} /> : <Clipboard size={15} />}</button></div><span className="mt-1 block text-[9px] text-amber-800">{done ? 'คัดลอกแล้ว' : 'คัดลอกรหัสเพื่อยืนยันสิทธิ์'}</span></div>}
-        {yearOneRedirect && <a href={event.redirect_url_year1} className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-[#7c0a02] py-3 text-xs font-bold text-white">ไปยังหน้ากิจกรรม <ExternalLink size={13} /></a>}
-      </section>
+
+          <div className="relative z-10 my-6">
+            <h1 className="text-2xl sm:text-3xl font-extrabold leading-snug tracking-tight">
+              {event.title}
+            </h1>
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-rose-100">
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin size={14} className="text-amber-300" />
+                <span>{event.location}</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Clock3 size={14} className="text-amber-300" />
+                <span>{event.activity_hours} ชั่วโมงกิจกรรม</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="relative z-10 border-t border-white/10 pt-4 flex items-center justify-between text-xs text-rose-200/80">
+            <span>ผู้เข้าร่วม: {user.full_name} ({user.student_id})</span>
+            {user.study_year > 0 && <span>ปี {user.study_year}</span>}
+          </div>
+        </section>
+
+        {/* Right: Ticket & QR / Passcode Card */}
+        <section className="bento p-6 sm:p-7 shadow-xl">
+          <AttendanceConfirmation status={registration?.status} eventTitle={event.title} />
+
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mt-2">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">สถานะการเข้าร่วม</span>
+              <div className="mt-1.5">
+                <StatusPill status={registration?.status || 'REGISTERED'} />
+              </div>
+            </div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-2.5 text-[#7c0a02]">
+              <QrCode size={22} />
+            </div>
+          </div>
+
+          {/* Active QR or Fallback QR */}
+          {isSupabaseConfigured ? (
+            registration && registration.status !== 'COMPLETED' && event.status === 'ACTIVE' ? (
+              <StudentQr key={event.id + ':' + session + ':' + registration.status} session={session} eventId={event.id} />
+            ) : completed ? (
+              <div className="my-6 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-md">
+                  <CheckCircle2 size={26} strokeWidth={2.5} />
+                </div>
+                <h3 className="mt-3 text-base font-extrabold text-emerald-950">คุณเข้าร่วมกิจกรรมเรียบร้อยแล้ว</h3>
+                <p className="mt-1 text-xs text-emerald-800">
+                  ระบบได้บันทึกการเช็กเอาต์และเวลาเข้าร่วม {event.activity_hours} ชั่วโมงสมบูรณ์
+                </p>
+              </div>
+            ) : (
+              <div className="my-6 rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">
+                ขณะนี้กิจกรรมยังไม่เปิดรอบสแกน หรือปิดรอบไปแล้ว
+              </div>
+            )
+          ) : (
+            <div className="my-5 text-center">
+              <div className="qr-frame relative mx-auto inline-block p-4 rounded-3xl bg-white shadow-lg border border-amber-200/50">
+                <div className="corner-reticle corner-tl" />
+                <div className="corner-reticle corner-tr" />
+                <div className="corner-reticle corner-bl" />
+                <div className="corner-reticle corner-br" />
+                <div className="qr-laser-beam" />
+                <QRCodeCanvas
+                  value={JSON.stringify({ e: event.id, u: user.id })}
+                  size={220}
+                  marginSize={3}
+                  level="M"
+                  fgColor="#000000"
+                  bgColor="#ffffff"
+                  role="img"
+                  aria-label="QR สำหรับสแกนเข้าและออกจากกิจกรรม"
+                />
+              </div>
+              <p className="mt-3 text-center text-[11px] leading-5 text-slate-500">
+                แสดง QR Code นี้ให้เจ้าหน้าที่สแกนเมื่อเข้างาน<br />ระบบจะแจ้งสถานะใหม่ให้อัตโนมัติ
+              </p>
+            </div>
+          )}
+
+          {/* Passcode Unlock */}
+          {registration?.status === 'COMPLETED' && user.study_year > 1 && !passcode && (
+            <div role="status" className="mt-5 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-xs text-amber-900 flex items-start gap-2.5">
+              <Clock3 size={16} className="text-amber-700 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">เข้าร่วมกิจกรรมสำเร็จแล้ว</p>
+                <p className="mt-0.5 text-amber-800">รอแอดมินจัดสรร Passcode ระบบจะแสดงรหัสเมื่อจับคู่เรียบร้อย</p>
+              </div>
+            </div>
+          )}
+
+          {passcode && (
+            <div className="mt-5 rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50/60 p-5 text-center shadow-sm">
+              <div className="flex items-center justify-center gap-1.5 text-amber-800">
+                <Sparkles size={14} className="text-amber-600" />
+                <span className="text-[10px] font-extrabold uppercase tracking-widest">
+                  PASSCODE ปลดล็อกแล้ว
+                </span>
+              </div>
+              <div className="mt-2.5 flex items-center justify-center gap-2">
+                <div className="rounded-xl border border-amber-300 bg-white px-4 py-2 shadow-inner">
+                  <b className="font-mono text-2xl tracking-[0.2em] text-[#7c0a02]">{passcode}</b>
+                </div>
+                <button
+                  type="button"
+                  title="คัดลอกรหัส"
+                  className="rounded-xl border border-amber-300 bg-white p-2.5 text-[#7c0a02] shadow-sm hover:bg-amber-50 active:scale-95 transition-transform"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(passcode);
+                    setDone(true);
+                    setTimeout(() => setDone(false), 1800);
+                  }}
+                >
+                  {done ? <Check size={18} className="text-emerald-600" /> : <Clipboard size={18} />}
+                </button>
+              </div>
+              <span className="mt-2 block text-[10px] font-semibold text-amber-800">
+                {done ? 'คัดลอกรหัสเรียบร้อยแล้ว' : 'คัดลอกรหัสเพื่อนำไปยืนยันสิทธิ์'}
+              </span>
+            </div>
+          )}
+
+          {yearOneRedirect && (
+            <a
+              href={event.redirect_url_year1}
+              className="btn-gold-action mt-5 flex items-center justify-center gap-2 rounded-xl py-3 text-xs font-bold text-white shadow-md"
+            >
+              <span>ไปยังหน้ากิจกรรม</span>
+              <ExternalLink size={14} />
+            </a>
+          )}
+        </section>
+      </div>
     </div>
-  </div>;
+  );
 }
 
 function ScanResultEffect({ message, flash }: { message: { ok: boolean; title: string; detail: string } | null; flash: string }) {
@@ -2150,8 +2548,9 @@ const PasscodeList = memo(function PasscodeList({ eventId, store, openCodes, rem
           {matching ? 'กำลังจับคู่…' : `จับคู่รหัสให้ผู้เข้างานจริง (${waitingAttended} คน)`}
         </button>
       </div>
-      <p className="text-[11px] leading-relaxed text-slate-600">
-        💡 <b>เกณฑ์การจัดสรร Passcode:</b> รหัสสำรองจะถูกจับคู่ให้เฉพาะนักศึกษาปี 2 ขึ้นไปที่ <b>สแกนเข้างานจริงแล้ว</b> (กำลังเข้าร่วม หรือ เช็กเอาต์แล้ว) โดยเรียงลำดับจากคนที่เช็กเอาต์ก่อน และตามลำดับเวลาที่สแกนเข้างาน
+      <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-slate-600">
+        <Sparkles size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+        <span><b>เกณฑ์การจัดสรร Passcode:</b> รหัสสำรองจะถูกจับคู่ให้เฉพาะนักศึกษาปี 2 ขึ้นไปที่ <b>สแกนเข้างานจริงแล้ว</b> (กำลังเข้าร่วม หรือ เช็กเอาต์แล้ว) โดยเรียงลำดับจากคนที่เช็กเอาต์ก่อน และตามลำดับเวลาที่สแกนเข้างาน</span>
       </p>
     </div>
     {matchNotice && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm">{matchNotice}</p>}

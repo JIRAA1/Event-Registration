@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { LocationFix } from './location-access';
-import { AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, X, Sparkles } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, X, Sparkles, ClipboardList } from 'lucide-react';
 
 type Warning = {
   message: string;
@@ -132,8 +132,8 @@ function Confirmation({ warning: w, done }: { warning: Warning; done: (reason: s
             <div className="min-w-0 flex-1">
               <p className="font-extrabold text-amber-950 text-sm">
                 {w.distance_m === null
-                  ? '⚠️ ไม่สามารถคำนวณระยะห่างได้ (ไม่มีพิกัด GPS)'
-                  : `📏 ระยะห่างประมาณ ${Math.round(w.distance_m)} เมตร (เกณฑ์สูงสุด ${w.radius_m} ม.)`}
+                  ? 'ไม่สามารถคำนวณระยะห่างได้ (ไม่มีพิกัด GPS)'
+                  : `ระยะห่างประมาณ ${Math.round(w.distance_m)} เมตร (เกณฑ์สูงสุด ${w.radius_m} ม.)`}
               </p>
               <p className="mt-1 text-[11px] text-amber-800 leading-relaxed">
                 {w.message}
@@ -152,7 +152,10 @@ function Confirmation({ warning: w, done }: { warning: Warning; done: (reason: s
 
         {/* Instructions */}
         <div className="rounded-xl bg-slate-50 px-3.5 py-2.5 border border-slate-200 text-slate-600">
-          <p className="font-bold text-slate-800">📋 ขั้นตอนของสตาฟ:</p>
+          <div className="flex items-center gap-1.5 text-slate-800">
+            <ClipboardList size={14} className="text-[#7c0a02]" />
+            <p className="font-bold">ขั้นตอนของสตาฟ:</p>
+          </div>
           <ul className="mt-1 space-y-0.5 list-disc list-inside text-[11px]">
             <li>ขอดูบัตรนักศึกษาตัวจริง หรือบัตรประชาชน</li>
             <li>ตรวจใบหน้านักศึกษาให้ตรงกับบัตรก่อนกดยืนยัน</li>
@@ -199,7 +202,7 @@ function Confirmation({ warning: w, done }: { warning: Warning; done: (reason: s
               placeholder="กรอกเหตุผลอย่างน้อย 5 ตัวอักษร เช่น ตรวจบัตรตัวจริงแล้ว..."
             />
             <div className="flex justify-between items-center text-[10px] text-slate-400 mt-1">
-              <span>{reason.trim().length < 5 ? `ต้องการอีก ${5 - reason.trim().length} ตัวอักษร` : '✓ ครบตามเกณฑ์แล้ว'}</span>
+              <span>{reason.trim().length < 5 ? `ต้องการอีก ${5 - reason.trim().length} ตัวอักษร` : 'ครบตามเกณฑ์แล้ว'}</span>
               <span>{reason.length}/500</span>
             </div>
           </div>

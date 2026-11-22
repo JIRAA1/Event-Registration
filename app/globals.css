@@ -152,6 +152,109 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline:3px solid
   input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px; }
 }
 
+/* Student Event Portal & VIP Ticket Styles */
+.student-pass-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 28px;
+  background: linear-gradient(135deg, #2b0808 0%, #580d0d 50%, #360707 100%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 20px 50px rgba(76, 8, 8, 0.2), 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+.student-pass-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 20%, rgba(255, 255, 255, 0.06) 45%, rgba(212, 175, 55, 0.12) 50%, transparent 60%);
+  animation: pass-sheen 6.5s ease-in-out infinite;
+}
+@keyframes pass-sheen {
+  0%, 70% { transform: translateX(-150%); }
+  100% { transform: translateX(150%); }
+}
+
+.ticket-pass {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+@media (hover: hover) {
+  .ticket-pass:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(124, 10, 2, 0.08);
+    border-color: rgba(124, 10, 2, 0.35);
+  }
+}
+
+/* Subtle Laser Scan Effect for QR */
+.qr-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  background: #ffffff;
+}
+.qr-laser-beam {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, #d4af37 25%, #ffffff 50%, #d4af37 75%, transparent 100%);
+  box-shadow: 0 0 14px 2px rgba(212, 175, 55, 0.65);
+  opacity: 0.85;
+  pointer-events: none;
+  animation: laser-scan 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes laser-scan {
+  0% { top: 0%; opacity: 0; }
+  15% { opacity: 0.9; }
+  85% { opacity: 0.9; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* QR Corner Reticles */
+.corner-reticle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: #d4af37;
+  pointer-events: none;
+}
+.corner-tl { top: 6px; left: 6px; border-top: 2.5px solid; border-left: 2.5px solid; border-top-left-radius: 6px; }
+.corner-tr { top: 6px; right: 6px; border-top: 2.5px solid; border-right: 2.5px solid; border-top-right-radius: 6px; }
+.corner-bl { bottom: 6px; left: 6px; border-bottom: 2.5px solid; border-left: 2.5px solid; border-bottom-left-radius: 6px; }
+.corner-br { bottom: 6px; right: 6px; border-bottom: 2.5px solid; border-right: 2.5px solid; border-bottom-right-radius: 6px; }
+
+/* Action Shine Button */
+.btn-gold-action {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: linear-gradient(110deg, #5f0804 0%, #8e1008 50%, #6b0b05 100%);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.btn-gold-action::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 20%, rgba(255, 255, 255, 0.22) 48%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.65s ease;
+}
+@media (hover: hover) {
+  .btn-gold-action:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(124, 10, 2, 0.25);
+  }
+  .btn-gold-action:hover::after {
+    transform: translateX(120%);
+  }
+}
+
 @layer components {
   .action-primary, .action-secondary, .action-danger {
     @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700;
