@@ -984,21 +984,21 @@ function Landing({ enterAs, saving, loginError }: { enterAs: () => void; saving:
     <section className="login-intro">
       <div className="login-atmosphere" aria-hidden="true"><i /><i /><i /><span className="login-orbit" /><span className="login-orbit login-orbit-inner" /></div>
       <div className="login-eyebrow"><span />องค์การนักศึกษา · ARU</div>
-      <h1>ทุกกิจกรรม<br /><span>เป็นส่วนหนึ่งของคุณ</span></h1>
-      <p className="login-description">ลงทะเบียน แสดงบัตร QR และติดตามการเข้าร่วมกิจกรรมของคุณ ในที่เดียว</p>
+      <h1>ระบบกิจกรรม<br /><span>นักศึกษา ARU</span></h1>
+      <p className="login-description">ลงทะเบียนกิจกรรม เช็กอิน–เช็กเอาต์ และตรวจสอบประวัติการเข้าร่วม</p>
       <div className="login-pass" aria-hidden="true">
         <span className="login-pass-sheen" />
         <div className="flex items-center gap-3"><img src="/aru-icon.jpg" alt="" className="h-12 w-12 rounded-xl" /><div><b>ARU Event Pass</b><p className="mt-1 text-sm text-white/70">บัตรกิจกรรมนักศึกษา</p></div></div>
         <div className="login-pass-divider" />
-        <div className="flex items-center justify-between gap-4"><div><span className="text-sm text-amber-200">พร้อมสำหรับกิจกรรมถัดไป</span><p className="mt-2 text-xl font-bold">พบกันที่หน้างาน</p></div><QrCode size={56} /></div>
+        <div className="flex items-center justify-between gap-4"><div><span className="text-sm text-amber-200">QR Code กิจกรรม</span><p className="mt-2 text-xl font-bold">เช็กอิน / เช็กเอาต์</p></div><QrCode size={56} /></div>
       </div>
       <p className="login-university">มหาวิทยาลัยราชภัฏพระนครศรีอยุธยา</p>
     </section>
     <section id="login-card" className="login-panel">
       <div className="mb-6 flex items-center gap-3"><img src="/aru-icon.jpg" alt="ตราองค์การนักศึกษา ARU" className="h-12 w-12 rounded-xl border border-amber-200" /><span className="text-sm font-bold tracking-wide text-[#7c0a02]">ARU EVENT PASS</span></div>
-      <div className="login-welcome">WELCOME BACK</div>
-      <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">ยินดีต้อนรับกลับมา</h2>
-      <p className="mt-2 text-base leading-7 text-slate-500">เข้าสู่ระบบเพื่อจัดการกิจกรรมของนักศึกษา</p>
+      <div className="login-welcome">LOGIN</div>
+      <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">เข้าสู่ระบบ</h2>
+      <p className="mt-2 text-base leading-7 text-slate-500">กรอกรหัสนักศึกษาหรือชื่อผู้ใช้และรหัสผ่าน</p>
       <form className="mt-7 space-y-5" onSubmit={event => { event.preventDefault(); if (!saving) enterAs(); }}>
         <Field label="รหัสนักศึกษา / ชื่อผู้ใช้งาน" name="login-id" id="login-id" autoComplete="username" required={isSupabaseConfigured} placeholder="กรอกรหัสนักศึกษาหรือชื่อผู้ใช้" />
         <Field label="รหัสผ่าน" name="login-password" id="login-password" autoComplete="current-password" enterKeyHint="go" required={isSupabaseConfigured} type="password" placeholder="กรอกรหัสผ่านของคุณ" />
