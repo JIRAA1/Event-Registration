@@ -7,6 +7,7 @@ import { LocationAccess, useLocationAccess } from './location-access';
 import { useSecureScan } from './scan-confirmation';
 import { AttendanceSecuritySettings } from './attendance-security-settings';
 import { StudentQr } from './student-qr';
+import { LatestPasscode } from './latest-passcode';
 import { RegistrationAdmin, LoginHelp } from './register/registration-admin';
 import BrowserGate from './browser-gate';
 import { SingleStudent } from './register/single-student';
@@ -160,14 +161,12 @@ function EventPass() {
     }
   }, [user, store.regs, store.applications, workspaceReady]);
 
-  const expireAdminSession = useCallback((token: string) => {
+  const expireSession = useCallback((token: string) => {
     // Ignore a response belonging to a previous login.
     if (sessionStorage.getItem('aru-session-token') !== token) return;
-    let cachedRole = ''; try { cachedRole = JSON.parse(sessionStorage.getItem('aru-user-v1') || 'null')?.role || ''; } catch { }
-    if (cachedRole !== 'ADMIN') return;
     sessionStorage.removeItem('aru-session-token'); sessionStorage.removeItem('aru-user-v1');
     setSessionToken(''); setUser(null); setWorkspaceReady(false); setView('home'); setModal(null);
-    setLoginError('เซสชันแอดมินหมดอายุหรือถูกยกเลิก กรุณาเข้าสู่ระบบใหม่แล้วบันทึกอีกครั้ง');
+    setLoginError('เซสชันหมดอายุหรือบัญชีนี้เข้าสู่ระบบบนเครื่องอื่นแล้ว กรุณาเข้าสู่ระบบใหม่');
   }, []);
   const isImportingRef = useRef(false);
   const refreshWorkspace = useMemo(() => {
@@ -189,14 +188,14 @@ function EventPass() {
             setStore(workspaceStore(data));
             setAcademicCatalog(workspaceCatalog(data));
           } else {
-            expireAdminSession(sessionToken);
+            expireSession(sessionToken);
             throw new Error(data?.message || 'โหลดข้อมูลไม่สำเร็จ');
           }
         } while (pending);
       })().finally(() => { running = undefined; });
       return running;
     };
-  }, [sessionToken, expireAdminSession]);
+  }, [sessionToken, expireSession]);
 
   const loadEventDashboard = useCallback(async () => {
     if (!sessionToken || !supabase) return [] as EventDashboardRow[];
@@ -204,17 +203,17 @@ function EventPass() {
     return !error && data?.success && Array.isArray(data.events) ? data.events as EventDashboardRow[] : [];
   }, [sessionToken]);
 
-  useEffect(() => { setStore(readStore()); localStorage.removeItem('aru-user-v1'); const session = sessionStorage.getItem('aru-user-v1'); if (session) { try { setUser(JSON.parse(session) as User) } catch { sessionStorage.removeItem('aru-user-v1') } } const token = sessionStorage.getItem('aru-session-token') || ''; setSessionToken(token); if (token && supabase) { void supabase.rpc('load_workspace', { p_session_token: token }).then(({ data, error }) => { if (!error && data?.success) { setWorkspaceReady(true); setStore(workspaceStore(data)); setAcademicCatalog(workspaceCatalog(data)); if (data.user) { setUser(data.user as User); sessionStorage.setItem('aru-user-v1', JSON.stringify(data.user)); } if (data.events?.[0]) { setSelectedEvent(data.events[0].id); setActiveEvent(data.events[0].id); } } else if (!error && data?.success === false) expireAdminSession(token); }); } }, [expireAdminSession]);
+  useEffect(() => { setStore(readStore()); localStorage.removeItem('aru-user-v1'); const session = sessionStorage.getItem('aru-user-v1'); if (session) { try { setUser(JSON.parse(session) as User) } catch { sessionStorage.removeItem('aru-user-v1') } } const token = sessionStorage.getItem('aru-session-token') || ''; setSessionToken(token); if (token && supabase) { void supabase.rpc('load_workspace', { p_session_token: token }).then(({ data, error }) => { if (!error && data?.success) { setWorkspaceReady(true); setStore(workspaceStore(data)); setAcademicCatalog(workspaceCatalog(data)); if (data.user) { setUser(data.user as User); sessionStorage.setItem('aru-user-v1', JSON.stringify(data.user)); } if (data.events?.[0]) { setSelectedEvent(data.events[0].id); setActiveEvent(data.events[0].id); } } else if (!error && data?.success === false) expireSession(token); }); } }, [expireSession]);
   useEffect(() => { try { localStorage.setItem(storeKey, JSON.stringify(store)); } catch { } }, [store]);
   useEffect(() => { if (!mobileNav) return; const close = (e: KeyboardEvent) => { if (e.key === 'Escape') setMobileNav(false); }; window.addEventListener('keydown', close); return () => window.removeEventListener('keydown', close); }, [mobileNav]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 2800); return () => clearTimeout(t) }, [toast]);
   useEffect(() => {
     const client = supabase;
     if (!sessionToken || !client) return;
-    const heartbeat = () => { if (document.hidden) return; const eventId = view === 'scanner' ? activeEvent : null; void client.rpc('heartbeat_session', { p_session_token: sessionToken, p_active_event_id: eventId }).then(({ data, error }) => { if (!error && data?.success === false) expireAdminSession(sessionToken); }); };
+    const heartbeat = () => { if (document.hidden) return; const eventId = view === 'scanner' ? activeEvent : null; void client.rpc('heartbeat_session', { p_session_token: sessionToken, p_active_event_id: eventId }).then(({ data, error }) => { if (!error && data?.success === false) expireSession(sessionToken); }); };
     heartbeat(); const timer = window.setInterval(heartbeat, 60000); const onVisible = () => { if (!document.hidden) heartbeat(); }; document.addEventListener('visibilitychange', onVisible);
     return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
-  }, [sessionToken, view, activeEvent, selectedEvent, expireAdminSession]);
+  }, [sessionToken, view, activeEvent, selectedEvent, expireSession]);
   useEffect(() => {
     if (!scannerLocked) return;
     const previousOverflow = document.body.style.overflow;
@@ -253,7 +252,9 @@ function EventPass() {
       const requestRevision = revision;
       try {
         const { data, error } = await client.rpc('load_workspace', { p_session_token: sessionToken });
-        if (disposed || error || !data?.success || requestRevision !== revision) return;
+        if (disposed || error || requestRevision !== revision) return;
+        if (data?.success === false) { expireSession(sessionToken); return; }
+        if (!data?.success) return;
         const next = workspaceStore(data);
         for (const reg of next.regs) {
           if (reg.user_id !== user.id) continue;
@@ -301,7 +302,7 @@ function EventPass() {
         });
     }).catch(() => startFallback());
     return () => { disposed = true; window.clearInterval(applicationTimer); document.removeEventListener('visibilitychange', refresh); window.removeEventListener('pageshow', refresh); stopFallback(); if (channel) void client.removeChannel(channel); };
-  }, [user?.id, user?.role, user?.study_year, sessionToken]);
+  }, [user?.id, user?.role, user?.study_year, sessionToken, expireSession]);
 
   async function enterAs() {
     setLoginError('');
@@ -421,11 +422,11 @@ function EventPass() {
       if (!sessionToken) { setToast('เซสชันหมดอายุ กรุณาเข้าสู่ระบบแอดมินใหม่'); return; }
       const { data, error } = await supabase.rpc('admin_update_event_details', { p_admin_token: sessionToken, p_event_id: selected.id, p_title: patch.title ?? null, p_location: patch.location ?? null, p_activity_hours: patch.activity_hours ?? null, p_status: patch.status ?? null });
       if (error || !data?.success) {
-        if (data?.error_code === 'SESSION_EXPIRED') { expireAdminSession(sessionToken); return; }
+        if (data?.error_code === 'SESSION_EXPIRED') { expireSession(sessionToken); return; }
         // Also diagnose installations still using migration 034's generic error.
         if (error?.message?.includes('สงวนสิทธิ์เฉพาะแอดมิน')) {
           const check = await supabase.rpc('load_workspace', { p_session_token: sessionToken });
-          if (!check.error && check.data?.success === false) { expireAdminSession(sessionToken); return; }
+          if (!check.error && check.data?.success === false) { expireSession(sessionToken); return; }
         }
         setToast(data?.message || error?.message || 'บันทึกข้อมูลกิจกรรมไม่สำเร็จ'); return;
       }
@@ -1097,6 +1098,10 @@ function StudentPassCard({ user, events, regs }: { user: User; events: Event[]; 
 }
 
 function StudentHome({ user, events, regs, select, store, session, refresh }: { session: string; refresh: () => Promise<void>; user: User; events: Event[]; regs: Registration[]; select: (id: string) => void; store: Store }) {
+  // Include closed events; select the latest checkout, not the latest nonempty code.
+  const latestCheckout = user.study_year > 1 ? regs.filter(reg => reg.user_id === user.id && reg.status === 'COMPLETED')
+    .sort((a,b)=>(Date.parse(b.checkout_at || '') || 0)-(Date.parse(a.checkout_at || '') || 0))[0] : undefined;
+  const latestEvent = latestCheckout ? store.events.find(event=>event.id===latestCheckout.event_id) : undefined;
   const registered = events.flatMap(event => {
     const registration = regs.find(reg => reg.event_id === event.id);
     return registration ? [{ event, registration }] : [];
@@ -1124,6 +1129,7 @@ function StudentHome({ user, events, regs, select, store, session, refresh }: { 
       <div><p className="text-sm font-medium text-[#7c0a02]">ARU EVENT PASS</p><h1 className="mt-1 text-2xl font-extrabold text-slate-900 sm:text-3xl">กิจกรรมของฉัน</h1><p className="mt-2 text-base text-slate-600">พร้อมเข้างาน เปิด QR แล้วให้เจ้าหน้าที่สแกนได้เลย</p></div>
       <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600">{formatThaiDate()}</span>
     </header>
+    {latestCheckout && <LatestPasscode key={latestCheckout.event_id+':'+(latestCheckout.passcode || '')} eventTitle={latestEvent?.title || 'กิจกรรมที่สแกนออกล่าสุด'} passcode={latestCheckout.passcode} checkoutAt={latestCheckout.checkout_at} openEvent={()=>select(latestCheckout.event_id)}/>}
     <section className="student-identity flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4 text-white sm:px-5" aria-label="บัตรนักศึกษาดิจิทัล">
       <div className="flex min-w-0 items-center gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/10 text-amber-200"><GraduationCap size={24} /></div><div className="min-w-0"><p className="font-bold">{user.full_name}</p><p className="mt-1 text-sm text-rose-100">{user.student_id} · ชั้นปีที่ {user.study_year}</p></div></div>
       <span className="rounded-xl border border-white/20 px-3 py-2 text-sm text-amber-100">สำเร็จแล้ว <b>{completed.length}</b> กิจกรรม</span>

@@ -71,6 +71,38 @@ const config={host:'127.0.0.1',port:55484,user:'lab',database:'postgres'};
   ok(true,'legacy scanning endpoints not callable by API roles');
   ok((await rpc('admin_scan_security',[admin,event])).radius_m===75,'new security-definer endpoint accessible through API role');
   await c.query('reset role');
+  await c.query(fs.readFileSync('supabase/migrations/042_student_session_takeover.sql','utf8'));
+  for(const id of ['takeover1','takeover2']){
+   const u=(await c.query("insert into users(student_id,full_name,password_hash,enrollment_year,role,study_year) values($1,$1,crypt('password',gen_salt('bf')),2569,'STUDENT',1) returning id",[id])).rows[0].id;
+   await c.query('insert into event_registrations(event_id,user_id) values($1,$2)',[event,u]);
+  }
+  const d4='4'.repeat(64),d5='5'.repeat(64),d6='6'.repeat(64);
+  let t1=(await login('takeover1',d4)).session_token;
+  const oldTicket=await issue(t1,d4);
+  let t2=(await login('takeover1',d5)).session_token;
+  ok(!!t2,'042 password login immediately replaces device');
+  ok(!(await rpc('load_workspace',[t1])).success,'042 previous session cannot read workspace');
+  ok(!(await scan(oldTicket.token)).success,'042 old QR rejected immediately');
+  ok(!(await issue(t1,d4)).success,'042 expired session cannot reclaim device');
+  const wrong=await rpc('login_device',['takeover1','wrong-password',d4]);
+  ok(!wrong.success&&(await rpc('load_workspace',[t2])).success,'042 wrong password does not revoke valid session');
+  ticket=await issue(t2,d5);ok((await scan(ticket.token)).success,'042 replacement device can check in');
+  t1=(await login('takeover1',d4)).session_token;
+  ok(!!t1&&!(await rpc('load_workspace',[t2])).success,'042 attending student can transfer own account');
+  await assert.rejects(login('takeover2',d5));ok(true,'042 former attending device cannot login friend');
+  await assert.rejects(login('takeover2',d4));ok(true,'042 current attending device cannot login friend');
+  ok(!(await rpc('logout_event_session',[t1])).success,'042 attending logout still blocked');
+  ticket=await issue(t1,d4);
+  ok((await scan(ticket.token,loc(),false,null,staff,'CHECKOUT')).success,'042 transferred account can check out');
+  ok(!!(await login('takeover2',d5)).session_token,'042 former device available after checkout');
+  const simultaneous=await Promise.all([login('takeover1',d4),login('takeover1',d6,other)]);
+  const validity=await Promise.all(simultaneous.map(r=>rpc('load_workspace',[r.session_token])));
+  ok(simultaneous.every(r=>r.success)&&validity.filter(r=>r.success).length===1,'042 concurrent logins leave exactly one valid session');
+  await c.query('set role anon');
+  ok((await login('takeover1',d4)).success,'042 takeover works through API role');
+  await assert.rejects(c.query('select * from event_pass_private.attendance_device_holds'));
+  ok(true,'042 device holds not exposed through API role');
+  await c.query('reset role');
   console.log(`SUCCESS ${checks} security checks; database ${db}`);
  }finally{await Promise.all([c.end(),other.end()]);}
 })().catch(e=>{console.error(e.message,e.where||'',e.stack);process.exitCode=1;});
