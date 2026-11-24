@@ -7,6 +7,7 @@ import { LocationAccess, useLocationAccess } from './location-access';
 import { useSecureScan } from './scan-confirmation';
 import { AttendanceSecuritySettings } from './attendance-security-settings';
 import { StudentQr } from './student-qr';
+import { PasscodeRound } from './passcode-round';
 import { LatestPasscode } from './latest-passcode';
 import { RegistrationAdmin, LoginHelp } from './register/registration-admin';
 import BrowserGate from './browser-gate';
@@ -96,6 +97,7 @@ function EventPass() {
   const [selectedEvent, setSelectedEvent] = useState('evt-aru-01');
   const [flash, setFlash] = useState<'success' | 'checkout' | 'error' | ''>('');
   const [scanMessage, setScanMessage] = useState<{ ok: boolean; title: string; detail: string } | null>(null);
+  const [recoveryScan, setRecoveryScan] = useState(false);
   const [scannerOn, setScannerOn] = useState(false);
   const [modal, setModal] = useState<'walkin' | 'event' | 'codes' | 'staff' | 'editUser' | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -342,11 +344,11 @@ function EventPass() {
       cooldown.current.set(raw, now);
       const response = await secureScan.scan({
         p_session_token: sessionToken, p_event_id: activeEvent, p_scan_mode: deviceMode, p_ticket: match[1],
-      }, gps.read);
+      }, gps.read, user?.role === 'ADMIN' && recoveryScan);
       if (!response) return;
       const { data, error } = response;
       if (error || !data?.success) {
-        setScanMessage({ ok: false, title: data?.message || 'สแกนไม่สำเร็จ', detail: error ? 'ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง' : 'กรุณาตรวจสอบบัตรก่อนสแกนอีกครั้ง' });
+        setScanMessage({ ok: false, title: data?.message || error?.message || 'สแกนไม่สำเร็จ', detail: error ? 'ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง' : 'กรุณาตรวจสอบบัตรก่อนสแกนอีกครั้ง' });
         setFlash('error'); soundEngine.playError(); return;
       }
       const isOut = data.new_status === 'COMPLETED';
@@ -827,6 +829,7 @@ function EventPass() {
     <div key={view} className="page-transition mx-auto mt-6 max-w-[1440px]">
       {view === 'scanner' && user && user.role !== 'STUDENT' && isSupabaseConfigured && <LocationAccess gps={gps} />}
       {secureScan.confirmation}
+      {view === 'scanner' && user?.role === 'ADMIN' && <label className="mx-auto mb-3 flex max-w-5xl items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm"><input type="checkbox" checked={recoveryScan} onChange={e => setRecoveryScan(e.target.checked)} className="h-5 w-5" />ยืนยันกลุ่มตกหล่น (หลังปิดรอบ · รับรหัสที่คืนมา · ต้องตรวจบัตรและระบุเหตุผล)</label>}
       {!user ? <Landing loginError={loginError} enterAs={() => void withLoading('กำลังตรวจสอบบัญชีผู้ใช้…', enterAs)} saving={saving || Boolean(loadingMessage)} /> : view === 'scanner' && user.role !== 'STUDENT' ? <ScannerView user={user} event={currentEvent} events={store.events} activeEvent={activeEvent} setActiveEvent={setActiveEvent} scannerOn={scannerOn} scannerLocked={scannerLocked} toggleScannerLock={() => setScannerLocked(value => !value)} startScanner={() => void withLoading('กำลังเปิดกล้อง…', startScanner)} stopScanner={() => void withLoading('กำลังปิดกล้อง…', stopScanner)} deviceMode={deviceMode} scanMode={setScanMode} scanInput={scanInput} setScanInput={setScanInput} scanPayload={async (raw: string) => { await withLoading('กำลังตรวจสอบ QR…', () => scanPayload(raw)); }} scanMessage={scanMessage} flash={flash} attendance={attendance} registered={registered} reserveLeft={reserveLeft} openWalkin={() => setModal('walkin')} /> : view === 'admin' && user.role === 'ADMIN' ? <AdminView isImportingRef={isImportingRef} deleteBatch={(kind, values) => withLoading('กำลังลบรายการ…', () => deleteBatch(kind, values))} sessionToken={sessionToken} store={store} academicCatalog={academicCatalog} manageAcademicCatalog={(...args) => withLoading('กำลังบันทึกคณะและสาขา…', () => manageAcademicCatalog(...args))} selectedEvent={selected} selectedEventId={selectedEvent} setSelectedEvent={setSelectedEvent} openCreate={() => setModal('event')} openCodes={() => setModal('codes')} openStaff={() => setModal('staff')} editUser={(target: User) => { setEditingUser(target); setEditingFaculty(target.faculty); setEditingMajor(target.major); setModal('editUser') }} deleteUser={(target: User) => void withLoading('กำลังลบบัญชีผู้ใช้…', () => deleteManagedUser(target))} deleteActivity={() => void withLoading('กำลังลบกิจกรรม…', deleteActivity)} deleteRegistration={(id: string) => void withLoading('กำลังนำรายชื่อออก…', () => deleteRegistration(id))} importError={importError} csvFile={csvFile} setCsvFile={setCsvFile} importCsv={roster => void withLoading('กำลังนำเข้ารายชื่อ…', () => importCsv(roster))} enrollRosterToEvent={() => withLoading('กำลังผูกรายชื่อเข้ากิจกรรม…', enrollRosterToEvent)} refreshWorkspace={refreshWorkspace} loadEventDashboard={loadEventDashboard} updateEvent={(patch: Partial<Event>) => withLoading('กำลังบันทึกการเปลี่ยนแปลง…', () => updateSelectedEvent(patch))} /> : view === 'studentStats' && user.role === 'STUDENT' ? <StudentStatsView user={user} events={store.events.filter(e => studentRegs.some(r => r.event_id === e.id))} regs={studentRegs} /> : view === 'event' && user.role === 'STUDENT' ? <EventDetail session={sessionToken} event={store.events.find(e => e.id === activeEvent) || currentEvent} user={user} registration={studentRegs.find(r => r.event_id === activeEvent)} back={() => setView('home')} /> : <StudentHome session={sessionToken} refresh={refreshWorkspace} user={user} events={store.events.filter(e => studentRegs.some(r => r.event_id === e.id))} regs={studentRegs} select={(id: string) => { setActiveEvent(id); setView('event') }} store={store} />}
     </div>
     {user && <div className="mx-auto mt-10 flex max-w-[1440px] items-center justify-between border-t border-slate-200/70 px-2 py-4 text-sm text-slate-500"><span>© 2026 ARU Student Organization · ระบบลงทะเบียนกิจกรรม</span><span className="hidden items-center gap-1 sm:flex"><ShieldCheck size={12} />ข้อมูลกิจกรรมอัปเดตแบบเรียลไทม์</span></div>}
@@ -2327,16 +2330,17 @@ const PasscodeList = memo(function PasscodeList({ eventId, store, openCodes, rem
   token: string; refresh: () => Promise<void>; eventId: string; store: Store; openCodes: () => void; remove: (values: string[]) => Promise<boolean | undefined>;
 }) {
   const [matching, setMatching] = useState(false);
+  const [roundClosed, setRoundClosed] = useState(false);
   const [matchNotice, setMatchNotice] = useState('');
   const seniors = useMemo(() => {
     return new Set(store.users.filter(user => user.study_year > 1 && user.role === 'STUDENT').map(user => user.id));
   }, [store.users]);
   const waitingAttended = useMemo(() => {
-    return store.regs.filter(reg => reg.event_id === eventId && !reg.passcode && seniors.has(reg.user_id) && (reg.status === 'ATTENDING' || reg.status === 'COMPLETED')).length;
-  }, [store.regs, eventId, seniors]);
+    return store.regs.filter(reg => reg.event_id === eventId && !reg.passcode && seniors.has(reg.user_id) && ((!roundClosed && reg.status === 'ATTENDING') || reg.status === 'COMPLETED')).length;
+  }, [store.regs, eventId, seniors, roundClosed]);
   const waitingUnchecked = useMemo(() => {
     return store.regs.filter(reg => reg.event_id === eventId && !reg.passcode && seniors.has(reg.user_id) && reg.status === 'REGISTERED').length;
-  }, [store.regs, eventId, seniors]);
+  }, [store.regs, eventId, seniors, roundClosed]);
   async function matchCodes() {
     if (!supabase || matching) return;
     setMatching(true); setMatchNotice('');
@@ -2394,6 +2398,7 @@ const PasscodeList = memo(function PasscodeList({ eventId, store, openCodes, rem
       <h2 className="font-bold text-slate-900">Passcode ของกิจกรรม</h2>
       <button type="button" onClick={openCodes} className="action-primary"><Plus size={16} />เพิ่มหลายรหัส</button>
     </div>
+    <PasscodeRound key={eventId} token={token} eventId={eventId} refresh={refresh} onClosed={setRoundClosed} />
     <div ref={listTop} className="scroll-mt-3" />
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-3">

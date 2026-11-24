@@ -5,6 +5,7 @@ import { LocationFix } from './location-access';
 import { AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, X, Sparkles, ClipboardList } from 'lucide-react';
 
 type Warning = {
+  code?: string;
   message: string;
   distance_m: number | null;
   radius_m: number;
@@ -38,20 +39,23 @@ export function useSecureScan(context: string) {
 
   async function scan(
     args: { p_session_token: string; p_event_id: string; p_scan_mode: string; p_ticket: string },
-    read: () => LocationFix | null
+    read: () => LocationFix | null,
+    recovery = false
   ) {
     if (busy.current || !supabase) return null;
     busy.current = true;
     try {
-      let response = await supabase.rpc('redeem_location_qr', { ...args, p_location: read() });
-      if (response.data?.code === 'GPS_CONFIRM_REQUIRED') {
+      const endpoint = recovery ? 'admin_recover_attendance_qr' : 'redeem_location_qr';
+      const payload = recovery ? { p_session_token: args.p_session_token, p_event_id: args.p_event_id, p_ticket: args.p_ticket } : args;
+      let response = await supabase.rpc(endpoint, { ...payload, p_location: read() });
+      if (['GPS_CONFIRM_REQUIRED', 'RECOVERY_CONFIRM_REQUIRED'].includes(response.data?.code)) {
         const reason = await new Promise<string | null>(resolve => {
           answer.current = resolve;
           setWarning(response.data as Warning);
         });
         if (reason === null) return null;
-        response = await supabase.rpc('redeem_location_qr', {
-          ...args,
+        response = await supabase.rpc(endpoint, {
+          ...payload,
           p_location: read(),
           p_confirm: true,
           p_reason: reason,
@@ -101,9 +105,9 @@ function Confirmation({ warning: w, done }: { warning: Warning; done: (reason: s
             </span>
             <div>
               <h2 id="gps-warning-title" className="text-base font-extrabold">
-                ต้องยืนยันตัวนักศึกษาก่อนสแกน
+                {w.code === 'RECOVERY_CONFIRM_REQUIRED' ? 'ยืนยันผู้เข้าร่วมที่สแกนเข้าตกหล่น' : 'ต้องยืนยันตัวนักศึกษาก่อนสแกน'}
               </h2>
-              <p className="mt-0.5 text-xs text-rose-100">ตรวจพบเงื่อนไขพิกัด GPS พิเศษ</p>
+              <p className="mt-0.5 text-xs text-rose-100">{w.code === 'RECOVERY_CONFIRM_REQUIRED' ? 'อนุมัติรับ Passcode ที่คืนมาโดยแอดมิน' : 'ตรวจพบเงื่อนไขพิกัด GPS พิเศษ'}</p>
             </div>
           </div>
           <button
@@ -178,7 +182,7 @@ function Confirmation({ warning: w, done }: { warning: Warning; done: (reason: s
 
             {/* Quick Reason Chips */}
             <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {QUICK_REASONS.map(qr => (
+              {(w.code === 'RECOVERY_CONFIRM_REQUIRED' ? [] : QUICK_REASONS).map(qr => (
                 <button
                   key={qr}
                   type="button"
@@ -221,7 +225,7 @@ function Confirmation({ warning: w, done }: { warning: Warning; done: (reason: s
               className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#7c0a02] py-2.5 font-bold text-white shadow-md hover:bg-[#600801] disabled:opacity-40 active:scale-95 transition-transform"
             >
               <UserCheck size={14} />
-              <span>ยืนยันและเช็กชื่อ</span>
+              <span>{w.code === 'RECOVERY_CONFIRM_REQUIRED' ? 'ยืนยันและให้ Passcode' : 'ยืนยันและเช็กชื่อ'}</span>
             </button>
           </div>
         </form>
