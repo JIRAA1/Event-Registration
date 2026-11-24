@@ -31,7 +31,7 @@ type Role = 'STUDENT' | 'STAFF' | 'ADMIN';
 type Status = 'REGISTERED' | 'ATTENDING' | 'COMPLETED';
 type User = { id: string; student_id: string; full_name: string; faculty: string; major: string; class_group: string; enrollment_year: number; study_year: number; birth_date?: string; phone?: string; role: Role };
 type Event = { id: string; title: string; location: string; activity_hours: number; status: 'ACTIVE' | 'UPCOMING' | 'CLOSED'; redirect_url_year1: string; scan_mode: 'CHECKIN' | 'CHECKOUT'; banner_url?: string; };
-type Registration = { event_id: string; user_id: string; status: Status; passcode?: string; checkin_at?: string; checkout_at?: string; checked_in_by?: string; checked_out_by?: string; checkin_staff_name?: string; checkout_staff_name?: string; is_walkin?: boolean; checkin_station?: boolean };
+type Registration = { event_id: string; user_id: string; status: Status; passcode_forfeited?: boolean; passcode?: string; checkin_at?: string; checkout_at?: string; checked_in_by?: string; checked_out_by?: string; checkin_staff_name?: string; checkout_staff_name?: string; is_walkin?: boolean; checkin_station?: boolean };
 type EventDashboardRow = { event_id: string; title: string; status: Event['status']; registered_count: number; checked_in_count: number; checked_out_count: number; online_students: number; online_staff: number };
 type Passcode = { event_id: string; code: string; is_reserve: boolean; assigned_to?: string };
 type Store = { users: User[]; events: Event[]; regs: Registration[]; codes: Passcode[]; applications?: { id: string; event_id: string; title: string; online: boolean; status: string; note: string }[] };
@@ -269,7 +269,7 @@ function EventPass() {
     };
     const startFallback = () => { if (!disposed && !pollTimer) pollTimer = setInterval(refresh, 10000); };
     const stopFallback = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = undefined; } };
-    const receiveUpdate = (message: { event_id?: string; user_id?: string; status?: Status; checkin_at?: string | null; checkout_at?: string | null; passcode?: string | null; operation?: string }) => {
+    const receiveUpdate = (message: { event_id?: string; user_id?: string; status?: Status; passcode_forfeited?: boolean; checkin_at?: string | null; checkout_at?: string | null; passcode?: string | null; operation?: string }) => {
       if (message.user_id !== user.id || !message.event_id) return;
       revision++;
       if (refreshing) refreshAgain = true;
@@ -282,7 +282,8 @@ function EventPass() {
       const known = storeRef.current.regs.some(reg => reg.event_id === message.event_id && reg.user_id === user.id);
       if (!known) { void refresh(); return; }
       if (message.status) {
-        setStore(old => ({ ...old, regs: old.regs.map(reg => reg.event_id === message.event_id && reg.user_id === user.id ? { ...reg, status: message.status!, checkin_at: message.checkin_at === undefined ? reg.checkin_at : message.checkin_at ?? undefined, checkout_at: message.checkout_at === undefined ? reg.checkout_at : message.checkout_at ?? undefined, passcode: message.passcode === undefined ? reg.passcode : message.passcode ?? undefined } : reg) }));
+        setStore(old => ({ ...old, regs: old.regs.map(reg => reg.event_id === message.event_id && reg.user_id === user.id ? { ...reg, status: message.status!, passcode_forfeited: message.passcode_forfeited ?? reg.passcode_forfeited, checkin_at: message.checkin_at === undefined ? reg.checkin_at : message.checkin_at ?? undefined, checkout_at: message.checkout_at === undefined ? reg.checkout_at : message.checkout_at ?? undefined, passcode: message.passcode === undefined ? reg.passcode : message.passcode ?? undefined } : reg) }));
+        if (message.passcode_forfeited) { setToast('ไม่สแกนออก · ไม่ได้รับ Passcode'); return; }
         observed.set(message.event_id, message.status);
         openAfterScan(storeRef.current.events.find(event => event.id === message.event_id), message.status);
         if (message.status === 'ATTENDING' || message.status === 'COMPLETED') setToast(message.status === 'COMPLETED' ? 'เข้าร่วมกิจกรรมสำเร็จ' : 'กำลังเข้าร่วมกิจกรรม');
@@ -1113,16 +1114,16 @@ function StudentHome({ user, events, regs, select, store, session, refresh }: { 
   const active = registered.filter(row => row.registration.status !== 'COMPLETED').sort((a, b) => priority[a.registration.status] - priority[b.registration.status]);
   const completed = registered.filter(row => row.registration.status === 'COMPLETED').sort((a, b) => (Date.parse(b.registration.checkout_at || '') || 0) - (Date.parse(a.registration.checkout_at || '') || 0));
   function eventCard({ event, registration }: typeof registered[number]) {
-    const attending = registration.status === 'ATTENDING';
+    const attending = registration.status === 'ATTENDING' && !registration.passcode_forfeited;
     const done = registration.status === 'COMPLETED';
-    const canScan = event.status === 'ACTIVE' && !done;
+    const canScan = event.status === 'ACTIVE' && !done && !registration.passcode_forfeited;
     const action = done ? 'ดูผลการเข้าร่วม' : !canScan ? 'ดูรายละเอียดกิจกรรม' : attending ? 'เปิด QR สแกนออก' : 'เปิด QR สแกนเข้า';
     return <article key={event.id} className={cx('student-event-card', attending && 'student-event-card-current')}>
-      <div className="flex flex-wrap items-center gap-2"><StatusPill status={registration.status} />{event.status === 'ACTIVE' && !done && <span className="text-sm font-medium text-emerald-700">เปิดรอบสแกน</span>}</div>
+      <div className="flex flex-wrap items-center gap-2"><StatusPill status={registration.status} forfeited={registration.passcode_forfeited} />{canScan && <span className="text-sm font-medium text-emerald-700">เปิดรอบสแกน</span>}</div>
       <h3 className="mt-3 text-lg font-bold text-slate-900">{event.title}</h3>
       <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600"><span className="inline-flex items-center gap-2"><MapPin size={16} />{event.location}</span><span className="inline-flex items-center gap-2"><Clock3 size={16} />{event.activity_hours} ชั่วโมงกิจกรรม</span></div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/80 pt-4">
-        <p className="text-sm text-slate-600">{done ? 'บันทึกผลการเข้าร่วมแล้ว' : attending ? 'ก่อนกลับ อย่าลืมให้เจ้าหน้าที่สแกนออก' : canScan ? 'แสดง QR ให้เจ้าหน้าที่เมื่อถึงหน้างาน' : 'รอเปิดรอบสแกนจากผู้จัดกิจกรรม'}</p>
+        <p className="text-sm text-slate-600">{registration.passcode_forfeited ? 'ปิดรอบแล้ว และคืน Passcode จากรายการนี้แล้ว' : done ? 'บันทึกผลการเข้าร่วมแล้ว' : attending ? 'ก่อนกลับ อย่าลืมให้เจ้าหน้าที่สแกนออก' : canScan ? 'แสดง QR ให้เจ้าหน้าที่เมื่อถึงหน้างาน' : 'รอเปิดรอบสแกนจากผู้จัดกิจกรรม'}</p>
         <button type="button" className={cx(done || !canScan ? 'action-secondary' : 'action-primary', 'w-full sm:w-auto')} onClick={() => select(event.id)} aria-label={action + ' · ' + event.title}>{done ? <CheckCircle2 size={20} /> : <QrCode size={20} />}{action}</button>
       </div>
     </article>;
@@ -1228,7 +1229,13 @@ function AttendanceConfirmation({ status, eventTitle }: { status?: Status; event
   );
 }
 
-function StatusPill({ status }: { status: Status }) {
+function attendanceLabel(reg: Pick<Registration, 'status' | 'passcode_forfeited'>) {
+  if (reg.passcode_forfeited) return 'ไม่สแกนออก · ไม่ได้รับ Passcode';
+  return { REGISTERED: 'รอสแกนเข้างาน', ATTENDING: 'กำลังเข้าร่วมกิจกรรม', COMPLETED: 'เข้าร่วมกิจกรรมสำเร็จ' }[reg.status];
+}
+
+function StatusPill({ status, forfeited }: { status: Status; forfeited?: boolean }) {
+  if (forfeited) return <span className="inline-flex rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1 text-sm font-bold text-rose-800">{attendanceLabel({ status, passcode_forfeited: true })}</span>;
   const label = status === 'REGISTERED' ? 'รอสแกนเข้างาน' : status === 'ATTENDING' ? 'กำลังเข้าร่วมกิจกรรม' : 'เข้าร่วมกิจกรรมสำเร็จ';
   return (
     <span
@@ -1288,7 +1295,7 @@ function EventDetail({ event, user, registration, back, session }: { session: st
             <div>
               <span className="text-sm font-bold uppercase tracking-wider text-slate-500">สถานะการเข้าร่วม</span>
               <div className="mt-1.5">
-                <StatusPill status={registration?.status || 'REGISTERED'} />
+                <StatusPill status={registration?.status || 'REGISTERED'} forfeited={registration?.passcode_forfeited} />
               </div>
             </div>
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-2.5 text-[#7c0a02]">
@@ -1859,12 +1866,12 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
       const latest = workspaceStore(data); const people = new Map(latest.users.map(person => [person.id, person]));
       population = latest.regs.filter(reg => reg.event_id === selectedEventId).map(reg => ({ reg, person: people.get(reg.user_id) })).filter((row): row is { reg: Registration; person: User } => Boolean(row.person));
     }
-    const rows = allRegistered ? population : population.filter(row => (reportStudyYear === 'ALL' || String(row.person.study_year) === reportStudyYear) && (reportFaculty === 'ALL' || row.person.faculty === reportFaculty) && (reportMajor === 'ALL' || row.person.major === reportMajor) && (reportClassGroup === 'ALL' || row.person.class_group === reportClassGroup) && (reportStatus === 'ALL' || (reportStatus === 'ATTENDED' && row.reg.status !== 'REGISTERED') || (reportStatus === 'NO_CHECKIN' && row.reg.status === 'REGISTERED') || (reportStatus === 'NO_CHECKOUT' && row.reg.status === 'ATTENDING'))); const csvRows = [['รหัสนักศึกษา', 'ชื่อ-นามสกุล', 'ชั้นปี', 'คณะ', 'สาขาวิชา', 'หมู่เรียน', 'เบอร์โทรศัพท์', 'สถานะ', 'เวลาเช็กอิน', 'ผู้เช็กอิน', 'เวลาเช็กเอาต์', 'สตาฟเช็กเอาต์'], ...rows.map(({ reg, person }) => [person.student_id, person.full_name, person.study_year, person.faculty, person.major, person.class_group, person.phone || '', ({ REGISTERED: 'รอสแกนเข้างาน', ATTENDING: 'กำลังเข้าร่วมกิจกรรม', COMPLETED: 'เข้าร่วมกิจกรรมสำเร็จ' }[reg.status]), reg.checkin_at || '', reg.checkin_station ? 'เครื่องลงทะเบียน iPad' : reg.checkin_staff_name || store.users.find(u => u.id === reg.checked_in_by)?.full_name || '', reg.checkout_at || '', reg.checkout_staff_name || store.users.find(u => u.id === reg.checked_out_by)?.full_name || ''])]; const quote = (value: string | number) => { const text = String(value); return '"' + (/^[=+@\-\t\r\n]/.test(text) ? "'" : '') + text.replace(/"/g, '""') + '"'; }; const csv = '\uFEFF' + csvRows.map(row => row.map(quote).join(',')).join('\r\n'); const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); const link = document.createElement('a'); link.href = url; link.download = 'aru-attendance-' + (allRegistered ? 'registered-all' : reportStatus.toLowerCase()) + '-' + selectedEventId + '.csv'; link.click(); URL.revokeObjectURL(url);
+    const rows = allRegistered ? population : population.filter(row => (reportStudyYear === 'ALL' || String(row.person.study_year) === reportStudyYear) && (reportFaculty === 'ALL' || row.person.faculty === reportFaculty) && (reportMajor === 'ALL' || row.person.major === reportMajor) && (reportClassGroup === 'ALL' || row.person.class_group === reportClassGroup) && (reportStatus === 'ALL' || (reportStatus === 'ATTENDED' && row.reg.status !== 'REGISTERED') || (reportStatus === 'NO_CHECKIN' && row.reg.status === 'REGISTERED') || (reportStatus === 'NO_CHECKOUT' && row.reg.status === 'ATTENDING'))); const csvRows = [['รหัสนักศึกษา', 'ชื่อ-นามสกุล', 'ชั้นปี', 'คณะ', 'สาขาวิชา', 'หมู่เรียน', 'เบอร์โทรศัพท์', 'สถานะ', 'เวลาเช็กอิน', 'ผู้เช็กอิน', 'เวลาเช็กเอาต์', 'สตาฟเช็กเอาต์'], ...rows.map(({ reg, person }) => [person.student_id, person.full_name, person.study_year, person.faculty, person.major, person.class_group, person.phone || '', attendanceLabel(reg), reg.checkin_at || '', reg.checkin_station ? 'เครื่องลงทะเบียน iPad' : reg.checkin_staff_name || store.users.find(u => u.id === reg.checked_in_by)?.full_name || '', reg.checkout_at || '', reg.checkout_staff_name || store.users.find(u => u.id === reg.checked_out_by)?.full_name || ''])]; const quote = (value: string | number) => { const text = String(value); return '"' + (/^[=+@\-\t\r\n]/.test(text) ? "'" : '') + text.replace(/"/g, '""') + '"'; }; const csv = '\uFEFF' + csvRows.map(row => row.map(quote).join(',')).join('\r\n'); const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); const link = document.createElement('a'); link.href = url; link.download = 'aru-attendance-' + (allRegistered ? 'registered-all' : reportStatus.toLowerCase()) + '-' + selectedEventId + '.csv'; link.click(); URL.revokeObjectURL(url);
   }
   return <div className="admin-workspace min-w-0 space-y-6">
     {correction && <Modal title="แก้สถานะเข้าร่วมกิจกรรม" subtitle={correction.name} close={() => { if (!correcting) setCorrection(null); }}>
       <form onSubmit={saveCorrection} className="space-y-4">
-        <div className="flex items-center gap-2 text-sm">สถานะปัจจุบัน <StatusPill status={correction.reg.status} /></div>
+        <div className="flex items-center gap-2 text-sm">สถานะปัจจุบัน <StatusPill status={correction.reg.status} forfeited={correction.reg.passcode_forfeited} /></div>
         <label className="block text-sm font-bold">เปลี่ยนเป็น
           <select value={nextStatus} onChange={e => setNextStatus(e.target.value as Registration['status'])} disabled={correcting} className="mt-2 min-h-12 w-full rounded-xl border border-slate-300 p-3">
             <option value="REGISTERED">รอสแกนเข้างาน</option><option value="ATTENDING">กำลังเข้าร่วมกิจกรรม</option><option value="COMPLETED">เข้าร่วมกิจกรรมสำเร็จ</option>
@@ -2160,7 +2167,7 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
           </div>
 
           {/* Detailed Table */}
-          <AttendanceList rows={selectedReportRows} users={store.users} status={reg => <StatusPill status={reg.status} />} actions={(reg, person) => <>
+          <AttendanceList rows={selectedReportRows} users={store.users} status={reg => <StatusPill status={reg.status} forfeited={reg.passcode_forfeited} />} actions={(reg, person) => <>
             <button className="action-secondary" onClick={() => { setCorrection({ reg, name: person.full_name + ' · ' + person.student_id }); setNextStatus(reg.status); setCorrectionReason(''); setCorrectionError(''); }}>แก้สถานะ</button>
             <button type="button" onClick={() => deleteRegistration(reg.user_id)} aria-label={'ลบการลงทะเบียนของ ' + person.full_name} className="action-danger"><Trash2 size={16} /></button>
           </>} />
@@ -2174,7 +2181,7 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
             </div>
             <button onClick={() => exportAttendance(true)} disabled={!reportPopulation.length} className="action-primary"><Download size={16} />ส่งออกรายชื่อ CSV ({reportPopulation.length})</button>
           </div>
-          <AttendanceList rows={reportPopulation} users={store.users} status={reg => <StatusPill status={reg.status} />} actions={(reg, person) => <>
+          <AttendanceList rows={reportPopulation} users={store.users} status={reg => <StatusPill status={reg.status} forfeited={reg.passcode_forfeited} />} actions={(reg, person) => <>
             <button className="action-secondary" onClick={() => { setCorrection({ reg, name: person.full_name + ' · ' + person.student_id }); setNextStatus(reg.status); setCorrectionReason(''); setCorrectionError(''); }}>แก้สถานะ</button>
             <button type="button" onClick={() => deleteRegistration(reg.user_id)} aria-label={'ลบการลงทะเบียนของ ' + person.full_name} className="action-danger"><Trash2 size={16} /></button>
           </>} />

@@ -147,6 +147,13 @@ const config={host:'127.0.0.1',port:55484,user:'lab',database:'postgres'};
   ok((await round('PREVIEW')).available_count===0,'043 API role may call authenticated admin RPC');
   await assert.rejects(c.query('select * from event_pass_private.passcode_recovery'));ok(true,'043 recovery audit private');
   await c.query('reset role');
+  const beforeReport=(await c.query('select jsonb_agg(to_jsonb(r) order by id) rows from event_registrations r')).rows[0].rows;
+  await c.query(fs.readFileSync('supabase/migrations/044_report_forfeited_passcodes.sql','utf8'));
+  const report=(await rpc('load_workspace',[admin])).registrations;
+  ok(report.find(r=>r.event_id===ev&&r.user_id===ids.absent).passcode_forfeited===true,'044 report exposes forfeited flag for reclaimed student');
+  ok(report.find(r=>r.event_id===ev&&r.user_id===ids.done).passcode_forfeited===false,'044 completed recipient remains not forfeited');
+  assert.deepEqual((await c.query('select jsonb_agg(to_jsonb(r) order by id) rows from event_registrations r')).rows[0].rows,beforeReport);
+  ok(true,'044 report migration does not rewrite attendance history');
   console.log(`SUCCESS ${checks} security checks; database ${db}`);
  }finally{await Promise.all([c.end(),other.end()]);}
 })().catch(e=>{console.error(e.message,e.where||'',e.stack);process.exitCode=1;});
