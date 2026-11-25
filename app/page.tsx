@@ -31,7 +31,7 @@ type Role = 'STUDENT' | 'STAFF' | 'ADMIN';
 type Status = 'REGISTERED' | 'ATTENDING' | 'COMPLETED';
 type User = { id: string; student_id: string; full_name: string; faculty: string; major: string; class_group: string; enrollment_year: number; study_year: number; birth_date?: string; phone?: string; role: Role };
 type Event = { id: string; title: string; location: string; activity_hours: number; status: 'ACTIVE' | 'UPCOMING' | 'CLOSED'; redirect_url_year1: string; scan_mode: 'CHECKIN' | 'CHECKOUT'; banner_url?: string; };
-type Registration = { event_id: string; user_id: string; status: Status; passcode_forfeited?: boolean; passcode?: string; checkin_at?: string; checkout_at?: string; checked_in_by?: string; checked_out_by?: string; checkin_staff_name?: string; checkout_staff_name?: string; is_walkin?: boolean; checkin_station?: boolean };
+type Registration = { event_id: string; user_id: string; status: Status; passcode_forfeited?: boolean; checkout_closed?: boolean; passcode?: string; checkin_at?: string; checkout_at?: string; checked_in_by?: string; checked_out_by?: string; checkin_staff_name?: string; checkout_staff_name?: string; is_walkin?: boolean; checkin_station?: boolean };
 type EventDashboardRow = { event_id: string; title: string; status: Event['status']; registered_count: number; checked_in_count: number; checked_out_count: number; online_students: number; online_staff: number };
 type Passcode = { event_id: string; code: string; is_reserve: boolean; assigned_to?: string };
 type Store = { users: User[]; events: Event[]; regs: Registration[]; codes: Passcode[]; applications?: { id: string; event_id: string; title: string; online: boolean; status: string; note: string }[] };
@@ -1114,16 +1114,16 @@ function StudentHome({ user, events, regs, select, store, session, refresh }: { 
   const active = registered.filter(row => row.registration.status !== 'COMPLETED').sort((a, b) => priority[a.registration.status] - priority[b.registration.status]);
   const completed = registered.filter(row => row.registration.status === 'COMPLETED').sort((a, b) => (Date.parse(b.registration.checkout_at || '') || 0) - (Date.parse(a.registration.checkout_at || '') || 0));
   function eventCard({ event, registration }: typeof registered[number]) {
-    const attending = registration.status === 'ATTENDING' && !registration.passcode_forfeited;
+    const attending = registration.status === 'ATTENDING' && !registration.passcode_forfeited && !registration.checkout_closed;
     const done = registration.status === 'COMPLETED';
-    const canScan = event.status === 'ACTIVE' && !done && !registration.passcode_forfeited;
+    const canScan = event.status === 'ACTIVE' && !done && !registration.passcode_forfeited && !(registration.checkout_closed && registration.status === 'ATTENDING');
     const action = done ? 'ดูผลการเข้าร่วม' : !canScan ? 'ดูรายละเอียดกิจกรรม' : attending ? 'เปิด QR สแกนออก' : 'เปิด QR สแกนเข้า';
     return <article key={event.id} className={cx('student-event-card', attending && 'student-event-card-current')}>
-      <div className="flex flex-wrap items-center gap-2"><StatusPill status={registration.status} forfeited={registration.passcode_forfeited} />{canScan && <span className="text-sm font-medium text-emerald-700">เปิดรอบสแกน</span>}</div>
+      <div className="flex flex-wrap items-center gap-2"><StatusPill status={registration.status} forfeited={registration.passcode_forfeited} closed={registration.checkout_closed} />{canScan && <span className="text-sm font-medium text-emerald-700">เปิดรอบสแกน</span>}</div>
       <h3 className="mt-3 text-lg font-bold text-slate-900">{event.title}</h3>
       <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600"><span className="inline-flex items-center gap-2"><MapPin size={16} />{event.location}</span><span className="inline-flex items-center gap-2"><Clock3 size={16} />{event.activity_hours} ชั่วโมงกิจกรรม</span></div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/80 pt-4">
-        <p className="text-sm text-slate-600">{registration.passcode_forfeited ? 'ปิดรอบแล้ว และคืน Passcode จากรายการนี้แล้ว' : done ? 'บันทึกผลการเข้าร่วมแล้ว' : attending ? 'ก่อนกลับ อย่าลืมให้เจ้าหน้าที่สแกนออก' : canScan ? 'แสดง QR ให้เจ้าหน้าที่เมื่อถึงหน้างาน' : 'รอเปิดรอบสแกนจากผู้จัดกิจกรรม'}</p>
+        <p className="text-sm text-slate-600">{registration.passcode_forfeited ? 'ปิดรอบแล้ว และคืน Passcode จากรายการนี้แล้ว' : registration.checkout_closed && registration.status === 'ATTENDING' ? 'ไม่สแกนออกภายในรอบที่กำหนด' : done ? 'บันทึกผลการเข้าร่วมแล้ว' : attending ? 'ก่อนกลับ อย่าลืมให้เจ้าหน้าที่สแกนออก' : canScan ? 'แสดง QR ให้เจ้าหน้าที่เมื่อถึงหน้างาน' : 'รอเปิดรอบสแกนจากผู้จัดกิจกรรม'}</p>
         <button type="button" className={cx(done || !canScan ? 'action-secondary' : 'action-primary', 'w-full sm:w-auto')} onClick={() => select(event.id)} aria-label={action + ' · ' + event.title}>{done ? <CheckCircle2 size={20} /> : <QrCode size={20} />}{action}</button>
       </div>
     </article>;
@@ -1229,13 +1229,14 @@ function AttendanceConfirmation({ status, eventTitle }: { status?: Status; event
   );
 }
 
-function attendanceLabel(reg: Pick<Registration, 'status' | 'passcode_forfeited'>) {
+function attendanceLabel(reg: Pick<Registration, 'status' | 'passcode_forfeited' | 'checkout_closed'>) {
   if (reg.passcode_forfeited) return 'ไม่สแกนออก · ไม่ได้รับ Passcode';
+  if (reg.checkout_closed && reg.status === 'ATTENDING') return 'ไม่สแกนออก · ปิดรอบแล้ว';
   return { REGISTERED: 'รอสแกนเข้างาน', ATTENDING: 'กำลังเข้าร่วมกิจกรรม', COMPLETED: 'เข้าร่วมกิจกรรมสำเร็จ' }[reg.status];
 }
 
-function StatusPill({ status, forfeited }: { status: Status; forfeited?: boolean }) {
-  if (forfeited) return <span className="inline-flex rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1 text-sm font-bold text-rose-800">{attendanceLabel({ status, passcode_forfeited: true })}</span>;
+function StatusPill({ status, forfeited, closed }: { status: Status; forfeited?: boolean; closed?: boolean }) {
+  if (forfeited || (closed && status === 'ATTENDING')) return <span className="inline-flex rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1 text-sm font-bold text-rose-800">{attendanceLabel({ status, passcode_forfeited: forfeited, checkout_closed: closed })}</span>;
   const label = status === 'REGISTERED' ? 'รอสแกนเข้างาน' : status === 'ATTENDING' ? 'กำลังเข้าร่วมกิจกรรม' : 'เข้าร่วมกิจกรรมสำเร็จ';
   return (
     <span
@@ -1295,7 +1296,7 @@ function EventDetail({ event, user, registration, back, session }: { session: st
             <div>
               <span className="text-sm font-bold uppercase tracking-wider text-slate-500">สถานะการเข้าร่วม</span>
               <div className="mt-1.5">
-                <StatusPill status={registration?.status || 'REGISTERED'} forfeited={registration?.passcode_forfeited} />
+                <StatusPill status={registration?.status || 'REGISTERED'} forfeited={registration?.passcode_forfeited} closed={registration?.checkout_closed} />
               </div>
             </div>
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-2.5 text-[#7c0a02]">
@@ -1871,7 +1872,7 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
   return <div className="admin-workspace min-w-0 space-y-6">
     {correction && <Modal title="แก้สถานะเข้าร่วมกิจกรรม" subtitle={correction.name} close={() => { if (!correcting) setCorrection(null); }}>
       <form onSubmit={saveCorrection} className="space-y-4">
-        <div className="flex items-center gap-2 text-sm">สถานะปัจจุบัน <StatusPill status={correction.reg.status} forfeited={correction.reg.passcode_forfeited} /></div>
+        <div className="flex items-center gap-2 text-sm">สถานะปัจจุบัน <StatusPill status={correction.reg.status} forfeited={correction.reg.passcode_forfeited} closed={correction.reg.checkout_closed} /></div>
         <label className="block text-sm font-bold">เปลี่ยนเป็น
           <select value={nextStatus} onChange={e => setNextStatus(e.target.value as Registration['status'])} disabled={correcting} className="mt-2 min-h-12 w-full rounded-xl border border-slate-300 p-3">
             <option value="REGISTERED">รอสแกนเข้างาน</option><option value="ATTENDING">กำลังเข้าร่วมกิจกรรม</option><option value="COMPLETED">เข้าร่วมกิจกรรมสำเร็จ</option>
@@ -2167,7 +2168,7 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
           </div>
 
           {/* Detailed Table */}
-          <AttendanceList rows={selectedReportRows} users={store.users} status={reg => <StatusPill status={reg.status} forfeited={reg.passcode_forfeited} />} actions={(reg, person) => <>
+          <AttendanceList rows={selectedReportRows} users={store.users} status={reg => <StatusPill status={reg.status} forfeited={reg.passcode_forfeited} closed={reg.checkout_closed} />} actions={(reg, person) => <>
             <button className="action-secondary" onClick={() => { setCorrection({ reg, name: person.full_name + ' · ' + person.student_id }); setNextStatus(reg.status); setCorrectionReason(''); setCorrectionError(''); }}>แก้สถานะ</button>
             <button type="button" onClick={() => deleteRegistration(reg.user_id)} aria-label={'ลบการลงทะเบียนของ ' + person.full_name} className="action-danger"><Trash2 size={16} /></button>
           </>} />
@@ -2181,7 +2182,7 @@ function AdminView({ isImportingRef, importError, deleteBatch, sessionToken, sto
             </div>
             <button onClick={() => exportAttendance(true)} disabled={!reportPopulation.length} className="action-primary"><Download size={16} />ส่งออกรายชื่อ CSV ({reportPopulation.length})</button>
           </div>
-          <AttendanceList rows={reportPopulation} users={store.users} status={reg => <StatusPill status={reg.status} forfeited={reg.passcode_forfeited} />} actions={(reg, person) => <>
+          <AttendanceList rows={reportPopulation} users={store.users} status={reg => <StatusPill status={reg.status} forfeited={reg.passcode_forfeited} closed={reg.checkout_closed} />} actions={(reg, person) => <>
             <button className="action-secondary" onClick={() => { setCorrection({ reg, name: person.full_name + ' · ' + person.student_id }); setNextStatus(reg.status); setCorrectionReason(''); setCorrectionError(''); }}>แก้สถานะ</button>
             <button type="button" onClick={() => deleteRegistration(reg.user_id)} aria-label={'ลบการลงทะเบียนของ ' + person.full_name} className="action-danger"><Trash2 size={16} /></button>
           </>} />

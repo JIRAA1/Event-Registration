@@ -154,6 +154,13 @@ const config={host:'127.0.0.1',port:55484,user:'lab',database:'postgres'};
   ok(report.find(r=>r.event_id===ev&&r.user_id===ids.done).passcode_forfeited===false,'044 completed recipient remains not forfeited');
   assert.deepEqual((await c.query('select jsonb_agg(to_jsonb(r) order by id) rows from event_registrations r')).rows[0].rows,beforeReport);
   ok(true,'044 report migration does not rewrite attendance history');
+  await c.query(fs.readFileSync('supabase/migrations/045_report_closed_round.sql','utf8'));
+  const openReport=(await rpc('load_workspace',[admin])).registrations;
+  ok(openReport.some(r=>r.event_id===event&&r.status==='ATTENDING'&&!r.checkout_closed),'045 open-round attendance remains active');
+  await rpc('admin_passcode_round',[admin,event,'CLOSE']);
+  const closedReport=(await rpc('load_workspace',[admin])).registrations;
+  ok(closedReport.some(r=>r.event_id===event&&r.status==='ATTENDING'&&r.checkout_closed&&!r.passcode_forfeited),'045 year one with no passcode exposes closed round');
+  ok(closedReport.find(r=>r.event_id===ev&&r.user_id===ids.done).status==='COMPLETED','045 completed attendance preserved');
   console.log(`SUCCESS ${checks} security checks; database ${db}`);
  }finally{await Promise.all([c.end(),other.end()]);}
 })().catch(e=>{console.error(e.message,e.where||'',e.stack);process.exitCode=1;});
